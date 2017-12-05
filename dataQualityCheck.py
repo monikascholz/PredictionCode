@@ -1,0 +1,155 @@
+
+# standard modules
+import numpy as np
+import matplotlib.pylab as plt
+import h5py
+# custom modules 
+import dataHandler as dh
+import makePlots as mp
+import dimReduction as dr
+
+    
+###############################################    
+# 
+#    load data into dictionary
+#
+##############################################  
+#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
+folder = "SelectDatasets/{}_linkcopy/"
+dataLog = "SelectDatasets/description.txt"
+# output is stored here
+outfile = "SelectDatasets/test.npz"
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
+  
+keyList = np.sort(dataSets.keys())
+
+# results dictionary 
+resultDict = {}
+for kindex, key in enumerate(keyList):
+    resultDict[key] = {}
+# analysis parameters
+
+pars ={'nCompPCA':10, # no PCA components
+        'PCAtimewarp':True, #timewarp so behaviors are equally represented
+        'trainingCut': 0.6, # what fraction of data to use for training 
+        'trainingType': 'middle', # select random or consecutive data for training. Middle is a testset in the middle
+        'linReg': 'simple', # ordinary or ransac least squares
+        'trainingSample': 6, # take only samples that are at least n apart to have independence
+      }
+
+###############################################    
+# 
+# check which calculations to perform
+#
+##############################################
+createIndicesTest = True 
+overview = False
+pca = True
+hierclust = False
+linreg = False
+lasso = False
+elasticnet = False
+positionweights = False
+###############################################    
+# 
+# create training and test set indices
+# 
+#
+##############################################
+if createIndicesTest:
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['Training'] = {'Indices':  dr.createTrainingTestIndices(dataSets[key], pars)}
+        
+###############################################    
+# 
+# some generic data checking plots
+#
+##############################################
+if overview:
+    mp.plotDataOverview(dataSets, keyList)
+    mp.plotNeurons3D(dataSets, keyList, threed = False)  
+    plt.show() 
+
+###############################################    
+# 
+# run PCA and store results
+#
+##############################################
+#%%
+if pca:
+    print 'running PCA'
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+    # overview of PCA results and weights
+    mp.plotPCAresults(dataSets, resultDict, keyList)
+    plt.show()
+    #  plot 3D trajectory of PCA
+    mp.plotPCAresults3D(dataSets, resultDict, keyList)
+    plt.show()
+#%%
+###############################################    
+# 
+# run PCA and store results
+#
+##############################################
+if hierclust:
+    print 'run hierarchical clustering'
+    print 'to implement'
+
+
+#%%
+###############################################    
+# 
+# linear regression single neurons
+#
+##############################################
+if linreg:
+    for kindex, key in enumerate(keyList):
+        trainingsInd, testInd = resultDict[key]['Training']['Indices']
+        resultDict[key]['Linear Regression'] = dr.linearRegressionSingleNeuron(dataSets[key], pars, testInd, trainingsInd)
+    
+    mp.plotLinearPredictionSingleNeurons(dataSets, resultDict, keyList)
+    plt.show()
+    
+#%%
+###############################################    
+# 
+# linear regression using LASSO
+#
+##############################################
+if lasso:
+    for kindex, key in enumerate(keyList):
+        print key
+        trainingsInd, testInd = resultDict[key]['Training']['Indices']
+        resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, testInd, trainingsInd, plot=0)
+    
+    mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='LASSO')
+    plt.show()
+#%%
+###############################################    
+# 
+# linear regression using elastic Net
+#
+##############################################
+if elasticnet:
+    for kindex, key in enumerate(keyList):
+        print 'Running Elastic Net',  key
+        trainingsInd, testInd = resultDict[key]['Training']['Indices']
+        resultDict[key]['ElasticNet'] = dr.runElasticNet(dataSets[key], pars, testInd, trainingsInd, plot=0)
+    
+    mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='ElasticNet')
+    plt.show()
+
+
+#%%
+###############################################    
+# 
+# overlay neuron projections with relevant neurons
+#
+##############################################
+if positionweights:
+    for kindex, key in enumerate(keyList):
+        print 'plotting linear model weights on positions',  key
+        
+    mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='LASSO')
+    plt.show()
