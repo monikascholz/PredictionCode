@@ -15,10 +15,16 @@ import dimReduction as dr
 #
 ##############################################  
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
-folder = "SelectDatasets/{}_linkcopy/"
-dataLog = "SelectDatasets/description.txt"
+#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
+#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
+folder = "AML32_moving/{}_MS/"
+dataLog = "AML32_moving/AML32_datasets.txt"
+##### GFP
+#folder = "AML18_moving/{}_MS/"
+#dataLog = "AML18_moving/AML18_datasets.txt"
 # output is stored here
 outfile = "SelectDatasets/test.npz"
+
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
   
 keyList = np.sort(dataSets.keys())
@@ -44,11 +50,11 @@ pars ={'nCompPCA':10, # no PCA components
 ##############################################
 createIndicesTest = True 
 overview = False
-pca = True
+pca = False
 hierclust = False
 linreg = False
-lasso = False
-elasticnet = False
+lasso = True
+elasticnet = True
 positionweights = False
 ###############################################    
 # 
@@ -80,11 +86,16 @@ if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
         resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+    
     # overview of PCA results and weights
     mp.plotPCAresults(dataSets, resultDict, keyList)
     plt.show()
     #  plot 3D trajectory of PCA
-    mp.plotPCAresults3D(dataSets, resultDict, keyList)
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'phase')
+    plt.show()
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'velocity')
+    plt.show()
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'turns')
     plt.show()
 #%%
 ###############################################    
@@ -124,6 +135,8 @@ if lasso:
         resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, testInd, trainingsInd, plot=0)
     
     mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='LASSO')
+    plt.show()
+    mp.plotLinearModelProgression(dataSets, resultDict, keyList, fitmethod='LASSO')
     plt.show()
 #%%
 ###############################################    

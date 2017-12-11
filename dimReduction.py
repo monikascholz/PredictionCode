@@ -146,8 +146,8 @@ def linearRegressionSingleNeuron(data, pars, testInd, trainingsInd):
 #        X = scalerN.fit_transform(X.T).T
 
         tmpData = []
-#        plot = False
-#        nPlots = int(np.sqrt(len(data['Neurons']['Activity']))+1)
+        plot = False
+        nPlots = int(np.sqrt(len(data['Neurons']['Activity']))+1)
         for nindex, neuron in enumerate(X):
             neuron = np.reshape(neuron, (-1,1))
             reg.fit(neuron[trainingsInd], Y[trainingsInd])
@@ -161,12 +161,13 @@ def linearRegressionSingleNeuron(data, pars, testInd, trainingsInd):
             tmpData.append(np.array([reg.coef_, reg.intercept_, score, scorepred]))
 #            
 #            # plot all regressions
-#            if plot:
-#                #plt.subplot(nPlots, nPlots, nindex+1)
-#                plt.scatter(neuron[trainingsInd], y[trainingsInd],alpha=0.1, s=1, c = 'r')
-#                plt.plot(neuron[trainingsInd], neuron[trainingsInd]*reg.coef_+reg.intercept_)
-#                plt.scatter(neuron[testInd], y[testInd],alpha=0.1, s=1, c='b')
-#                plt.show()
+            if plot:
+                xfit = np.arange(np.min(neuron), np.max(neuron))
+                plt.subplot(nPlots, nPlots, nindex+1)
+                plt.scatter(neuron[trainingsInd], Y[trainingsInd],alpha=0.1, s=1, c = 'r')
+                plt.plot(xfit,xfit*reg.coef_+reg.intercept_)
+                plt.scatter(neuron[testInd], Y[testInd],alpha=0.1, s=1, c='b')
+        plt.show()
         tmpData = np.array(tmpData)
         coef_, intercept_, score, scorepred = tmpData.T
         linData[label] = {}

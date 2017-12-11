@@ -6,6 +6,7 @@ With unmodified output, sinusoidal modulation remain in turn component.
 @author: monika
 """
 # standard modules
+import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -43,10 +44,13 @@ def findRotationMatrix(xS, yS, zS):
     return R
 
 # load data
-folder = "SelectDatasets/{}_linkcopy/"
-dataLog = "SelectDatasets/description.txt"
+folder = "AML32_moving/{}_MS/"
+dataLog = "AML32_moving/AML32_datasets.txt"
+loc = 'AML18_moving/'
+folder = os.path.join(loc,"{}_MS/")
+dataLog = os.path.join(loc,"AML18_datasets.txt")
 # output is stored here
-outfile = "SelectDatasets/Rotationmatrix.dat"
+outfile = os.path.join(loc,"Rotationmatrix.dat")
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
 nWorms = len(dataSets)
 overwrite = False # if True fits new rotation matrix and overwrites old one!
@@ -113,7 +117,7 @@ turn = dh.savitzky_golay(zN, window_size=9, order=5)
 plt.figure('Rotated Eigenworms')
 plt.subplot(211)
 plt.plot(velo, label = 'phase velocity after rotation')
-v = dataSets['BrainScanner20170610_105634']['Behavior']['CMSVelocity']
+v = dataSets[key]['Behavior']['CMSVelocity']
 plt.plot(v*np.max(velo)/np.max(v), label = 'CMS velocity (rescaled)')
 plt.ylabel('New phase velocity')
 

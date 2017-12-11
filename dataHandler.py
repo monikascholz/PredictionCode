@@ -8,6 +8,24 @@ import scipy.io
 import os
 import numpy as np
 import matplotlib.pylab as plt
+import scipy.interpolate
+
+def loadCenterlines(folder):
+    """get centerlines from centerline.mat file"""
+    tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
+    print tmp.keys()
+    clTime = tmp['clTime'] # 50Hz centerline times
+    volTime =  tmp['hasPointsTime']# 6 vol/sec neuron times
+    
+    
+    cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
+    
+    print cl.shape, clTime.shape
+    clNew = np.interp(volTime, xp=clTime, fp=cl)
+    for cl in clNew:
+        plt.plot(cl)
+    plt.show()
+    return clNew
 
 def loadData(folder):
     """load matlab data."""
@@ -73,9 +91,10 @@ def loadData(folder):
     Y = Y[order]
     mask = np.isnan(Y)
     Y[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), Y[~mask])
-    Y = rankTransform(Y)
     # smooth with small window size
-    #Y = np.array([savitzky_golay(line, window_size=15, order=3) for line in Y])
+    Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
+    
+    #Y = rankTransform(Y)
     
    
     # create a time axis in seconds
