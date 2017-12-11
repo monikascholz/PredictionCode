@@ -23,10 +23,9 @@ dataLog = "AML32_moving/AML32_datasets.txt"
 #folder = "AML18_moving/{}_MS/"
 #dataLog = "AML18_moving/AML18_datasets.txt"
 # output is stored here
-outfile = "SelectDatasets/test.npz"
+outLoc = "AML32_moving/Analysis/"
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
-  
 keyList = np.sort(dataSets.keys())
 
 # results dictionary 
@@ -37,7 +36,7 @@ for kindex, key in enumerate(keyList):
 
 pars ={'nCompPCA':10, # no PCA components
         'PCAtimewarp':True, #timewarp so behaviors are equally represented
-        'trainingCut': 0.6, # what fraction of data to use for training 
+        'trainingCut': 0.4, # what fraction of data to use for training 
         'trainingType': 'middle', # select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 6, # take only samples that are at least n apart to have independence
@@ -54,13 +53,12 @@ pca = False
 hierclust = False
 linreg = False
 lasso = True
-elasticnet = True
+elasticnet = False
 positionweights = False
 ###############################################    
 # 
 # create training and test set indices
 # 
-#
 ##############################################
 if createIndicesTest:
     for kindex, key in enumerate(keyList):
@@ -75,6 +73,7 @@ if overview:
     mp.plotDataOverview(dataSets, keyList)
     mp.plotNeurons3D(dataSets, keyList, threed = False)  
     plt.show() 
+
 
 ###############################################    
 # 
@@ -129,15 +128,20 @@ if linreg:
 #
 ##############################################
 if lasso:
+    print "Performing LASSO."
     for kindex, key in enumerate(keyList):
         print key
         trainingsInd, testInd = resultDict[key]['Training']['Indices']
         resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, testInd, trainingsInd, plot=0)
+        # calculate how much more neurons contribute
+        tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], testInd, trainingsInd, fitmethod = 'LASSO')
+        for tmpKey in tmpDict.keys():
+            resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
     
     mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='LASSO')
     plt.show()
-    mp.plotLinearModelProgression(dataSets, resultDict, keyList, fitmethod='LASSO')
-    plt.show()
+   
+    
 #%%
 ###############################################    
 # 

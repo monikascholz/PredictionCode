@@ -9,6 +9,7 @@ import os
 import numpy as np
 import matplotlib.pylab as plt
 import scipy.interpolate
+from scipy.signal import medfilt
 
 def loadCenterlines(folder):
     """get centerlines from centerline.mat file"""
@@ -49,8 +50,7 @@ def loadData(folder):
 #    print len(timing), len(pc1)
     # unpack behavior variables
     etho, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
-    # get from behavior on heatmap data. These are 'corrected' eigenworms
-    etho, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
+    
     # deal with eigenworms
     pc1 = pc12[:,0]
     pc2 = pc12[:,1]
@@ -67,9 +67,14 @@ def loadData(folder):
         pc2[mask2] = np.interp(np.flatnonzero(mask2), np.flatnonzero(~mask2), pc2[~mask2])
     if np.any(mask3):
         pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc2[~mask3])
-    theta = np.unwrap(np.arctan2(pc2, pc1))
-    velo = savitzky_golay(theta, window_size=17, order=5, deriv=1, rate=1)
-    pc3 = savitzky_golay(pc3, window_size=9, order=5)
+    # median filter the Eigenworms
+    pc1 = scipy.signal.medfilt(pc1, 5)
+    pc2 = scipy.signal.medfilt(pc2, 5)
+    pc3 = scipy.signal.medfilt(pc3, 5)
+    theta = np.arctan2(pc2, pc1)
+    velo = savitzky_golay(np.unwrap(theta), window_size=17, order=3, deriv=1, rate=1)
+    pc3 = savitzky_golay(pc3, window_size=15, order=3)
+    
 #    if flag['heatmap']=='ratio':
 #        Y = np.array(data['Ratio2'])
 #    if flag['heatmap']=='raw':
@@ -92,18 +97,18 @@ def loadData(folder):
     mask = np.isnan(Y)
     Y[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), Y[~mask])
     # smooth with small window size
-    Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
+    #Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
     
     #Y = rankTransform(Y)
-    
+    #Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
    
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
     # create a dictionary structure of these data
     dataDict = {}
     dataDict['Behavior'] = {}
-    tmpData = [vel[:,0], pc1, pc2, pc3, velo, etho]
-    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', 'Eigenworm3', 'AngleVelocity', 'Ethogram']):
+    tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho]
+    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', 'Eigenworm3', 'AngleVelocity','Theta', 'Ethogram']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
     dataDict['Neurons']['Time'] = T[nonNan]

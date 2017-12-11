@@ -6,10 +6,11 @@ dimensionality reduction and linear model.
 """
 import matplotlib.pylab as plt
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from sklearn.cluster import AgglomerativeClustering
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import explained_variance_score
 
 ###############################################    
 # 
@@ -44,8 +45,9 @@ def createTrainingTestIndices(data, pars):
 # PCA
 #
 ##############################################
+
 def runPCANormal(data, pars):
-    """run PCA on neural data and return nicely orgainzed dictionary."""
+    """run PCA on neural data and return nicely organized dictionary."""
     nComp = pars['nCompPCA']
     pca = PCA(n_components = nComp)
     pcs = pca.fit_transform( data['Neurons']['Activity'])
@@ -229,7 +231,7 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False):
     
 ###############################################    
 # 
-# LASSO
+# ElasticNet
 #
 ##############################################    
 
@@ -275,4 +277,56 @@ def runElasticNet(data, pars, testInd, trainingsInd, plot = False):
                 plt.plot(reg.alphas_[l1index], reg.mse_path_[l1index], 'k', alpha = 0.1)
                 plt.plot(reg.alphas_[l1index], np.mean(reg.mse_path_[l1index], axis =1), 'k')
             plt.show()
+    return linData
+
+###############################################    
+# 
+# Show how prediction improves with more neurons
+#
+##############################################  
+def scoreModelProgression(data, results, testInd, trainingsInd, fitmethod = 'LASSO'):
+    """show how more neurons improve predictive abilities."""
+    linData = {}
+    for label in ['AngleVelocity', 'Eigenworm3']:
+        # get the weights from previously fit data and sort by absolute amplitude
+        weights = results[fitmethod][label]['weights']
+        weightsInd = np.argsort(np.abs(weights))[::-1]
+        
+        # sort neurons by weight
+        Y = data['Behavior'][label]
+        X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        # individual predictive scores
+        indScore = []
+        sumScore = []
+        for count, wInd in enumerate(weightsInd):
+            if np.abs(weights[wInd]) >0:
+                # fit one neuron
+                reg = linear_model.LinearRegression()
+                xTmp = np.reshape(X[:,wInd], (-1,1))
+                reg.fit(xTmp[trainingsInd], Y[trainingsInd])
+                indScore.append(reg.score(xTmp[testInd], Y[testInd]))
+                plt.scatter(xTmp[testInd], Y[testInd], s=0.5)
+                plt.plot(xTmp[testInd], reg.predict(xTmp[testInd]))
+                plt.show()
+                # fit up to n neurons
+                reg = linear_model.LinearRegression()
+                xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
+                reg.fit(xTmp[trainingsInd], Y[trainingsInd])
+                
+                sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
+#                plt.subplot(311)
+#                plt.plot(Y[trainingsInd])
+#                plt.plot(reg.predict(xTmp[trainingsInd]))
+#                
+#                plt.subplot(312)
+#                plt.plot(Y[testInd])
+#                plt.plot(reg.predict(xTmp[testInd]), lw=0.5)
+#                
+#                plt.subplot(313)
+#                plt.scatter(reg.predict(xTmp[testInd]),Y[testInd], s=0.2)
+                
+            plt.show()
+        linData[label] = {}
+        linData[label]['cumulativeScore'] = sumScore
+        linData[label]['individualScore'] = indScore
     return linData
