@@ -33,10 +33,10 @@ import dimReduction as dr
 #    try out hdf5
 #
 ############################################## 
-print h5py.__version__
-f = h5py.File("mytfile3.hdf5", mode='w')
-f.create_group("test")
-t = np.arange(10)
-f['test'].create_dataset("ArrayName",data = t)
-
-f.close()
+#print h5py.__version__
+#f = h5py.File("mytfile3.hdf5", mode='w')
+#f.create_group("test")
+#t = np.arange(10)
+#f['test'].create_dataset("ArrayName",data = t)
+#
+#f.close()

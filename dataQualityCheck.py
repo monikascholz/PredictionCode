@@ -25,8 +25,15 @@ dataLog = "AML32_moving/AML32_datasets.txt"
 # output is stored here
 outLoc = "AML32_moving/Analysis/"
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
+# data parameters
+dataPars = {'medianWindow':13, # smooth eigenworms with median filter of that size, must be odd
+            'savGolayWindow':13, # savitzky-golay window for angle velocity derivative. must be odd
+            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
+            'savGolayWindowGCamp': 13 # savitzky-golay window for red anc green channel
+            }
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
+
 
 # results dictionary 
 resultDict = {}
@@ -34,13 +41,17 @@ for kindex, key in enumerate(keyList):
     resultDict[key] = {}
 # analysis parameters
 
-pars ={'nCompPCA':10, # no PCA components
+pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':True, #timewarp so behaviors are equally represented
-        'trainingCut': 0.4, # what fraction of data to use for training 
-        'trainingType': 'middle', # select random or consecutive data for training. Middle is a testset in the middle
+        'trainingCut': 0.6, # what fraction of data to use for training 
+        'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
-        'trainingSample': 6, # take only samples that are at least n apart to have independence
+        'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
+        'useRank': 0, # use the rank transformed version of neural data for all analyses
       }
+
+behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2']
+#behaviors = ['AngleVelocity']
 
 ###############################################    
 # 
@@ -48,13 +59,13 @@ pars ={'nCompPCA':10, # no PCA components
 #
 ##############################################
 createIndicesTest = True 
-overview = False
-pca = False
+overview = 1#False
+pca = 0#False
 hierclust = False
 linreg = False
-lasso = True
-elasticnet = False
-positionweights = False
+lasso = 1
+elasticnet = 0#True
+positionweights = True
 ###############################################    
 # 
 # create training and test set indices
@@ -62,8 +73,8 @@ positionweights = False
 ##############################################
 if createIndicesTest:
     for kindex, key in enumerate(keyList):
-        resultDict[key]['Training'] = {'Indices':  dr.createTrainingTestIndices(dataSets[key], pars)}
-        
+        resultDict[key]['Training'] = {'Indices':  dr.createTrainingTestIndices(dataSets[key], pars, label='Eigenworm3')}
+    print "Done generating trainingsets"
 ###############################################    
 # 
 # some generic data checking plots
@@ -73,6 +84,7 @@ if overview:
     mp.plotDataOverview(dataSets, keyList)
     mp.plotNeurons3D(dataSets, keyList, threed = False)  
     plt.show() 
+
 
 
 ###############################################    
@@ -87,14 +99,14 @@ if pca:
         resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
     
     # overview of PCA results and weights
-    mp.plotPCAresults(dataSets, resultDict, keyList)
+    mp.plotPCAresults(dataSets, resultDict, keyList, pars)
     plt.show()
     #  plot 3D trajectory of PCA
-    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'phase')
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
     plt.show()
-    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'velocity')
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
     plt.show()
-    mp.plotPCAresults3D(dataSets, resultDict, keyList, col = 'turns')
+    mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'turns')
     plt.show()
 #%%
 ###############################################    
@@ -128,17 +140,17 @@ if linreg:
 #
 ##############################################
 if lasso:
-    print "Performing LASSO."
+    print "Performing LASSO.",
     for kindex, key in enumerate(keyList):
         print key
         trainingsInd, testInd = resultDict[key]['Training']['Indices']
-        resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, testInd, trainingsInd, plot=0)
+        resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, testInd, trainingsInd, plot=1, behaviors = behaviors)
         # calculate how much more neurons contribute
-        tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], testInd, trainingsInd, fitmethod = 'LASSO')
+        tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], testInd, trainingsInd, pars, fitmethod = 'LASSO', behaviors = behaviors)
         for tmpKey in tmpDict.keys():
             resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
     
-    mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='LASSO')
+    mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
     plt.show()
    
     
@@ -152,9 +164,12 @@ if elasticnet:
     for kindex, key in enumerate(keyList):
         print 'Running Elastic Net',  key
         trainingsInd, testInd = resultDict[key]['Training']['Indices']
-        resultDict[key]['ElasticNet'] = dr.runElasticNet(dataSets[key], pars, testInd, trainingsInd, plot=0)
-    
-    mp.plotLinearModelResults(dataSets, resultDict, keyList, fitmethod='ElasticNet')
+        resultDict[key]['ElasticNet'] = dr.runElasticNet(dataSets[key], pars, testInd, trainingsInd, plot=1, behaviors = behaviors)
+        # calculate how much more neurons contribute
+        tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], testInd, trainingsInd,pars, fitmethod = 'ElasticNet', behaviors = behaviors, )
+        for tmpKey in tmpDict.keys():
+            resultDict[key]['ElasticNet'][tmpKey].update(tmpDict[tmpKey])
+    mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
     plt.show()
 
 

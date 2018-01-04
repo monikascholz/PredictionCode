@@ -10,44 +10,60 @@ import numpy as np
 import matplotlib.pylab as plt
 import scipy.interpolate
 from scipy.signal import medfilt
+from sklearn import preprocessing
 
-def loadCenterlines(folder):
+def loadPoints(folder, straight = True):
+    """get tracked points from Pointfile."""
+    points = np.squeeze(scipy.io.loadmat(folder+'pointStatsNew.mat')['pointStatsNew'])
+    print points.shape
+    print len(points[10]), [len(p[0]) for p in points[10]]
+    if straight:
+        return [p[0] for p in points]
+    else:
+        return [p[1] for p in points]
+
+def loadCenterlines(folder, wormcentered = False):
     """get centerlines from centerline.mat file"""
     tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
-    print tmp.keys()
-    clTime = tmp['clTime'] # 50Hz centerline times
-    volTime =  tmp['hasPointsTime']# 6 vol/sec neuron times
+    clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
+    volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
+    print volTime.shape
+    clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))
     
+    #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
     
     cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
-    
-    print cl.shape, clTime.shape
-    clNew = np.interp(volTime, xp=clTime, fp=cl)
-    for cl in clNew:
-        plt.plot(cl)
-    plt.show()
+    #
+    if wormcentered:
+        cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
+    # reduce to volume time
+    clNew = cl[clIndices.astype(int)]
+#    for cl in clNew[::10]:
+#        plt.plot(cl[:,0], cl[:,1])
+#    plt.show()
     return clNew
+    
+def transformEigenworms(pc1, pc2, pc3, dataPars):
+    """smooth Eigenworms and calculate associated metrics like velocity."""
+    theta = np.unwrap(np.arctan2(pc2, pc1))
+    velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
+    
+    # median filter the velocity and pca components 
+    if dataPars['medianWindow'] < 3:
+        return pc1, pc2, pc3, velo, theta
+    velo = scipy.signal.medfilt(velo, dataPars['medianWindow'])
+    
+    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
+    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
+    pc3 = scipy.signal.medfilt(pc3, dataPars['medianWindow'])
+    
+    return pc1, pc2, pc3, velo, theta
+    
 
-def loadData(folder):
+def loadData(folder, dataPars):
     """load matlab data."""
     data = scipy.io.loadmat(folder+'heatDataMS.mat')
-    # load rotation matrix
-    R = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
-    # try to use original eigenworms instead of weirdly transformed ones
-#    print data.keys()
-#    hasPointsTime = data['hasPointsTime']
-#    print hasPointsTime
-#    # load timing info for highRes
-#    timing = scipy.io.loadmat(folder+'hiResData.mat')
-#    timing = timing['dataAll'][0][0][3]
-#    
-#    # load centerline data eigenproj
-#    clines = scipy.io.loadmat(folder+'centerline.mat')
-#    eigen = clines['eigenProj']
-#    pc1, pc2, pc3 = eigen[:3,:]
-#    plt.plot(pc1)
-#    plt.show(block=True)
-#    print len(timing), len(pc1)
+    
     # unpack behavior variables
     etho, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
     
@@ -56,8 +72,12 @@ def loadData(folder):
     pc2 = pc12[:,1]
     pc3 = pc3[:,0]
     # Rotate Eigenworms
-    pc1,pc2, pc3 = np.array(np.dot(R, np.vstack([pc1, pc2, pc3])))
-    #mask nans in eigenworms by interpolation
+    if dataPars['rotate']:
+        # load rotation matrix
+        # set rotate to False when doing rotation matrix calculation
+        R = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
+        pc1,pc2, pc3 = np.array(np.dot(R, np.vstack([pc1, pc2, pc3])))
+    #mask nans in eigenworms by linear interpolation
     mask1 = np.isnan(pc1)
     mask2 = np.isnan(pc2)
     mask3 = np.isnan(pc3)
@@ -66,22 +86,28 @@ def loadData(folder):
     if np.any(mask2):
         pc2[mask2] = np.interp(np.flatnonzero(mask2), np.flatnonzero(~mask2), pc2[~mask2])
     if np.any(mask3):
-        pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc2[~mask3])
-    # median filter the Eigenworms
-    pc1 = scipy.signal.medfilt(pc1, 5)
-    pc2 = scipy.signal.medfilt(pc2, 5)
-    pc3 = scipy.signal.medfilt(pc3, 5)
-    theta = np.arctan2(pc2, pc1)
-    velo = savitzky_golay(np.unwrap(theta), window_size=17, order=3, deriv=1, rate=1)
-    pc3 = savitzky_golay(pc3, window_size=15, order=3)
+        pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc3[~mask3])
     
-#    if flag['heatmap']=='ratio':
-#        Y = np.array(data['Ratio2'])
-#    if flag['heatmap']=='raw':
-#        Y = np.array(data['G2'])/np.array(data['R2'])
+    # do Eigenworm transformations and calculate velocity etc.
+#    # median filter the Eigenworms
+    pc1, pc2, pc3, velo, theta = transformEigenworms(pc1, pc2, pc3, dataPars)
+    ## recalculate velocity from position
+    vel = np.squeeze(np.sqrt((np.diff(xPos, axis=0)**2 + np.diff(yPos, axis=0)**2))/6.)
+    vel = np.pad(vel, (1,0), 'constant')
+    #print vel.shape, xPos.shape
 #    else:# by default load phtocorrected but not otherwise corrected data
-    #Y= np.array(data['gPhotoCorr'])/np.array(data['rPhotoCorr'])
-    Y = np.array(data['Ratio2'])
+    R = np.array(data['rPhotoCorr'])
+    G = np.array(data['gPhotoCorr'])
+    mask = np.isnan(R)
+    R[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), R[~mask])
+    mask = np.isnan(G)
+    G[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), G[~mask])
+    if dataPars['savGolayWindowGCamp'] > 3:
+        # smooth with GCamp6 halftime = 1s
+        G = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in G])
+        R = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in R])
+    Y = G/R
+    
     # ordering from correlation map/hie
     order = np.array(data['cgIdx']).T[0]-1
     # unpack neuron position (only one frame, randomly chosen)
@@ -92,23 +118,56 @@ def loadData(folder):
         print 'No neuron positions:', folder
     # prep neural data by masking nans
     # store relevant indices
-    nonNan = np.arange(Y.shape[1])#np.where(np.all(np.isfinite(Y),axis=0))[0]
+    nonNan = np.arange(Y.shape[1])
+    nonNan  = np.where(np.all(np.isfinite(np.array(data['rPhotoCorr'])),axis=0))[0]
+    #print nonNan
     Y = Y[order]
-    mask = np.isnan(Y)
-    Y[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), Y[~mask])
-    # smooth with small window size
-    #Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
-    
-    #Y = rankTransform(Y)
-    #Y = np.array([savitzky_golay(line, window_size=7, order=5) for line in Y])
    
+#    # make values nicer
+    #Y -= np.nanmin(Y, axis=0)
+    # = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
+    # smooth with small window size
+    #Y = np.array([savitzky_golay(line, window_size=17, order=3) for line in Y])
+    #Y =  preprocessing.scale(Y.T).T
+    #quantile_transformer = preprocessing.QuantileTransformer(random_state=0)
+    #Y = quantile_transformer.fit_transform(Y.T).T
+#    plt.imshow(Y, aspect='auto')
+#    plt.colorbar()
+#    plt.show()
+    # long-window size smoothing filter to subtract overall fluctuation in SNR
+    wind = 60
+    mean = np.mean(rolling_window(np.mean(Y,axis=0), window=2*wind), axis=1)
+    #pad with normal mean in front to correctly center the mean values
+    mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(Y,axis=0)[:wind])))[:-wind]
+    # do the same in the end
+    mean[-wind:] = np.repeat(np.mean(np.mean(Y,axis=0)[:-wind]), wind)
+#    print len(mean), Y.shape
+#    m, s = np.mean(Y, axis=0), np.std(Y, axis=0)
+#    plt.subplot(211)
+#    plt.plot(m, 'r', label='mean')
+#    plt.plot(mean, label='rolling mean')
+#    plt.fill_between(range(len(m)), m-s, m+s, alpha=0.5, label='stdev')
+#    plt.ylabel('R/R0')
+#    plt.legend()
+#    Y -= mean
+#
+#    plt.subplot(212)
+#    
+#    plt.plot(np.mean(Y, axis=0)/s, label='rolling Z-score')
+#    plt.plot(np.mean(Y, axis=0), label ='mean subtracted')
+#    plt.ylabel('<Signal>/Stdev(Signal)')
+#    plt.xlabel('frames')
+#    plt.tight_layout()
+#    plt.legend()
+#    plt.show()
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
     # create a dictionary structure of these data
     dataDict = {}
     dataDict['Behavior'] = {}
-    tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho]
-    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', 'Eigenworm3', 'AngleVelocity','Theta', 'Ethogram']):
+    tmpData = [vel, pc1, pc2, pc3, velo, theta, etho, xPos, yPos]
+    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', 'Eigenworm3',\
+                'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
     dataDict['Neurons']['Time'] = T[nonNan]
@@ -118,7 +177,7 @@ def loadData(folder):
     return dataDict
     
     
-def loadMultipleDatasets(dataLog, pathTemplate):
+def loadMultipleDatasets(dataLog, pathTemplate, dataPars):
     """load matlab files containing brainscanner data. 
     string dataLog: file containing Brainscanner names with timestamps e.g. BrainScanner20160413_133747.
     path pathtemplate: relative or absoluet location of the dataset with a formatter replacing the folder name. e.g.
@@ -129,7 +188,7 @@ def loadMultipleDatasets(dataLog, pathTemplate):
     datasets={}
     for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)):
         folder = pathTemplate.format(line[0])
-        datasets[line[0]] = loadData(folder)
+        datasets[line[0]] = loadData(folder, dataPars)
     return datasets
 
 def loadNeuronPositions(filename):
@@ -220,3 +279,10 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
     y = np.concatenate((firstvals, y, lastvals))
     return np.convolve( m[::-1], y, mode='valid')
+
+def rolling_window(a, window):
+    a = np.pad(a, (0,window), mode="constant", constant_values=(np.nan,))
+    shape = a.shape[:-1] + (a.shape[-1] - window, window)
+    strides = a.strides + (a.strides[-1],)
+    
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)

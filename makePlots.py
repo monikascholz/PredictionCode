@@ -6,25 +6,36 @@ plot assistant. make pretty plots.
 """
 import numpy as np
 import matplotlib as mpl
-
+#
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 from sklearn.decomposition import PCA
-from sklearn.metrics import explained_variance_score, r2_score
+from scipy.signal import medfilt
+from scipy.ndimage.filters import gaussian_filter1d
+#
+import dataHandler as dh
+# change axes
 axescolor = 'k'
 mpl.rcParams["axes.edgecolor"]=axescolor
 mpl.rcParams["axes.spines.right"] = False
 mpl.rcParams["axes.spines.top"] = False
-
+# text
 mpl.rcParams["text.color"]='k'
 mpl.rcParams["ytick.color"]=axescolor
 mpl.rcParams["xtick.color"]=axescolor
 mpl.rcParams["axes.labelcolor"]='k'
 mpl.rcParams["savefig.format"] ='pdf'
+# change legend properties
+mpl.rcParams["legend.frameon"]=False
+mpl.rcParams["legend.labelspacing"]=0.25
+mpl.rcParams["legend.labelspacing"]=0.25
 #mpl.rcParams['text.usetex'] =True
+mpl.rcParams["axes.labelsize"]=  12
+mpl.rcParams["xtick.labelsize"]=  12
+mpl.rcParams["ytick.labelsize"]=  12
 mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
 mpl.rc('text.latex', preamble='\usepackage{sfmath}')
 plt.rcParams['image.cmap'] = 'viridis'
@@ -55,14 +66,23 @@ colors = np.concatenate([cmap[name](np.linspace(0, 1, N))
 
 cyclon, _ = mpl.colors.from_levels_and_colors(levels, colors)
 
-# continous behavior colors
-colorBeh = {'AngleVelocity':'#DC143C', 'Eigenworm3':'#4876FF'}
+# continous behavior colors - training
+colorBeh = {'AngleVelocity':'#DC143C', 'Eigenworm3':'#4876FF', 'Eigenworm2':'#4caf50'}
+# continous behavior colors - prediction
+colorPred = {'AngleVelocity':'#6e0a1e', 'Eigenworm3':'#1c2f66', 'Eigenworm2':'#265728'}
 # discrete behaviors
 colDict = {-1:'red',0:'k',1:'green',2:'blue'}
 labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
-
+# color the ethogram
 ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb('#C21807'), UCgray[1], mpl.colors.to_rgb('#4AA02C'), mpl.colors.to_rgb('#0F52BA')], name='etho', N=None)
+ethobounds=[-1,0,1,2, 3]
+ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 
+# rename behaviors for plots
+names = {'AngleVelocity': 'Angular velocity',
+         'Eigenworm3': 'Turns', 
+         'Eigenworm2': 'Head swing'
+        }
             
 def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     '''plot 3 projections into 2d for 3dim data sets. Takes an outer gridspec object to place plots.'''
@@ -88,12 +108,18 @@ def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     ax3.set_xlabel('Z')
     return [ax1, ax2, ax3]
 
-def multicolor(ax,x,y,z,t,c, threedim = True):
-    """multicolor plot from francesco."""
+def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
+    """multicolor plot modified from francesco."""
+    x = x[::cg]
+    y = y[::cg]
+    z = z[::cg]
+    t = t[::cg]
     if threedim:
         points = np.array([x,y,z]).transpose().reshape(-1,1,3)
         segs = np.concatenate([points[:-1],points[1:]],axis=1)
         lc = Line3DCollection(segs, cmap=c, lw=0.5)
+        if etho:
+            lc = Line3DCollection(segs, cmap=c, lw=0.5, norm=ethonorm)
         lc.set_array(t)
         ax.add_collection3d(lc)
         ax.set_xlim(np.min(x),np.max(x))
@@ -103,6 +129,8 @@ def multicolor(ax,x,y,z,t,c, threedim = True):
         points = np.array([x,y]).transpose().reshape(-1,1,2)
         segs = np.concatenate([points[:-1],points[1:]],axis=1)
         lc = LineCollection(segs, cmap=c, lw=0.5)
+        if etho:
+            lc = LineCollection(segs, cmap=c, lw=0.5, norm=ethonorm)
         lc.set_array(t)
         ax.add_collection(lc)
         ax.set_xlim(np.min(x),np.max(x))
@@ -155,8 +183,8 @@ def plotDataOverview(dataSets, keyList):
     """plot ethogram and heatmap"""
     nWorms = len(dataSets)
     fig = plt.figure('Overview',(6.8, nWorms*3.4))
-    gs = gridspec.GridSpec(nWorms*2, 3,
-                           width_ratios=[1,0.1, 2])
+    gs = gridspec.GridSpec(nWorms*2, 4,
+                           width_ratios=[1,0.1, 2, 1])
     for dindex, key in enumerate(keyList):
         print 'Plotting overview of ', key
         data = dataSets[key]
@@ -164,21 +192,25 @@ def plotDataOverview(dataSets, keyList):
         hm = plotHeatmap(data['Neurons']['Time'], data['Neurons']['rankActivity'])
         ax2 = plt.subplot(gs[2*dindex:2*dindex+2,1])
         plt.colorbar(hm, cax=ax2)
+             
+        
         ax3 = plt.subplot(gs[2*dindex,2])
         yMin, yMax = np.min(data['Behavior']['AngleVelocity']), np.max(data['Behavior']['AngleVelocity'])
-        print len(data['Neurons']['Time']),  len(data['Behavior']['Ethogram'])
+        #print len(data['Neurons']['Time']),  len(data['Behavior']['Ethogram'])
         plotEthogram(ax3, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25, yValMin=yMin,yValMax=yMax )        
-        plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = 'Angular velocity')
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
         
         ax4 = plt.subplot(gs[2*dindex+1,2])
         yMin, yMax = np.nanmin(data['Behavior']['Eigenworm3']), np.nanmax(data['Behavior']['Eigenworm3'])
         plotEthogram(ax4, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25,yValMin=yMin,yValMax=yMax)
-        plotEigenworms(data['Neurons']['Time'], data['Behavior']['Eigenworm3'],color = colorBeh['Eigenworm3'], label = 'Turns')
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['Eigenworm3'],color = colorBeh['Eigenworm3'], label = names['Eigenworm3'])
+        #plot cms motion        
+        ax5 = plt.subplot(gs[2*dindex:2*dindex+2,3])
+        ax5.plot(data['Behavior']['X'], data['Behavior']['Y'])
     plt.tight_layout()
     plt.show()
+
     
-
-
 def plotNeurons3D(dataSets, keyList, threed = True):
     """plot neuron locations."""
     nWorms = len(dataSets)
@@ -224,7 +256,49 @@ def plotNeurons3D(dataSets, keyList, threed = True):
 # neuronal signal pca or ica, first n components and weights plotted
 #
 ############################################## 
-def plotPCAresults(dataSets, resultSet, keyList, flag = 'PCA'):
+def singlePCAResult(fig, gridloc, Neuro, results, time):
+    """plot PCA of one dataset"""
+    inner_grid = gridspec.GridSpecFromSubplotSpec(2, 3,
+        subplot_spec=gridloc, hspace=0.5, wspace=0.35, width_ratios=[2,0.2, 1])
+    
+    ax1 = plt.Subplot(fig, inner_grid[0, 0])
+    # plot neurons ordered by weight in first PCA component
+    cax1 = plotHeatmap(time,  Neuro[results['neuronOrderPCA']], ax= ax1)
+    ax1.set_xlabel('Time (s)')
+    fig.add_subplot(ax1)        
+    axcb = plt.Subplot(fig, inner_grid[0, 1])        
+    plt.colorbar(cax1, cax=axcb, use_gridspec = True)
+    fig.add_subplot(axcb) 
+    
+    # plot the weights
+    ax2 = plt.Subplot(fig, inner_grid[0,2])
+    pcs = results['neuronWeights']
+    rank = np.arange(0, len(pcs))
+    
+    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,0][results['neuronOrderPCA']], step='pre')
+    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,1][results['neuronOrderPCA']], step='pre')       
+    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,2][results['neuronOrderPCA']], step='pre')       
+    ax2.set_xlabel('Neuron weight')
+    ax2.spines['left'].set_visible(False)
+    ax2.set_yticks([])
+    fig.add_subplot(ax2)
+    
+    ax3 = plt.Subplot(fig, inner_grid[1,0])
+    for i in range(3):
+        ax3.plot(time, 0.1*i+results['pcaComponents'][i], label=i, lw=0.5)
+    ax3.set_ylabel('PCA components')
+    ax3.set_xlabel('Time (s)')
+    fig.add_subplot(ax3)
+    ax4 = plt.Subplot(fig, inner_grid[1,2])
+    nComp = results['nComp']
+    
+    ax4.fill_between(np.arange(nComp),results['expVariance'])
+    ax4.step(np.arange(nComp),np.cumsum(results['expVariance']), where = 'pre')
+    ax4.set_ylabel('Explained variance')
+    ax4.set_xlabel('Number of components')
+    fig.add_subplot(ax4)    
+    
+def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
     """make an overview figure with PCA weights and components."""
     nWorms = len(keyList)
     fig = plt.figure('{}'.format(flag),(6.8, nWorms*3.4))
@@ -232,46 +306,14 @@ def plotPCAresults(dataSets, resultSet, keyList, flag = 'PCA'):
     
     for kindex, key in enumerate(keyList):
         data = dataSets[key]
+        if pars['useRank']:
+            Neuro = data['Neurons']['rankActivity']
+        else:
+            Neuro = data['Neurons']['Activity']
+        time = data['Neurons']['Time']
         results = resultSet[key][flag]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(2, 3,
-            subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35, width_ratios=[2,0.2, 1])
-        
-        ax1 = plt.Subplot(fig, inner_grid[0, 0])
-        # plot neurons ordered by weight in first PCA component
-        cax1 = plotHeatmap(data['Neurons']['Time'],  data['Neurons']['Activity'][results['neuronOrderPCA']], ax= ax1)
-        ax1.set_xlabel('Time (s)')
-        fig.add_subplot(ax1)        
-        axcb = plt.Subplot(fig, inner_grid[0, 1])        
-        plt.colorbar(cax1, cax=axcb, use_gridspec = True)
-        fig.add_subplot(axcb) 
-        
-        # plot the weights
-        ax2 = plt.Subplot(fig, inner_grid[0,2])
-        pcs = results['neuronWeights']
-        rank = np.arange(0, len(pcs))
-        print len(pcs[:,0])
-        ax2.fill_betweenx(rank, np.zeros(len(data['Neurons']['Activity'])),pcs[:,0][results['neuronOrderPCA']], step='pre')
-        ax2.fill_betweenx(rank, np.zeros(len(data['Neurons']['Activity'])),pcs[:,1][results['neuronOrderPCA']], step='pre')       
-        ax2.fill_betweenx(rank, np.zeros(len(data['Neurons']['Activity'])),pcs[:,2][results['neuronOrderPCA']], step='pre')       
-        ax2.set_xlabel('Neuron weight')
-        ax2.spines['left'].set_visible(False)
-        ax2.set_yticks([])
-        fig.add_subplot(ax2)
-        
-        ax3 = plt.Subplot(fig, inner_grid[1,0])
-        for i in range(3):
-            ax3.plot(data['Neurons']['Time'], 0.1*i+results['pcaComponents'][i], label=i, lw=0.5)
-        ax3.set_ylabel('PCA components')
-        ax3.set_xlabel('Time (s)')
-        fig.add_subplot(ax3)
-        ax4 = plt.Subplot(fig, inner_grid[1,2])
-        nComp = results['nComp']
-        
-        ax4.fill_between(np.arange(nComp),results['expVariance'])
-        ax4.step(np.arange(nComp),np.cumsum(results['expVariance']), where = 'pre')
-        ax4.set_ylabel('Explained variance')
-        ax4.set_xlabel('Number of components')
-        fig.add_subplot(ax4)
+        gridloc=outer_grid[kindex]
+        singlePCAResult(fig, gridloc, Neuro, results, time)
         
     outer_grid.tight_layout(fig)        
     
@@ -282,19 +324,32 @@ def plotPCAresults(dataSets, resultSet, keyList, flag = 'PCA'):
 # neuronal signal pca, plot in 3D with behavior labels
 #
 ############################################## 
-def plotPCAresults3D(dataSets, resultSet, keyList, col = 'phase', flag = 'PCA'):
+def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA'):
     """Show neural manifold with behavior label."""
     nWorms = len(keyList)
+    print 'colored by ', col
+    fig2 = plt.figure('{} projections'.format(flag),(6.8, nWorms*3.4))
+    fig3 = plt.figure('{} temporal'.format(flag),(6.8, nWorms*3.4))
+    outer_grid2 = gridspec.GridSpec(nWorms, 3, hspace=0.25, wspace=0.25)
     fig1 = plt.figure('{} manifold'.format(flag),(6.8, nWorms*3.4))
     outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
-    fig2 = plt.figure('{} projections'.format(flag),(6.8, nWorms*3.4))
+    
+    
     for kindex, key in enumerate(keyList):
-        inner_grid = gridspec.GridSpecFromSubplotSpec(1, 3,
-            subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
         data = dataSets[key]
+        inner_grid = gridspec.GridSpecFromSubplotSpec(1, 2,
+            subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35, width_ratios=[1,0.2])
+        
+        inner_grid2 = gridspec.GridSpecFromSubplotSpec(3, 1,
+            subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
+        
         results = resultSet[key][flag]
         x,y,z = results['pcaComponents'][:3,]
+        x = gaussian_filter1d(x, 2)
+        y = gaussian_filter1d(y, 2)
+        z = gaussian_filter1d(z, 2)
         
+        etho=False
         if col == 'phase':
             colorBy = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
             
@@ -309,189 +364,190 @@ def plotPCAresults3D(dataSets, resultSet, keyList, col = 'phase', flag = 'PCA'):
             colorBy -= np.mean(data['Behavior']['Eigenworm3'])
             colorBy /= np.std(data['Behavior']['Eigenworm3'])
             cm = 'jet'
+        elif col=='time':
+            colorBy = data['Neurons']['Time']
+            cm = 'jet'
         else:
             colorBy = np.reshape(np.array(data['Behavior']['Ethogram']), (-1, ))
             cm = ethocmap
+            etho = True
         #etho[np.isnan(etho)] = 1
         #print ethocmap[0], ethocmap[1]
         #ax3 = plt.Subplot(fig, outer_grid[kindex])
-        ax4= fig1.add_subplot(outer_grid[kindex], projection = '3d')
-        cax = multicolor(ax4,x,y,z,colorBy,c = cm, threedim = True)
+        coarsegrain = 1
+        ax4 = fig1.add_subplot(inner_grid[0,0], projection = '3d')
+        cax = multicolor(ax4,x,y,z,colorBy,c = cm, threedim = True, etho=etho,  cg =coarsegrain)
         ax4.set_ylabel('{} components 2'.format(flag))
         ax4.set_xlabel('{} components 1'.format(flag))
         ax4.set_zlabel('{} components 3'.format(flag))
-        plt.colorbar(cax, ax = ax4)
+        if etho:
+            
+            #axcb = plt.Subplot(fig1, inner_grid[0, 1])     
+            axcb = fig1.add_subplot(inner_grid[0, 1])
+            cbar = plt.colorbar(cax, cax=axcb, use_gridspec = True, norm=ethonorm, drawedges=False)
+            cbar.ax.get_yaxis().set_ticks([])
+            for j, lab in enumerate(['Reverse','Pause','Forward','Turn']):
+                cbar.ax.text(.5, (2 * j + 1) / 8.0, lab, ha='center', va='center', color='white')
+            cbar.ax.get_yaxis().labelpad = 15
+            #fig1.add_subplot(axcb) 
+        else:
+            axcb = fig1.add_subplot(inner_grid[0, 1])
+            cbar= plt.colorbar(cax, cax = axcb, use_gridspec=True)
         
-        ax1 = plt.Subplot(fig2, inner_grid[0])
-        fig2.add_subplot(ax1)
-        multicolor(ax1,x,y,z,colorBy,c = cm,threedim = False)
+        cbar.outline.set_visible(False)
+        cbar.ax.set_ylabel(col, rotation=270)
+
+                
+        ax1= fig2.add_subplot(outer_grid2[kindex, 0])
+       
+        multicolor(ax1,x,y,z,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         ax1.set_ylabel('Y')
         ax1.set_xlabel('X')
-        
-        ax2 = plt.Subplot(fig2, inner_grid[1])
-        fig2.add_subplot(ax2)
-        multicolor(ax2,x,z,z,colorBy,c = cm,threedim = False)
+
+        ax2= fig2.add_subplot(outer_grid2[kindex, 1])
+        multicolor(ax2,x,z,z,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         ax2.set_ylabel('Z')
         ax2.set_xlabel('X')
         
-        ax3 = plt.Subplot(fig2, inner_grid[2])
-        fig2.add_subplot(ax3)
-        multicolor(ax3,z,y,x,colorBy,c = cm,threedim = False)
+        ax3= fig2.add_subplot(outer_grid2[kindex, 2])
+        multicolor(ax3,z,y,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         ax3.set_ylabel('Y')
         ax3.set_xlabel('Z')
         
+        # temporal evolution
+        ax4 = fig3.add_subplot(inner_grid2[0])
+        multicolor(ax4,data['Neurons']['Time'],x,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
+        ax4.set_ylabel('PCA 1')
+        ax4 = fig3.add_subplot(inner_grid2[1])
+        multicolor(ax4,data['Neurons']['Time'],y,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         
+        ax4.set_ylabel('PCA 2')
+        ax4 = fig3.add_subplot(inner_grid2[2])
+        multicolor(ax4,data['Neurons']['Time'],z,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         
-    #outer_grid.tight_layout(fig2)
+        ax4.set_xlabel('Time (s)')
+        ax4.set_ylabel('PCA 3')
+    outer_grid2.tight_layout(fig2)
+    outer_grid.tight_layout(fig3)
 
-   
-    
-###############################################    
-# 
-# linear prediction from single neurons
-#
-##############################################    
-def plotLinearPredictionSingleNeurons(dataSets, resultSet, keyList):
-    """make an overview figure with linear regression predictions."""
+
+def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
+    """correlate PCA with all sorts of stuffs"""
     nWorms = len(keyList)
-    
-    fig = plt.figure('Linear Prediction',(6.8, nWorms*3.4))
+    fig3 = plt.figure('{} Correlates'.format(flag),(6.8, nWorms*3.4))
     outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
-    
+
     for kindex, key in enumerate(keyList):
-        trainingsInd, testInd = resultSet[key]['Training']['Indices']  
         data = dataSets[key]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(4, 2,
-                subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35, width_ratios=[1, 3], height_ratios = [1,3,1,3])
-        for lindex, label in enumerate(['AngleVelocity', 'Eigenworm3']):
-            results = resultSet[key]['Linear Regression'][label]
-            # plot r2 predictive scores for each neuron
-            ax1 = plt.Subplot(fig, inner_grid[2*lindex:2*lindex+2,0])
-            scores = results['score']
-            scorepred = results['scorepredicted']
-            
-            # order neurons by r^2 score
-            indices = np.arange(len(data['Neurons']['Activity']))
-            indices = np.argsort(scores)
-            
-            #ax1.fill_between(np.arange(len(scores)),np.zeros(len(scores)),scores[indices], step='pre')
-            #ax1.plot(np.arange(len(scores)),scores[indices])
-            #ax1.plot(scores[indices])
-            hist, bins = np.histogram(scores, bins = 30, density = True)
-            ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post', color=colorBeh[label])
-            hist, bins = np.histogram(scorepred, bins = 30, density = True)
-            ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post',color=colorBeh[label], alpha = 0.5)
-            ax1.set_xlabel(r'$R^2$ score')
-            ax1.set_ylabel('PDF($R^2$ score)')
-            #ax1.set_ylim([-1,1])
-            #ax1.set_xlim([0,100])
-            fig.add_subplot(ax1)
-            
-#            #plot most predictive neurons
-#            ax2 = plt.Subplot(fig, inner_grid[2*lindex,1])
-#            for i in range(3):
-#                ax2.plot(data['Neurons']['Time'][testInd], data['Neurons']['Activity'][indices[-i-1],testInd], label=i)
-#            ax2.set_ylabel('Neural Activity')
-#            ax2.set_xlabel('Time (s)')
-#            fig.add_subplot(ax2)
-            # plot ground truth and best prediction 
-            #---- only predicted part
-#            ax3 = plt.Subplot(fig, inner_grid[2*lindex:2*lindex+2,1])
-#            y = data['Behavior'][label][testInd]
-#            x = data['Neurons']['Activity'][:,testInd]
-#            ax3.plot(data['Neurons']['Time'][testInd], y, color='red', label = 'Behavior')
-#            for k, ind in enumerate(indices[-3:]):
-#                
-#                slope, intercept = results[0,ind],results[1,ind]
-#                ax3.plot(data['Neurons']['Time'][testInd], x[ind]*slope + intercept, color='k', alpha = 0.2*k+0.2, label = "predictive score: {:.2f} fitted score: {:.2f}".format(scorepred[ind], scores[ind]))
-#                ax3.set_xlim(np.percentile(data['Neurons']['Time'][testInd], [0,100]))
-#            ax3.legend()
-#            fig.add_subplot(ax3)
-            #---- whole trace
-            ax3 = plt.Subplot(fig, inner_grid[2*lindex:2*lindex+2,1])
-            y = data['Behavior'][label]
-            x = data['Neurons']['Activity']
-            ax3.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior')
-            for k, ind in enumerate(indices[-3:]):
-                # best three neurons
-                slope, intercept = results['score'][ind],results['scorepredicted'][ind]
-                ax3.plot(data['Neurons']['Time'], x[ind]*slope + intercept, color='k', alpha = 0.2*k+0.2, label = "predictive score: {:.2f} fitted score: {:.2f}".format(scorepred[ind], scores[ind]))
-                ax3.set_xlim(np.percentile(data['Neurons']['Time'], [0,100]))
-            ax3.legend()
-            fig.add_subplot(ax3)
+        inner_grid = gridspec.GridSpecFromSubplotSpec(1, 5,
+        subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
+        x,y,z = resultDict[key][flag]['pcaComponents'][:3,]
         
-    outer_grid.tight_layout(fig)
-    
+        theta = np.unwrap(np.arctan2(y, z))
+        velo = dh.savitzky_golay(theta, window_size=17, order=5, deriv=1, rate=1)
+        #velo = dh.savitzky_golay(x, window_size=7, order=3, deriv=2, rate=1)
+        phase = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
+            
+        size, a = 0.5, 0.1
+        ax = fig3.add_subplot(inner_grid[0])
+        ax.scatter(velo, data['Behavior']['CMSVelocity'], s=size, alpha=a)
+        ax = fig3.add_subplot(inner_grid[1])
+        ax.scatter(velo, data['Behavior']['AngleVelocity'], s=size, alpha=a)
+        ax = fig3.add_subplot(inner_grid[2])
+        ax.scatter(velo, data['Behavior']['Eigenworm1'], s=size, alpha=a)
+        ax = fig3.add_subplot(inner_grid[3])
+        ax.scatter(velo, phase, s=size, alpha=a)
+        ax = fig3.add_subplot(inner_grid[4])
+        ax.scatter(velo, phase, s=size, alpha=a)
+    outer_grid.tight_layout(fig3)
+        
 ###############################################    
 # 
 # plot LASSO and other linear models
 #
-##############################################    
-def plotLinearModelResults(dataSets, resultSet, keyList, fitmethod='LASSO'):
+##############################################  
+def plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd, behaviors):
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 3,
+                subplot_spec=gridloc, hspace=1, wspace=0.25, width_ratios=[3,1,1])
+    for lindex, label in enumerate(behaviors):
+        #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
+        weights = results[label]['weights']
+        intercept = results[label]['intercepts']
+        if pars['useRank']:
+            x = data['Neurons']['rankActivity']
+        else:
+            x = data['Neurons']['Activity']
+        y = data['Behavior'][label]
+       
+        # calculate y from model
+        yPred = np.dot(weights, x) + intercept
+        
+        yTrain = np.ones(yPred.shape)*np.nan
+        yTrain[trainingsInd] = yPred[trainingsInd]
+        
+        yTest =  np.ones(yPred.shape)*np.nan
+        yTest[testInd] = yPred[testInd]
+        
+        #if random=='random':
+        #    yTest = yPred
+        # plot training and test set behavior and prediction
+        ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
+        
+        ax1.plot(data['Neurons']['Time'], yTrain, color=colorBeh[label], label = 'Training', alpha =0.4, lw=2)
+        ax1.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior', lw=1)
+        ax1.plot(data['Neurons']['Time'], yTest, color=colorPred[label], label = r'$R^2$ {0:.2f}'.format(results[label]['scorepredicted']), lw=1)
+        ax1.set_xlim(np.percentile(data['Neurons']['Time'], [0,100]))    
+        ax1.set_ylabel(names[label])
+        if lindex==len(behaviors)-1:
+            ax1.set_xlabel('Time (s)')
+        
+        ax1.legend(loc=(0.0,0.9), ncol = 2)
+        fig.add_subplot(ax1)
+        
+        # show how predictive each additional neuron is
+        ax4 = plt.Subplot(fig, inner_grid[lindex, 2])
+        ax4.plot(results[label]['cumulativeScore'], color=colorPred[label],marker='o',  markerfacecolor="none",markersize=5)
+        ax4.plot(results[label]['individualScore'], color=colorBeh[label],marker='o', markerfacecolor="none", markersize=5)
+          
+        ax4.set_ylabel(r'$R^2$ score')
+        if lindex==len(behaviors)-1:
+            ax4.set_xlabel('Number of neurons')
+        fig.add_subplot(ax4)
+    # plot weights
+        
+    ax3 = plt.Subplot(fig, inner_grid[:,1])
+    for lindex, label in enumerate(behaviors):
+        weights = results[label]['weights']
+        
+        if lindex == 0:
+            indices = np.arange(len(x))
+            indices = np.argsort(weights)
+        rank = np.arange(0, len(weights))
+        ax3.fill_betweenx(rank, np.zeros(len(weights)),weights[indices]/np.max(weights), step='pre', color=colorBeh[label], alpha = 0.5)
+    
+    ax3.set_ylabel('Neuron weights')
+    ax3.spines['left'].set_visible(False)
+    ax3.set_yticks([])
+    fig.add_subplot(ax3)        
+        
+def plotLinearModelResults(dataSets, resultSet, keyList, pars, fitmethod='LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'], random = 'none'):
     """make an overview figure with Lasso weights and components."""
     nWorms = len(keyList)
     
-    fig = plt.figure(fitmethod,(6.8, nWorms*3.4))
+    fig = plt.figure(fitmethod,(2*6.8, nWorms*1.7*len(behaviors)))
     outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
     
     for kindex, key in enumerate(keyList):
+        gridloc = outer_grid[kindex]
         trainingsInd, testInd = resultSet[key]['Training']['Indices']  
         data = dataSets[key]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(2, 3,
-                subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.25, width_ratios=[3,1,1])
-        for lindex, label in enumerate(['AngleVelocity', 'Eigenworm3']):
-            #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
-            weights = resultSet[key][fitmethod][label]['weights']
-            intercept = resultSet[key][fitmethod][label]['intercepts']
-            
-            y = data['Behavior'][label]
-            x = data['Neurons']['Activity']
-            # calculate y from model
-            yPred = np.dot(weights, x) + intercept
-            # calculate relevant neurons
-            Xvelo = np.copy(x)
-            Xvelo[weights==0,:] = 0 
-            
-            # plot training and test set behavior and prediction
-            ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
-            ax1.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior', lw=0.5, alpha = 0.5)
-            ax1.plot(data['Neurons']['Time'][trainingsInd], yPred[trainingsInd], color=colorBeh[label], label = 'Training')
-            ax1.plot(data['Neurons']['Time'][testInd], yPred[testInd], color='k', label = 'Prediction score {0:.2f}'.format(resultSet[key][fitmethod][label]['scorepredicted']))
-            ax1.set_xlim(np.percentile(data['Neurons']['Time'], [0,100]))    
-            ax1.set_ylabel(label)
-            ax1.set_xlabel('Time (s)')
-            ax1.legend()
-            fig.add_subplot(ax1)
-            
-            # show how predictive each additional neuron is
-            ax4 = plt.Subplot(fig, inner_grid[lindex, 2])
-            ax4.plot(resultSet[key][fitmethod][label]['cumulativeScore'], color=colorBeh[label],marker='o' )
-            ax4.plot(resultSet[key][fitmethod][label]['individualScore'], color=colorBeh[label],marker='o', markerfacecolor="none")
-              
-            ax4.set_ylabel(r'$R^2$ score')
-            ax4.set_xlabel('Number of neurons')
-            fig.add_subplot(ax4)
-        # plot weights
-            
-        ax3 = plt.Subplot(fig, inner_grid[:,1])
-        for lindex, label in enumerate(['AngleVelocity', 'Eigenworm3']):
-            weights = resultSet[key][fitmethod][label]['weights']
-            
-            if lindex == 0:
-                indices = np.arange(len( data['Neurons']['Activity']))
-                indices = np.argsort(weights)
-            rank = np.arange(0, len(weights))
-            ax3.fill_betweenx(rank, np.zeros(len(weights)),weights[indices]/np.max(weights), step='pre', color=colorBeh[label], alpha = 0.5)
         
-        ax3.set_xlabel('Neuron weights ({})'.format(fitmethod))
-        ax3.spines['left'].set_visible(False)
-        ax3.set_yticks([])
-        fig.add_subplot(ax3)
-    
-    outer_grid.tight_layout(fig)
+        results = resultSet[key][fitmethod]
+        plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd)
+    #outer_grid.tight_layout(fig)
 ###############################################     
 # 
-# plot how performance increases when adding more neurons
+# plot residuals of linear model fit
 #
 ##############################################    
 def plotLinearModelResiduals(dataSets, resultSet, keyList, fitmethod='LASSO'):
