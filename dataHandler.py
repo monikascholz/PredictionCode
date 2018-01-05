@@ -11,6 +11,18 @@ import matplotlib.pylab as plt
 import scipy.interpolate
 from scipy.signal import medfilt
 from sklearn import preprocessing
+import makePlots as mp
+from scipy.ndimage.filters import gaussian_filter1d
+
+def makeEthogram(anglevelocity, pc3):
+    """use rotated Eigenworms to create a new Ethogram."""
+    etho = np.zeros((len(anglevelocity),1))
+    # set forward and backward
+    etho[np.where(anglevelocity>0)] = 1
+    etho[np.where(anglevelocity<0)] = -1
+    # overwrite this in case of turns
+    etho[np.abs(pc3)>10] = 2
+    return etho
 
 def loadPoints(folder, straight = True):
     """get tracked points from Pointfile."""
@@ -53,9 +65,12 @@ def transformEigenworms(pc1, pc2, pc3, dataPars):
         return pc1, pc2, pc3, velo, theta
     velo = scipy.signal.medfilt(velo, dataPars['medianWindow'])
     
-    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
-    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
-    pc3 = scipy.signal.medfilt(pc3, dataPars['medianWindow'])
+#    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
+#    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
+#    pc3 = scipy.signal.medfilt(pc3, dataPars['medianWindow'])
+    pc1 = gaussian_filter1d(pc1, dataPars['medianWindow'])
+    pc2 = gaussian_filter1d(pc2, dataPars['medianWindow'])
+    pc3 = gaussian_filter1d(pc3, dataPars['medianWindow'])
     
     return pc1, pc2, pc3, velo, theta
     
@@ -65,7 +80,7 @@ def loadData(folder, dataPars):
     data = scipy.io.loadmat(folder+'heatDataMS.mat')
     
     # unpack behavior variables
-    etho, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
+    ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
     
     # deal with eigenworms
     pc1 = pc12[:,0]
@@ -94,6 +109,15 @@ def loadData(folder, dataPars):
     ## recalculate velocity from position
     vel = np.squeeze(np.sqrt((np.diff(xPos, axis=0)**2 + np.diff(yPos, axis=0)**2))/6.)
     vel = np.pad(vel, (1,0), 'constant')
+    # ethogram redone
+    etho = makeEthogram(velo, pc3)
+    ax = plt.subplot(211)
+    T = np.arange(pc1.shape[0])/6.
+#    print T, etho.shape, ethoOrig.shape
+#    mp.plotEthogram(ax, T, ethoOrig, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
+#    ax = plt.subplot(212)
+#    mp.plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
+#    plt.show()
     #print vel.shape, xPos.shape
 #    else:# by default load phtocorrected but not otherwise corrected data
     R = np.array(data['rPhotoCorr'])
@@ -119,7 +143,7 @@ def loadData(folder, dataPars):
     # prep neural data by masking nans
     # store relevant indices
     nonNan = np.arange(Y.shape[1])
-    nonNan  = np.where(np.all(np.isfinite(np.array(data['rPhotoCorr'])),axis=0))[0]
+    #nonNan  = np.where(np.all(np.isfinite(np.array(data['rPhotoCorr'])),axis=0))[0]
     #print nonNan
     Y = Y[order]
    
@@ -141,7 +165,8 @@ def loadData(folder, dataPars):
     mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(Y,axis=0)[:wind])))[:-wind]
     # do the same in the end
     mean[-wind:] = np.repeat(np.mean(np.mean(Y,axis=0)[:-wind]), wind)
-#    print len(mean), Y.shape
+    print len(mean), Y.shape
+    Y = Y-mean
 #    m, s = np.mean(Y, axis=0), np.std(Y, axis=0)
 #    plt.subplot(211)
 #    plt.plot(m, 'r', label='mean')
@@ -160,6 +185,8 @@ def loadData(folder, dataPars):
 #    plt.tight_layout()
 #    plt.legend()
 #    plt.show()
+    # zscore values 
+    Y =  preprocessing.scale(Y.T).T
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
     # create a dictionary structure of these data
@@ -286,3 +313,4 @@ def rolling_window(a, window):
     strides = a.strides + (a.strides[-1],)
     
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
+    

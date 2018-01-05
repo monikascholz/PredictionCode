@@ -10,10 +10,10 @@ import subprocess
 import numpy as np
 
 # read in the dataset table and create date-time pairs
-dataLog = "AML18_moving/AML18_datasets.txt"
-outfolder = "AML18_moving"
-#dataLog = "AML32_moving/AML32_datasets.txt"
-#outfolder = "AML32_moving"
+#dataLog = "AML18_moving/AML18_datasets.txt"
+#outfolder = "AML18_moving"
+dataLog = "AML32_moving/AML32_datasets.txt"
+outfolder = "AML32_moving"
 for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)):
     print "Creating dataset ", line[0]
     date, time = line[0].split('_')[0][-8:], line[0].split('_')[1]

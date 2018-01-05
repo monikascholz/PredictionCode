@@ -16,7 +16,72 @@ import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
 
+def plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd, behaviors):
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 3,
+                subplot_spec=gridloc, hspace=1, wspace=0.25, width_ratios=[3,1,1])
+    for lindex, label in enumerate(behaviors):
+        #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
+        weights = results[label]['weights']
+        intercept = results[label]['intercepts']
+        if pars['useRank']:
+            x = data['Neurons']['rankActivity']
+        else:
+            x = data['Neurons']['Activity']
+        y = data['Behavior'][label]
+       
+        # calculate y from model
+        yPred = np.dot(weights, x) + intercept
+        
+        yTrain = np.ones(yPred.shape)*np.nan
+        yTrain[trainingsInd] = yPred[trainingsInd]
+        
+        yTest =  np.ones(yPred.shape)*np.nan
+        yTest[testInd] = yPred[testInd]
+        
+        #if random=='random':
+        #    yTest = yPred
+        # plot training and test set behavior and prediction
+        ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
+        
+        ax1.plot(data['Neurons']['Time'], yTrain, color=colorBeh[label], label = 'Training', alpha =0.4, lw=2)
+        ax1.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior', lw=1)
+        ax1.plot(data['Neurons']['Time'], yTest, color=colorPred[label], label = r'$R^2$ {0:.2f}'.format(results[label]['scorepredicted']), lw=1)
+        ax1.set_xlim(np.percentile(data['Neurons']['Time'], [0,100]))    
+        ax1.set_ylabel(names[label])
+        if lindex==len(behaviors)-1:
+            ax1.set_xlabel('Time (s)')
+        
+        ax1.legend(loc=(0.0,0.9), ncol = 2)
+        fig.add_subplot(ax1)
+        
+        # show how predictive each additional neuron is
+        ax4 = plt.Subplot(fig, inner_grid[lindex, 2])
+        ax4.plot(results[label]['cumulativeScore'], color=colorPred[label],marker='o',  markerfacecolor="none",markersize=5)
+        ax4.plot(results[label]['individualScore'], color=colorBeh[label],marker='o', markerfacecolor="none", markersize=5)
+          
+        ax4.set_ylabel(r'$R^2$ score')
+        if lindex==len(behaviors)-1:
+            ax4.set_xlabel('Number of neurons')
+        fig.add_subplot(ax4)
+    # plot weights
+        
+    ax3 = plt.Subplot(fig, inner_grid[:,1])
+    for lindex, label in enumerate(behaviors):
+        weights = results[label]['weights']
+        
+        if lindex == 0:
+            indices = np.arange(len(x))
+            indices = np.argsort(weights)
+        rank = np.arange(0, len(weights))
+        ax3.fill_betweenx(rank, np.zeros(len(weights)),weights[indices]/np.max(weights), step='pre', color=colorBeh[label], alpha = 0.5)
+    
+    ax3.set_ylabel('Neuron weights')
+    ax3.spines['left'].set_visible(False)
+    ax3.set_yticks([])
+    fig.add_subplot(ax3)  
+
 folder = "AML32_moving/BrainScanner20170610_105634_MS/"
+folder = "AML32_moving/BrainScanner20170613_134800_MS/"
 dataLog = "AML32_moving/AML32_datasets.txt"
 ##### GFP
 #folder = "AML18_moving/{}_MS/"
@@ -56,14 +121,14 @@ pars ={'nCompPCA':10, # no of PCA components
 
 #################################################    
 ### 
-###  show pipeline effects
+###  show pipeline effects one by one
 ###
 ################################################
 
 print "Performing LASSO.",
 behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2']
 fig = plt.figure('Lasso 1',(2*6.8, 1.7*len(behaviors)))
-outer_grid = gridspec.GridSpec(1, 1, hspace=0.25, wspace=0.25)
+outer_grid = gridspec.GridSpec(2, 1, hspace=0.25, wspace=0.25)
 
 results = {'LASSO':{}}
 results['LASSO'] = dr.runLasso(data, pars, testIndices, trainingsIndices, plot=0, behaviors = behaviors)
@@ -73,11 +138,8 @@ for tmpKey in tmpDict.keys():
     results['LASSO'][tmpKey].update(tmpDict[tmpKey])
 print 'Done with Lasso. Plotting...'
 print results
-mp.plotSingleLinearFit(fig, outer_grid[0], pars, results['LASSO'], data, trainingsIndices, testIndices, behaviors)
-
-plt.figure('Lasso 1')
-
-
+gridloc = outer_grid[0]
+plotSingleLinearFit(fig, gridloc , pars, results['LASSO'], data, trainingsIndices, testIndices, behaviors)
 
 plt.show()
    

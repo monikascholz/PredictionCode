@@ -155,7 +155,7 @@ def plotHeatmap(T, Y, ax = None):
     
 def plotEigenworms(T, E, label, color = 'k'):
     """make an eigenworm plot"""
-    plt.plot(T, E, color = color, lw=0.5)
+    plt.plot(T, E, color = color, lw=1)
     plt.ylabel(label)
     plt.xlabel('Time (s)')
 
@@ -181,14 +181,16 @@ def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
 ##############################################    
 def plotDataOverview(dataSets, keyList):
     """plot ethogram and heatmap"""
-    nWorms = len(dataSets)
-    fig = plt.figure('Overview',(6.8, nWorms*3.4))
+    nWorms = len(keyList)
+    fig = plt.figure('Overview',(10, nWorms*3.4))
     gs = gridspec.GridSpec(nWorms*2, 4,
                            width_ratios=[1,0.1, 2, 1])
     for dindex, key in enumerate(keyList):
         print 'Plotting overview of ', key
+        
         data = dataSets[key]
         ax = plt.subplot(gs[2*dindex:2*dindex+2,0])
+        ax.set_title(key)
         hm = plotHeatmap(data['Neurons']['Time'], data['Neurons']['rankActivity'])
         ax2 = plt.subplot(gs[2*dindex:2*dindex+2,1])
         plt.colorbar(hm, cax=ax2)
@@ -213,7 +215,7 @@ def plotDataOverview(dataSets, keyList):
     
 def plotNeurons3D(dataSets, keyList, threed = True):
     """plot neuron locations."""
-    nWorms = len(dataSets)
+    nWorms = len(keyList)
     fig = plt.figure('Neurons',(6.8, nWorms*3.4))
     gs = gridspec.GridSpec(nWorms,1, hspace=0.25, wspace=0.25)
     for dindex, key in enumerate(keyList):
@@ -324,7 +326,7 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
 # neuronal signal pca, plot in 3D with behavior labels
 #
 ############################################## 
-def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA'):
+def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 6):
     """Show neural manifold with behavior label."""
     nWorms = len(keyList)
     print 'colored by ', col
@@ -345,9 +347,9 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
         
         results = resultSet[key][flag]
         x,y,z = results['pcaComponents'][:3,]
-        x = gaussian_filter1d(x, 2)
-        y = gaussian_filter1d(y, 2)
-        z = gaussian_filter1d(z, 2)
+        x = gaussian_filter1d(x, smooth)
+        y = gaussian_filter1d(y, smooth)
+        z = gaussian_filter1d(z, smooth)
         
         etho=False
         if col == 'phase':
@@ -543,7 +545,7 @@ def plotLinearModelResults(dataSets, resultSet, keyList, pars, fitmethod='LASSO'
         data = dataSets[key]
         
         results = resultSet[key][fitmethod]
-        plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd)
+        plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd, behaviors)
     #outer_grid.tight_layout(fig)
 ###############################################     
 # 
@@ -619,15 +621,20 @@ def plotLinearModelResiduals(dataSets, resultSet, keyList, fitmethod='LASSO'):
 ##############################################  
 def plotWeightLocations(dataSets, resultSet, keyList, fitmethod='ElasticNet'):
     """plot neuron locations."""
-    nWorms = len(dataSets)
+    nWorms = len(keyList)
     fig = plt.figure('Neurons',(6.8, nWorms*3.4))
     gs = gridspec.GridSpec(nWorms,1, hspace=0.25, wspace=0.25)
     for dindex, key in enumerate(keyList):
         data = dataSets[key]
         xS, yS, zS = data['Neurons']['Positions']
-        # fitted weights
-        weightsAV = resultSet[key][fitmethod]['AngleVelocity']['weights']
-        weightsEW = resultSet[key][fitmethod]['Eigenworm3']['weights']
+        if fitmethod == 'PCA':
+            weightsAV = resultSet[key][fitmethod]['neuronWeights'][:,0]
+            weightsEW = resultSet[key][fitmethod]['neuronWeights'][:,1]
+        else:
+            
+            # fitted weights
+            weightsAV = resultSet[key][fitmethod]['AngleVelocity']['weights']
+            weightsEW = resultSet[key][fitmethod]['Eigenworm3']['weights']
         # find non-zero weighted neurons
         indexAV = weightsAV != 0
         indexEW = weightsEW != 0

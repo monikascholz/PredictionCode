@@ -10,8 +10,14 @@ from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from sklearn.cluster import AgglomerativeClustering
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import explained_variance_score
+from sklearn.metrics import explained_variance_score, accuracy_score
 from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report
+from sklearn import svm
+import dataHandler as dh
+
 
 ###############################################    
 # 
@@ -21,6 +27,10 @@ from sklearn import preprocessing
 def createTrainingTestIndices(data, pars, label):
     """split time points into trainings and test set."""
     timeLen = data['Neurons']['Activity'].shape[1]
+    if pars['trainingType'] == 'start':
+        cutoff = int(pars['trainingCut']*timeLen)
+        testIndices = np.arange(timeLen)[:cutoff:]
+        trainingsIndices = np.arange(timeLen)[cutoff::pars['trainingSample']]
     if pars['trainingType'] == 'simple':
         cutoff = int(pars['trainingCut']*timeLen)
         trainingsIndices = np.arange(timeLen)[:cutoff:pars['trainingSample']]
@@ -38,22 +48,22 @@ def createTrainingTestIndices(data, pars, label):
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
-        center = np.where(np.abs(data['Behavior']['Eigenworm3'])>15)[0]
-        print center
-        testsize = int((1-pars['trainingCut'])*timeLen/2.)
-        testLoc = np.random.randint(0,len(center))
-        testIndices = np.arange(center[testLoc]-testsize, np.min([len(data['Behavior']['Eigenworm3']),center[testLoc]+testsize]))
+        #center = np.where(np.abs(data['Behavior']['Eigenworm3'])>15)[0]
+        cutoff = int((pars['trainingCut'])*timeLen/2.)
+        #testsize = int((1-pars['trainingCut'])*timeLen/2.)
+        #testLoc = np.random.randint(0,len(center))
+        #testIndices = np.arange(center[testLoc]-testsize, np.min([len(data['Behavior']['Eigenworm3']),center[testLoc]+testsize]))
 #        cutoff = int(pars['trainingCut']*timeLen)
 #        testIndices = np.arange(timeLen)[cutoff:]
         #cutoff = int((pars['trainingCut'])*timeLen/2.)
-        #tmpIndices = np.arange(timeLen)
-        #testIndices = tmpIndices[cutoff:-cutoff]
+        tmpIndices = np.arange(timeLen)
+        testIndices = tmpIndices[cutoff:-cutoff]
         # create a trainingset by equalizing probabilities
         # bin  to get probability distribution
         nbin = 10
         hist, bins = np.histogram(data['Behavior'][label], nbin)
         # this is the amount of data that will be left in each bin after equalization
-        N = np.sum(hist)/50.#hist[0]+hist[-1]
+        N = np.sum(hist)/20.#hist[0]+hist[-1]
         # digitize data 
         dataProb = np.digitize(data['Behavior'][label], bins=bins[:-2], right=True)
         # rescale such that we get desired trainingset length
@@ -76,7 +86,8 @@ def createTrainingTestIndices(data, pars, label):
         plt.show()
     return np.sort(trainingsIndices), np.sort(testIndices)
     
-    
+ 
+   
 ###############################################    
 # 
 # create behavioral signatures
@@ -100,16 +111,20 @@ def runPCANormal(data, pars):
         Neuro = data['Neurons']['rankActivity']
     else:
         Neuro = data['Neurons']['Activity']
+    Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
     pcs = pca.fit_transform(Neuro )
+    #comp = pca.components_
+    comp = np.cumsum(pca.components_, axis=1)
     # order neurons by weight in first component
     #indices = np.arange(len(Neuro))
+    
     indices = np.argsort(pcs[:,0])
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
     pcares['expVariance'] =  pca.explained_variance_ratio_
     pcares['neuronWeights'] =  pcs
     pcares['neuronOrderPCA'] =  indices
-    pcares['pcaComponents'] =  pca.components_
+    pcares['pcaComponents'] =  comp
     
     return pcares
     
@@ -173,8 +188,67 @@ def timewarp(data):
 def runHierarchicalClustering(data, pars):
     """cluster neural data."""
     
+###############################################    
+# 
+# predict discrete behaviors
+#
+##############################################
+    
+def discreteBehaviorPrediction(data, pars, testInd, trainingsInd):
+    """use a svm to predict discrete behaviors from the data."""
+    # modify data to be like scikit likes it
+    if pars['useRank']:
+            X = data['Neurons']['rankActivity'].T
+    else:
+        X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+    # use ethogram for behavior
+    Y = data['Behavior']['Ethogram']
+    # create a linear SVC
+#    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced')
+#    
+#    lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
+#    
+#    Ypred = lin_clf.predict(X[testInd])
+    X_train = X[trainingsInd]
+    y_train = Y[trainingsInd]
+    X_test = X[testInd]
+    y_test = Y[testInd]
+    # Set the parameters by cross-validation
+    tuned_parameters = [ {'kernel': ['linear'], 'C': [1, 5,10,100]}]
+    
+    scores = ['f1_weighted', 'f1_macro']
+    
+    for score in scores:
+        print("# Tuning hyper-parameters for %s" % score)
+        print()
+    
+        clf = GridSearchCV(svm.SVC(class_weight='balanced'), tuned_parameters, cv=5,
+                           scoring='%s' % score)
+        clf.fit(X_train, y_train)
+    
+        print("Best parameters set found on development set:")
+        
+        print(clf.best_params_)
+        
+        print("Grid scores on development set:")
+       
+        means = clf.cv_results_['mean_test_score']
+        stds = clf.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r"
+                  % (mean, std * 2, params))
+        print()
+    
+        print("Detailed classification report:")
+        print()
+        print("The model is trained on the full development set.")
+        print("The scores are computed on the full evaluation set.")
+        print()
+        y_true, y_pred = y_test, clf.predict(X_test)
+        print(classification_report(y_true, y_pred))
+        print()
 
-
+    
 ###############################################    
 # 
 # Linear regression individual neurons
@@ -258,9 +332,9 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['Angl
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
 
         # fit lasso and validate
-        a = np.linspace(0.001,0.05,100)
-        reg = linear_model.LassoCV(cv=5, selection = 'random', verbose=1, \
-        eps=0.001, max_iter=3000, alphas=a)#, normalize=False)
+        #a = np.linspace(0.001,0.05,100)
+        reg = linear_model.LassoCV(cv=5, selection = 'random', verbose=0, \
+        eps=0.001, max_iter=3000)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         
         # TODO use one-stdev rule: all else equal, regularize more
@@ -327,10 +401,10 @@ def runElasticNet(data, pars, testInd, trainingsInd, plot = False, behaviors = [
         l1_ratio = [0.5, .9, .95, 0.99, 1]
         cv = 10
         a = np.linspace(0.0001,0.05,100)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=cv, verbose=1)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=cv, verbose=0)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
-        scorepred = reg.score(X[testInd], Y[testInd], sample_weight=np.abs(Y[testInd]))
+        scorepred = reg.score(X[testInd], Y[testInd])
         score = reg.score(X[trainingsInd], Y[trainingsInd])
         
         #linData[label] = [reg.coef_, reg.intercept_, reg.alpha_, score, scorepred]
@@ -361,11 +435,11 @@ def runElasticNet(data, pars, testInd, trainingsInd, plot = False, behaviors = [
             #ax1.set_xlabel(r'weights')
             #ax1.set_ylabel('PDF(weights)')
             plt.subplot(224)
-#            
-            #for l1index, l1 in enumerate(l1_ratio):
-            #plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
-            #plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
-            #plt.show()
+            # use if only one l1_ratio
+            
+#            plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
+#            plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
+#            plt.show()
             for l1index, l1 in enumerate(l1_ratio):
                 plt.plot(reg.alphas_[l1index], reg.mse_path_[l1index], 'k', alpha = 0.1)
                 plt.plot(reg.alphas_[l1index], np.mean(reg.mse_path_[l1index], axis =1))
