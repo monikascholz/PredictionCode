@@ -111,7 +111,7 @@ def loadData(folder, dataPars):
     vel = np.pad(vel, (1,0), 'constant')
     # ethogram redone
     etho = makeEthogram(velo, pc3)
-    ax = plt.subplot(211)
+    #etho = ethoOrig
     T = np.arange(pc1.shape[0])/6.
 #    print T, etho.shape, ethoOrig.shape
 #    mp.plotEthogram(ax, T, ethoOrig, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
@@ -142,14 +142,15 @@ def loadData(folder, dataPars):
         print 'No neuron positions:', folder
     # prep neural data by masking nans
     # store relevant indices
-    nonNan = np.arange(Y.shape[1])
+    nonNan = np.arange(100, Y.shape[1]-100)
+    
     #nonNan  = np.where(np.all(np.isfinite(np.array(data['rPhotoCorr'])),axis=0))[0]
     #print nonNan
     Y = Y[order]
    
 #    # make values nicer
-    #Y -= np.nanmin(Y, axis=0)
-    # = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
+    Y -= np.nanmin(Y, axis=0)
+    Y = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
     # smooth with small window size
     #Y = np.array([savitzky_golay(line, window_size=17, order=3) for line in Y])
     #Y =  preprocessing.scale(Y.T).T
@@ -166,7 +167,7 @@ def loadData(folder, dataPars):
     # do the same in the end
     mean[-wind:] = np.repeat(np.mean(np.mean(Y,axis=0)[:-wind]), wind)
     print len(mean), Y.shape
-    Y = Y-mean
+    #Y = Y-mean
 #    m, s = np.mean(Y, axis=0), np.std(Y, axis=0)
 #    plt.subplot(211)
 #    plt.plot(m, 'r', label='mean')

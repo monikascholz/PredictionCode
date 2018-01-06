@@ -164,8 +164,13 @@ def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
     colDict = {-1:'red',0:'k',1:'green',2:'blue'}
     labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
     #y1 = np.where(etho==key,1,0)
+    
     for key in colDict.keys():
-        plt.fill_between(T, y1=np.ones(len(T))*yValMin, y2=np.ones(len(T))*yValMax, where=(etho==key)[:,0], \
+        where = np.squeeze((etho==key))
+#        if len((etho==key))==0:
+#            
+#            continue
+        plt.fill_between(T, y1=np.ones(len(T))*yValMin, y2=np.ones(len(T))*yValMax, where=where, \
         interpolate=False, color=colDict[key], label=labelDict[key], alpha = alpha)
     plt.xlim([min(T), max(T)])
     plt.ylim([yValMin, yValMax])
@@ -258,13 +263,14 @@ def plotNeurons3D(dataSets, keyList, threed = True):
 # neuronal signal pca or ica, first n components and weights plotted
 #
 ############################################## 
-def singlePCAResult(fig, gridloc, Neuro, results, time):
+def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
     """plot PCA of one dataset"""
     inner_grid = gridspec.GridSpecFromSubplotSpec(2, 3,
         subplot_spec=gridloc, hspace=0.5, wspace=0.35, width_ratios=[2,0.2, 1])
     
     ax1 = plt.Subplot(fig, inner_grid[0, 0])
     # plot neurons ordered by weight in first PCA component
+    
     cax1 = plotHeatmap(time,  Neuro[results['neuronOrderPCA']], ax= ax1)
     ax1.set_xlabel('Time (s)')
     fig.add_subplot(ax1)        
@@ -275,6 +281,8 @@ def singlePCAResult(fig, gridloc, Neuro, results, time):
     # plot the weights
     ax2 = plt.Subplot(fig, inner_grid[0,2])
     pcs = results['neuronWeights']
+    # normalize by max for each group
+    #pcs = np.divide(pcs.T,np.max(np.abs(pcs), axis=1)).T
     rank = np.arange(0, len(pcs))
     
     ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,0][results['neuronOrderPCA']], step='pre')
@@ -294,9 +302,15 @@ def singlePCAResult(fig, gridloc, Neuro, results, time):
     ax4 = plt.Subplot(fig, inner_grid[1,2])
     nComp = results['nComp']
     
-    ax4.fill_between(np.arange(nComp),results['expVariance'])
-    ax4.step(np.arange(nComp),np.cumsum(results['expVariance']), where = 'pre')
-    ax4.set_ylabel('Explained variance')
+    
+    
+    if flag=='SVM':
+        ax4.set_ylabel('F1 score')
+        ax4.step(np.arange(nComp),results['expVariance'], where = 'pre')
+    else:
+        ax4.fill_between(np.arange(nComp),results['expVariance'])
+        ax4.step(np.arange(nComp),np.cumsum(results['expVariance']), where = 'pre')
+        ax4.set_ylabel('Explained variance')
     ax4.set_xlabel('Number of components')
     fig.add_subplot(ax4)    
     
@@ -314,8 +328,9 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
             Neuro = data['Neurons']['Activity']
         time = data['Neurons']['Time']
         results = resultSet[key][flag]
+       
         gridloc=outer_grid[kindex]
-        singlePCAResult(fig, gridloc, Neuro, results, time)
+        singlePCAResult(fig, gridloc, Neuro, results, time, flag)
         
     outer_grid.tight_layout(fig)        
     
@@ -468,9 +483,9 @@ def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
 # plot LASSO and other linear models
 #
 ##############################################  
-def plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd, behaviors):
-    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 3,
-                subplot_spec=gridloc, hspace=1, wspace=0.25, width_ratios=[3,1,1])
+def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 4,
+                subplot_spec=gridloc, hspace=1, wspace=0.5, width_ratios=[3,1,1,1])
     for lindex, label in enumerate(behaviors):
         #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
         weights = results[label]['weights']
@@ -480,7 +495,7 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd
         else:
             x = data['Neurons']['Activity']
         y = data['Behavior'][label]
-       
+        trainingsInd, testInd = splits[label]['Indices']
         # calculate y from model
         yPred = np.dot(weights, x) + intercept
         
@@ -515,6 +530,13 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd
         if lindex==len(behaviors)-1:
             ax4.set_xlabel('Number of neurons')
         fig.add_subplot(ax4)
+        # plot prediction scatter
+        ax5 = plt.Subplot(fig, inner_grid[lindex, 3])
+        if lindex==len(behaviors)-1:
+            ax5.set_xlabel('True behavior')
+        ax5.set_ylabel('Predicted')
+        ax5.scatter(y[testInd], yPred[testInd], alpha=0.05, color=colorPred[label])
+        fig.add_subplot(ax5)
     # plot weights
         
     ax3 = plt.Subplot(fig, inner_grid[:,1])
@@ -541,12 +563,12 @@ def plotLinearModelResults(dataSets, resultSet, keyList, pars, fitmethod='LASSO'
     
     for kindex, key in enumerate(keyList):
         gridloc = outer_grid[kindex]
-        trainingsInd, testInd = resultSet[key]['Training']['Indices']  
+        splits = resultSet[key]['Training']  
         data = dataSets[key]
         
         results = resultSet[key][fitmethod]
-        plotSingleLinearFit(fig, gridloc, pars, results, data, trainingsInd, testInd, behaviors)
-    #outer_grid.tight_layout(fig)
+        plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors)
+    outer_grid.tight_layout(fig)
 ###############################################     
 # 
 # plot residuals of linear model fit
@@ -667,3 +689,57 @@ def plotWeightLocations(dataSets, resultSet, keyList, fitmethod='ElasticNet'):
         ax3.scatter(zS[indexEW],yS[indexEW],color=colorBeh['Eigenworm3'], s = s2)
         ax3.set_ylabel('Y')
         ax3.set_xlabel('Z')
+        
+
+###############################################    
+# 
+# scatter plot of LASSO and other linear models
+#
+##############################################  
+def scatterSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 1,
+                subplot_spec=gridloc, hspace=1, wspace=0.25)
+    for lindex, label in enumerate(behaviors):
+        #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
+        weights = results[label]['weights']
+        intercept = results[label]['intercepts']
+        if pars['useRank']:
+            x = data['Neurons']['rankActivity']
+        else:
+            x = data['Neurons']['Activity']
+        y = data['Behavior'][label]
+        trainingsInd, testInd = splits[label]['Indices']
+        # calculate y from model
+        yPred = np.dot(weights, x) + intercept
+        
+        yTrain = np.ones(yPred.shape)*np.nan
+        yTrain[trainingsInd] = yPred[trainingsInd]
+        
+        yTest =  np.ones(yPred.shape)*np.nan
+        yTest[testInd] = yPred[testInd]
+        
+        #if random=='random':
+        #    yTest = yPred
+        # plot training and test set behavior and prediction
+        ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
+        ax1.scatter(y[testInd], yTest[testInd])
+        
+        fig.add_subplot(ax1)        
+
+def plotLinearModelScatter(dataSets, resultSet, keyList, pars, fitmethod='LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'], random = 'none'):
+    """make an overview figure with Lasso weights and components."""
+    nWorms = len(keyList)
+    
+    fig = plt.figure(fitmethod,(2*6.8, nWorms*1.7*len(behaviors)))
+    outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
+    
+    for kindex, key in enumerate(keyList):
+        gridloc = outer_grid[kindex, 0]
+        
+        data = dataSets[key]
+        
+        results = resultSet[key][fitmethod]
+        splits = resultSet[key]['Training']
+        scatterSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors)
+        
+        

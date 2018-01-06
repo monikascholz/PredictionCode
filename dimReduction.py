@@ -10,14 +10,18 @@ from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from sklearn.cluster import AgglomerativeClustering
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import explained_variance_score, accuracy_score
+from sklearn.metrics import explained_variance_score, accuracy_score, precision_recall_fscore_support
 from sklearn import preprocessing
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 from sklearn import svm
 import dataHandler as dh
-
+from scipy.interpolate import interp1d
+from scipy.optimize import newton 
+# 
+import makePlots as mp
 
 ###############################################    
 # 
@@ -50,20 +54,18 @@ def createTrainingTestIndices(data, pars, label):
         # crop out a testset first -- find an area that contains at least one turn
         #center = np.where(np.abs(data['Behavior']['Eigenworm3'])>15)[0]
         cutoff = int((pars['trainingCut'])*timeLen/2.)
-        #testsize = int((1-pars['trainingCut'])*timeLen/2.)
-        #testLoc = np.random.randint(0,len(center))
-        #testIndices = np.arange(center[testLoc]-testsize, np.min([len(data['Behavior']['Eigenworm3']),center[testLoc]+testsize]))
-#        cutoff = int(pars['trainingCut']*timeLen)
-#        testIndices = np.arange(timeLen)[cutoff:]
-        #cutoff = int((pars['trainingCut'])*timeLen/2.)
+        
         tmpIndices = np.arange(timeLen)
         testIndices = tmpIndices[cutoff:-cutoff]
         # create a trainingset by equalizing probabilities
+        trainingsIndices = np.setdiff1d(tmpIndices, testIndices)
         # bin  to get probability distribution
-        nbin = 10
+        nbin = 5
         hist, bins = np.histogram(data['Behavior'][label], nbin)
         # this is the amount of data that will be left in each bin after equalization
-        N = np.sum(hist)/20.#hist[0]+hist[-1]
+        #N = np.sum(hist)/20.#hist[0]+hist[-1]
+        N = np.max(hist)/2#*nbin
+        print bins, np.min(data['Behavior'][label]), np.max(data['Behavior'][label])
         # digitize data 
         dataProb = np.digitize(data['Behavior'][label], bins=bins[:-2], right=True)
         # rescale such that we get desired trainingset length
@@ -86,8 +88,8 @@ def createTrainingTestIndices(data, pars, label):
         plt.show()
     return np.sort(trainingsIndices), np.sort(testIndices)
     
- 
    
+
 ###############################################    
 # 
 # create behavioral signatures
@@ -111,10 +113,10 @@ def runPCANormal(data, pars):
         Neuro = data['Neurons']['rankActivity']
     else:
         Neuro = data['Neurons']['Activity']
-    Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
+    #Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
     pcs = pca.fit_transform(Neuro )
-    #comp = pca.components_
-    comp = np.cumsum(pca.components_, axis=1)
+    comp = pca.components_
+    #comp = np.cumsum(pca.components_, axis=1)
     # order neurons by weight in first component
     #indices = np.arange(len(Neuro))
     
@@ -194,7 +196,7 @@ def runHierarchicalClustering(data, pars):
 #
 ##############################################
     
-def discreteBehaviorPrediction(data, pars, testInd, trainingsInd):
+def discreteBehaviorPrediction(data, pars, splits):
     """use a svm to predict discrete behaviors from the data."""
     # modify data to be like scikit likes it
     if pars['useRank']:
@@ -203,122 +205,126 @@ def discreteBehaviorPrediction(data, pars, testInd, trainingsInd):
         X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
     # use ethogram for behavior
     Y = data['Behavior']['Ethogram']
+    trainingsInd, testInd = splits['AngleVelocity']['Indices']
     # create a linear SVC
-#    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced')
+    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=10)
+    
+    lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
+    
+    Ypred = lin_clf.predict(X[testInd])
+    
+    print classification_report(Y[testInd], Ypred)
+    pcs = lin_clf.coef_
+    indices = np.argsort(pcs[0])
+    
+    comp = np.zeros((4, len(X)))
+    # show temporal components
+    for wi, weights in enumerate(pcs):
+        comp[wi] = np.dot(X, weights)
+    #print f1_score(Y[testInd], Ypred, average='micro')
+    recision, recall, fscore, support = precision_recall_fscore_support(Y[testInd], Ypred, labels=[-1,0,1,2])
+    print fscore
+    pcares = {}
+    pcares['nComp'] =  4
+    pcares['expVariance'] =  fscore
+    pcares['neuronWeights'] =  pcs.T
+    pcares['neuronOrderPCA'] =  indices
+    pcares['pcaComponents'] =  comp
+#    X_train = X[trainingsInd]
+#    y_train = Y[trainingsInd]
+#    X_test = X[testInd]
+#    y_test = Y[testInd]
+#    # Set the parameters by cross-validation
+#    tuned_parameters = [ {'kernel': ['linear'], 'C': [1, 5,10,100]}]
 #    
-#    lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
+#    scores = ['f1_weighted', 'f1_macro']
 #    
-#    Ypred = lin_clf.predict(X[testInd])
-    X_train = X[trainingsInd]
-    y_train = Y[trainingsInd]
-    X_test = X[testInd]
-    y_test = Y[testInd]
-    # Set the parameters by cross-validation
-    tuned_parameters = [ {'kernel': ['linear'], 'C': [1, 5,10,100]}]
-    
-    scores = ['f1_weighted', 'f1_macro']
-    
-    for score in scores:
-        print("# Tuning hyper-parameters for %s" % score)
-        print()
-    
-        clf = GridSearchCV(svm.SVC(class_weight='balanced'), tuned_parameters, cv=5,
-                           scoring='%s' % score)
-        clf.fit(X_train, y_train)
-    
-        print("Best parameters set found on development set:")
-        
-        print(clf.best_params_)
-        
-        print("Grid scores on development set:")
-       
-        means = clf.cv_results_['mean_test_score']
-        stds = clf.cv_results_['std_test_score']
-        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
-            print("%0.3f (+/-%0.03f) for %r"
-                  % (mean, std * 2, params))
-        print()
-    
-        print("Detailed classification report:")
-        print()
-        print("The model is trained on the full development set.")
-        print("The scores are computed on the full evaluation set.")
-        print()
-        y_true, y_pred = y_test, clf.predict(X_test)
-        print(classification_report(y_true, y_pred))
-        print()
-
-    
-###############################################    
-# 
-# Linear regression individual neurons
-#
-##############################################  
-def linearRegressionSingleNeuron(data, pars, testInd, trainingsInd):
-    """for each neuron do linear regression to behavior and test predictive power."""
-    if pars['linReg']=='simple':
-        reg = linear_model.LinearRegression()
-    elif pars['linReg']=='ransac':
-        reg = linear_model.RANSACRegressor()
-    else:
-        return ValueError
-    linData = {}
-    for label in ['AngleVelocity', 'Eigenworm3']:
-        Y = data['Behavior'][label]
-        if pars['useRank']:
-            X = data['Neurons']['rankActivity']
-        else:
-            X = data['Neurons']['Activity']
-#        scalerB = StandardScaler()
-#        Y = scalerB.fit_transform(Y)
-#        scalerN = StandardScaler()
-#        X = scalerN.fit_transform(X.T).T
-
-        tmpData = []
-        plot = False
-        nPlots = int(np.sqrt(len(data['Neurons']['Activity']))+1)
-        for nindex, neuron in enumerate(X):
-            neuron = np.reshape(neuron, (-1,1))
-            reg.fit(neuron[trainingsInd], Y[trainingsInd])
-            #
-            #reg.predict(neuron[testInd])
-            scorepred = reg.score(neuron[testInd], Y[testInd])
-            score = reg.score(neuron[trainingsInd], Y[trainingsInd])
-            # rescale coefficients to match real numbers
-#            slope_scaled = reg.coef_*scalerB.std_/scalerN.std_[nindex]
-#            intercept_scaled =(-scalerN.mean_[nindex]/scalerN.std_[nindex]*reg.coef_ + scalerB.mean_/scalerB.std_+reg.intercept_)*scalerB.std_
-            tmpData.append(np.array([reg.coef_, reg.intercept_, score, scorepred]))
-#            
-#            # plot all regressions
-            if plot:
-                xfit = np.arange(np.min(neuron), np.max(neuron))
-                plt.subplot(nPlots, nPlots, nindex+1)
-                plt.scatter(neuron[trainingsInd], Y[trainingsInd],alpha=0.1, s=1, c = 'r')
-                plt.plot(xfit,xfit*reg.coef_+reg.intercept_)
-                plt.scatter(neuron[testInd], Y[testInd],alpha=0.1, s=1, c='b')
-        plt.show()
-        tmpData = np.array(tmpData)
-        coef_, intercept_, score, scorepred = tmpData.T
-        linData[label] = {}
-        linData[label]['weights'] = coef_
-        linData[label]['intercepts'] = intercept_
-        linData[label]['alpha'] = None
-        linData[label]['score'] = score
-        linData[label]['scorepredicted'] = scorepred
-        #linData[label] = tmpData.T
-    return linData
-            
+#    for score in scores:
+#        print("# Tuning hyper-parameters for %s" % score)
+#        print()
+#    
+#        clf = GridSearchCV(svm.SVC(class_weight='balanced'), tuned_parameters, cv=5,
+#                           scoring='%s' % score)
+#        clf.fit(X_train, y_train)
+#    
+#        print("Best parameters set found on development set:")
+#        
+#        print(clf.best_params_)
+#        
+#        print("Grid scores on development set:")
+#       
+#        means = clf.cv_results_['mean_test_score']
+#        stds = clf.cv_results_['std_test_score']
+#        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
+#            print("%0.3f (+/-%0.03f) for %r"
+#                  % (mean, std * 2, params))
+#        print()
+#    
+#        print("Detailed classification report:")
+#        print()
+#        print("The model is trained on the full development set.")
+#        print("The scores are computed on the full evaluation set.")
+#        print()
+#        y_true, y_pred = y_test, clf.predict(X_test)
+#        print(classification_report(y_true, y_pred))
+#        print()
+    T = testInd
+    ax1 = plt.subplot(211)
+    mp.plotEthogram(ax1, T, Y[testInd], alpha = 0.5, yValMax=1, yValMin=0, legend=0)
+    ax1 = plt.subplot(212)
+    mp.plotEthogram(ax1, T, Ypred, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
+    return pcares
 ###############################################    
 # 
 # LASSO
 #
 ##############################################    
 
-def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
+def stdevRule(x, y, std):
+    """move by one stdeviation to increase regularization."""
+    yUp = np.min(y) + std[np.argmin(y)]
+    yFunc =  interp1d(x,y,'cubic',fill_value='extrapolate')
+#    plt.plot(x,y)
+#    plt.errorbar(x,y, yerr=std)
+#    plt.show()
+#    y0, y1 = np.min(y), y[-1]
+#    x0, x1 = x[np.argmin(y)], x[-1]
+#    m = (y1-y0)/(x1-x0)
+#    c = y0-m*x0
+#    xalpha = (c-yUp)/m
+    xalpha = x[np.argmin(y)]*1.5
+    xUpper = newton(lambda x: np.abs(yFunc(x) - yUp), xalpha)
+#    print xUpper, xalpha
+#    plt.plot(np.abs(yFunc(x) - yUp))
+#    
+#    plt.show()
+    return xUpper
+
+###############################################    
+# balanced splits for crossvalidation
+#
+##############################################
+def crossvalFolds(yData, nsplits):
+    """create balanced data."""
+    nbin = 5
+    hist, bins = np.histogram(y, nbin)
+    # this is the amount of data that will be left in each bin after equalization
+    N = np.min(hist)#*nbin
+    # digitize data 
+    dataProb = np.digitize(yData, bins=bins[:-2], right=True)
+    # rescale such that we get desired trainingset length
+    
+    
+  
+    
+   
+   
+def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
     """run LASSO to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
         Y = data['Behavior'][label]
+        trainingsInd, testInd = splits[label]['Indices']
         #Y = Y.reshape((-1,1))
         #scale = np.nanmean(Y)
         #Y-=scale
@@ -333,13 +339,22 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['Angl
 
         # fit lasso and validate
         #a = np.linspace(0.001,0.05,100)
-        reg = linear_model.LassoCV(cv=5, selection = 'random', verbose=0, \
-        eps=0.001, max_iter=3000)#, normalize=False)
+        cv = 15
+        fold = KFold(cv, shuffle=False) 
+       
+        reg = linear_model.LassoCV(cv=fold, selection = 'random', verbose=0, \
+        eps=1e-3, max_iter=3000)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
+        alphas = reg.alphas_
+        ymean = np.mean(reg.mse_path_, axis =1)
+        yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
+        alphaNew = alphas[np.argmin(ymean)]
+        # calculate standard deviation rule
+#        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
+#        reg = linear_model.Lasso(alpha=alphaNew)
+#        reg.fit(X[trainingsInd], Y[trainingsInd])
         
-        # TODO use one-stdev rule: all else equal, regularize more
-        #mean, stdev = np.mean(reg.mse_path_, axis =1), np.stdev(reg.mse_path_, axis =1)
-        #alpha = np.interp(reg.alphas_, mean+stdev)
+        
         if plot:
             plt.subplot(221)
             plt.title('Trainingsset')
@@ -357,12 +372,14 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['Angl
 #            ax1.set_xlabel(r'weights')
 #            ax1.set_ylabel('PDF(weights)')
             plt.subplot(224)
-            plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.3)
-            plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1), 'k')
-            ymean = np.mean(reg.mse_path_, axis =1)
-            yerr = np.std(reg.mse_path_, axis =1)
             
-            plt.fill_between(reg.alphas_,y1=ymean-yerr, y2= ymean+yerr, alpha=0.5)
+            #plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.3)
+            plt.plot(alphas, ymean, 'k')
+            plt.errorbar(alphas, ymean, yerr=yerr, capsize=1)
+            plt.axvline(alphas[np.argmin(ymean)],label='minimal error')
+            plt.axvline(alphaNew,label='stdev rule')
+            plt.xscale('log')
+            #plt.fill_between(reg.alphas_,y1=ymean-yerr, y2= ymean+yerr, alpha=0.5)
             #plt.errorbar(,color= 'k')
             plt.tight_layout()            
             plt.show()
@@ -373,11 +390,11 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['Angl
         linData[label] = {}
         linData[label]['weights'] =  reg.coef_
         linData[label]['intercepts'] = reg.intercept_
-        linData[label]['alpha'] = reg.alpha_
+        linData[label]['alpha'] = alphaNew#reg.alpha_
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
-        print 'alpha', reg.alpha_, scorepred
+        print 'alpha', alphaNew, scorepred
     return linData
     
 ###############################################    
@@ -386,7 +403,7 @@ def runLasso(data, pars, testInd, trainingsInd, plot = False, behaviors = ['Angl
 #
 ##############################################    
 
-def runElasticNet(data, pars, testInd, trainingsInd, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
+def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
     """run EN to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
@@ -396,10 +413,10 @@ def runElasticNet(data, pars, testInd, trainingsInd, plot = False, behaviors = [
             X = data['Neurons']['rankActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
-
+        trainingsInd, testInd = splits[label]['Indices']
         # fit elasticNet and validate
-        l1_ratio = [0.5, .9, .95, 0.99, 1]
-        cv = 10
+        l1_ratio = [0.5, 0.75, .9, .95, 0.99, 1]
+        cv = 15
         a = np.linspace(0.0001,0.05,100)
         reg = linear_model.ElasticNetCV(l1_ratio, cv=cv, verbose=0)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
@@ -451,7 +468,7 @@ def runElasticNet(data, pars, testInd, trainingsInd, plot = False, behaviors = [
 # Show how prediction improves with more neurons
 #
 ##############################################  
-def scoreModelProgression(data, results, testInd, trainingsInd, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3']):
+def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3']):
     """show how more neurons improve predictive abilities."""
     linData = {}
     for label in behaviors:
@@ -465,6 +482,7 @@ def scoreModelProgression(data, results, testInd, trainingsInd, pars, fitmethod 
             X = data['Neurons']['rankActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        trainingsInd, testInd = splits[label]['Indices']
         # individual predictive scores
         indScore = []
         sumScore = []
