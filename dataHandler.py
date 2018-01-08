@@ -34,26 +34,27 @@ def loadPoints(folder, straight = True):
     else:
         return [p[1] for p in points]
 
-def loadCenterlines(folder, wormcentered = False):
+def loadCenterlines(folder):
     """get centerlines from centerline.mat file"""
     tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
     clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
     volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
-    print volTime.shape
+    #print volTime.shape
     clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))
     
     #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
     
     cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
     #
-    if wormcentered:
-        cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
+    #if wormcentered:
+    wc = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
     # reduce to volume time
     clNew = cl[clIndices.astype(int)]
 #    for cl in clNew[::10]:
 #        plt.plot(cl[:,0], cl[:,1])
 #    plt.show()
-    return clNew
+    print 'Done loading centerlines'
+    return clNew, wc
     
 def transformEigenworms(pc1, pc2, pc3, dataPars):
     """smooth Eigenworms and calculate associated metrics like velocity."""
@@ -107,11 +108,11 @@ def loadData(folder, dataPars):
 #    # median filter the Eigenworms
     pc1, pc2, pc3, velo, theta = transformEigenworms(pc1, pc2, pc3, dataPars)
     ## recalculate velocity from position
-    vel = np.squeeze(np.sqrt((np.diff(xPos, axis=0)**2 + np.diff(yPos, axis=0)**2))/6.)
-    vel = np.pad(vel, (1,0), 'constant')
+    #vel = np.squeeze(np.sqrt((np.diff(xPos, axis=0)**2 + np.diff(yPos, axis=0)**2))/6.)
+    #vel = np.pad(vel, (1,0), 'constant')
     # ethogram redone
-    etho = makeEthogram(velo, pc3)
-    #etho = ethoOrig
+    #etho = makeEthogram(velo, pc3)
+    etho = ethoOrig
     T = np.arange(pc1.shape[0])/6.
 #    print T, etho.shape, ethoOrig.shape
 #    mp.plotEthogram(ax, T, ethoOrig, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
@@ -131,7 +132,7 @@ def loadData(folder, dataPars):
         G = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in G])
         R = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in R])
     Y = G/R
-    
+    Y =  np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in Y])
     # ordering from correlation map/hie
     order = np.array(data['cgIdx']).T[0]-1
     # unpack neuron position (only one frame, randomly chosen)
@@ -149,8 +150,8 @@ def loadData(folder, dataPars):
     Y = Y[order]
    
 #    # make values nicer
-    Y -= np.nanmin(Y, axis=0)
-    Y = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
+    #Y -= np.nanmin(Y, axis=0)
+    #Y = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
     # smooth with small window size
     #Y = np.array([savitzky_golay(line, window_size=17, order=3) for line in Y])
     #Y =  preprocessing.scale(Y.T).T
@@ -167,7 +168,7 @@ def loadData(folder, dataPars):
     # do the same in the end
     mean[-wind:] = np.repeat(np.mean(np.mean(Y,axis=0)[:-wind]), wind)
     print len(mean), Y.shape
-    #Y = Y-mean
+    Y = Y-mean
 #    m, s = np.mean(Y, axis=0), np.std(Y, axis=0)
 #    plt.subplot(211)
 #    plt.plot(m, 'r', label='mean')

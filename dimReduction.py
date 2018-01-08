@@ -114,7 +114,7 @@ def runPCANormal(data, pars):
     else:
         Neuro = data['Neurons']['Activity']
     #Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
-    pcs = pca.fit_transform(Neuro )
+    pcs = pca.fit_transform(Neuro)
     comp = pca.components_
     #comp = np.cumsum(pca.components_, axis=1)
     # order neurons by weight in first component
@@ -207,7 +207,7 @@ def discreteBehaviorPrediction(data, pars, splits):
     Y = data['Behavior']['Ethogram']
     trainingsInd, testInd = splits['AngleVelocity']['Indices']
     # create a linear SVC
-    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=10)
+    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=1)
     
     lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
     
@@ -527,4 +527,34 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         linData[label]['individualScore'] = indScore
     return linData
     
+###############################################    
+# 
+# reorganize linear models to fit PCA plot style
+#
+##############################################
+def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3']):
+    """takes a model fit and calculates basis vectors etc."""
+    # modify data to be like scikit likes it
+    if pars['useRank']:
+        X = data['Neurons']['rankActivity'].T
+    else:
+        X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+    # get weights
+    pcs = np.vstack([results[fitmethod][label]['weights'] for label in behaviors])
+    indices = np.argsort(pcs[0])
+    
+    comp = np.zeros((len(behaviors), len(X)))
+    # show temporal components
+    for wi, weights in enumerate(pcs):
+        comp[wi] = np.dot(X, weights)
+    # calculate redicted neural dynamics  TODO
+    score = np.ones(len(behaviors))
+    #score = explained_variance_score()
+    
+    pcares = {}
+    pcares['nComp'] =  len(behaviors)
+    pcares['expVariance'] =  score
+    pcares['neuronWeights'] =  pcs.T
+    pcares['neuronOrderPCA'] =  indices
+    pcares['pcaComponents'] =  comp
     

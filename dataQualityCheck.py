@@ -46,7 +46,7 @@ for key in keyListAll:
     
     pars ={'nCompPCA':10, # no of PCA components
             'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.9, # what fraction of data to use for training 
+            'trainingCut': 0.6, # what fraction of data to use for training 
             'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
@@ -62,9 +62,9 @@ for key in keyListAll:
     #
     ##############################################
     createIndicesTest = True 
-    overview = 0#False
-    svm = 0
-    pca = 0#False
+    overview = 1#False
+    svm = 1
+    pca = 1#False
     hierclust = False
     linreg = False
     lasso = 1
@@ -88,8 +88,10 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
+        mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)
         #mp.plotNeurons3D(dataSets, keyList, threed = False)  
+        mp.plotExampleCenterlines(dataSets, keyList, folder)
         plt.show() 
     ###############################################    
     # 
@@ -191,8 +193,17 @@ for key in keyListAll:
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key],splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
                 resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
+            tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
+            for tmpKey in tmpDict.keys():
+                resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
         
         mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
+        plt.show()
+        # overview of SVM results and weights
+        mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')
+        plt.show()
+        #  plot 3D trajectory of SVM
+        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'LASSO')
         plt.show()
         
         

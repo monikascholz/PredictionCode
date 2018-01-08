@@ -6,6 +6,7 @@ plot assistant. make pretty plots.
 """
 import numpy as np
 import matplotlib as mpl
+import os
 #
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -148,7 +149,7 @@ def plotHeatmap(T, Y, ax = None):
     """nice looking heatmap for neural dynamics."""
     if ax is None:
         ax = plt.gca()
-    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0])#,vmax=2, vmin=-2)
+    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=2, vmin=-2)
     ax.set_xlabel('Time (s)')
     ax.set_ylabel("Neuron")
     return cax1
@@ -179,6 +180,57 @@ def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
     if legend:
         plt.legend(ncol=2)
     
+def plotExampleCenterlines(dataSets, keyList, folder)  :
+    """plot a few centerlines from different behaviors."""
+    print 'plot centerline'
+    nWorms = len(keyList)
+    fig = plt.figure('Centerlines',(10, nWorms*3.4))
+    gs = gridspec.GridSpec(nWorms, 10)
+    for dindex, key in enumerate(keyList):
+        cl, wc = dh.loadCenterlines(folder.format(key))
+        
+        for i, index in enumerate(np.arange(0,len(cl), int(len(cl)/10))):
+            ax2 = plt.subplot(gs[dindex, i])
+            x, y = cl[index][:,0], cl[index][:,1]
+            ax2.plot(x,y)
+            span = np.max([np.max(x)-np.min(x), np.max(y)-np.min(y)])
+            ax2.set_xlim([np.min(x)-10, np.max(x)+span])
+            ax2.set_ylim([np.min(y)-10, np.max(y)+span])
+            
+###############################################    
+# 
+# velocity versus angle veocity
+#
+##############################################       
+def plotVelocityTurns(dataSets, keyList):
+    """plot velocity in relation to CMS velocity."""
+    nWorms = len(keyList)
+    fig = plt.figure('Eigenworms after Projection',(10, nWorms*3.4))
+    gs = gridspec.GridSpec(nWorms*2, 1)
+    for dindex, key in enumerate(keyList):
+        
+        data = dataSets[key]
+        ax = plt.subplot(gs[2*dindex])
+        ax.set_title(key)
+        vel =data['Behavior']['CMSVelocity']
+        vel = (vel-np.min(vel))/np.max(vel)
+        vel += np.min(data['Behavior']['AngleVelocity'])
+        vel *= np.max(data['Behavior']['AngleVelocity'])
+        yMin, yMax = np.min(data['Behavior']['AngleVelocity']), np.max(data['Behavior']['AngleVelocity'])
+        plotEthogram(ax, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25, yValMin=yMin,yValMax=yMax )        
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
+        plotEigenworms(data['Neurons']['Time'], vel, color = 'k',label = 'CMS velocity')
+        plt.legend()
+       
+        ax2 = plt.subplot(gs[2*dindex+1])
+        yMin, yMax = np.nanmin(data['Behavior']['Eigenworm3']), np.nanmax(data['Behavior']['Eigenworm3'])
+        plotEthogram(ax2, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25,yValMin=yMin,yValMax=yMax)
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['Eigenworm3'],color = colorBeh['Eigenworm3'], label = names['Eigenworm3'])
+        #plot cms motion        
+    
+    plt.tight_layout()
+    plt.show()  
+    
 ###############################################    
 # 
 # full figures
@@ -196,7 +248,7 @@ def plotDataOverview(dataSets, keyList):
         data = dataSets[key]
         ax = plt.subplot(gs[2*dindex:2*dindex+2,0])
         ax.set_title(key)
-        hm = plotHeatmap(data['Neurons']['Time'], data['Neurons']['rankActivity'])
+        hm = plotHeatmap(data['Neurons']['Time'], data['Neurons']['Activity'])
         ax2 = plt.subplot(gs[2*dindex:2*dindex+2,1])
         plt.colorbar(hm, cax=ax2)
              
