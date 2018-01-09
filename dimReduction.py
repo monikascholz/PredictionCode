@@ -28,6 +28,84 @@ import makePlots as mp
 # create trainings and test sets
 #
 ############################################## 
+def splitIntoSets(y, nBins=5, nSets=5, splitMethod='auto', verbose=0):
+    """get balanced training sets for a dataset y."""
+    # Determine limits of array
+    yLimits = np.array([np.min(y),np.max(y)])
+    yLimits = np.percentile(y, [2.28, 97.72])#
+    if verbose >= 1:
+        print 'Min and max y: ', yLimits
+
+    # Calculate bin edges and number of events in each bin
+    nCounts,binEdges = np.histogram(y,nBins,yLimits)
+    if  verbose >= 2:
+        print 'Bin edges: ', binEdges
+        print 'Counts: ', nCounts
+
+    # Get minimum and maximum number of events in bins
+    nCountsLimits = np.array([np.min(nCounts),np.max(nCounts)])
+    if verbose >= 1:
+        print 'Min and max counts: ', nCountsLimits
+
+    # Determine bin index for each individual event
+    # Digitize is semi-open, i.e. slightly increase upper limit
+    binEdges[-1] += 1e-5
+    binEdges[0], binEdges[-1] = np.min(y), np.max(y)+1e-5
+    yBinIdx = np.digitize(y,binEdges) - 1
+
+    # Get event indices for each bin
+    eventIndices = []
+    for binIdx in range(nBins):
+        eventIndices.append(np.arange(len(y),dtype=int)[yBinIdx == binIdx])
+    eventIndices = np.asarray(eventIndices)
+
+    # Determine split method if auto is used
+    nPerBin = nCountsLimits[0]/nSets
+    if splitMethod == 'auto':
+        if nPerBin < 10:
+            splitMethod = 'redraw'
+        else:
+            splitMethod = 'unique'
+
+    # Get proper number of events per bin, depending on split method
+    if splitMethod == 'redraw':
+        nPerBin = nCountsLimits[1]/nSets                            # Maximum bin count divided by number of sets
+        if nPerBin > nCountsLimits[0]: nPerBin = nCountsLimits[0]   # But has to be at most the minimum bin count
+    else: nPerBin = nCountsLimits[0]/nSets
+
+    if verbose >= 1:
+        print 'Split method: ', splitMethod
+        print 'Events per bin per set: ', nPerBin
+
+    # Create subsets
+    sets = [[] for i in range(nSets)]
+    for i in range(nBins):
+        _tEvtIdx = np.asarray(eventIndices[i][:])
+        for j in range(nSets):
+            np.random.shuffle(_tEvtIdx)
+            if len(_tEvtIdx) > nPerBin:
+                sets[j].append(np.copy(_tEvtIdx[:nPerBin]))
+            else:
+                sets[j].append(np.copy(_tEvtIdx[:]))
+            if splitMethod == 'unique':
+                _tEvtIdx = _tEvtIdx[nPerBin:]
+
+    # Convert into numpy arrays
+    for i in range(nSets):
+        sets[i] = np.asarray(sets[i]).reshape(nPerBin*nBins)
+    sets = np.asarray(sets)
+
+    # Prepare info dictionary with helpful data
+    info = {}
+    info['total-entries'] = int(sets.shape[0] * sets.shape[1])
+    info['unique-entries'] = len(list(set(np.ravel(sets))))
+    info['method'] = splitMethod
+    info['min-max-y'] = yLimits
+    info['min-max-cts'] = nCountsLimits
+    info['nbins'] = nBins
+
+    return sets, info
+    
 def createTrainingTestIndices(data, pars, label):
     """split time points into trainings and test set."""
     timeLen = data['Neurons']['Activity'].shape[1]
@@ -88,16 +166,7 @@ def createTrainingTestIndices(data, pars, label):
         plt.show()
     return np.sort(trainingsIndices), np.sort(testIndices)
     
-   
 
-###############################################    
-# 
-# create behavioral signatures
-#
-##############################################
-def behaviorTAvg(data, pars):
-    """use ethogram to calculate behavior triggered averages."""
-    
 
 ###############################################    
 # 
@@ -120,7 +189,8 @@ def runPCANormal(data, pars):
     # order neurons by weight in first component
     #indices = np.arange(len(Neuro))
     
-    indices = np.argsort(pcs[:,0])
+    indices = np.argsort(pcs.T)[0]
+    #print indices.shape
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
     pcares['expVariance'] =  pca.explained_variance_ratio_
@@ -162,7 +232,9 @@ def timewarp(data):
     for bindex, behavior in enumerate([-1,1,2]):
         # find behavior indices
         indices.append(np.where(data['Behavior']['Ethogram']==behavior)[0])
+    # number of timestamps in each behavior
     lens = np.array([len(x) for x in indices])
+    # timesamples in the smallest behavior
     minval = np.min(lens[np.nonzero(lens)])
     #subsample neural data to the minimal, non-zero size
     neurArr = []
@@ -207,7 +279,7 @@ def discreteBehaviorPrediction(data, pars, splits):
     Y = data['Behavior']['Ethogram']
     trainingsInd, testInd = splits['AngleVelocity']['Indices']
     # create a linear SVC
-    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=1)
+    lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=10)
     
     lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
     
@@ -299,26 +371,14 @@ def stdevRule(x, y, std):
 #    
 #    plt.show()
     return xUpper
-
-###############################################    
-# balanced splits for crossvalidation
-#
-##############################################
-def crossvalFolds(yData, nsplits):
-    """create balanced data."""
-    nbin = 5
-    hist, bins = np.histogram(y, nbin)
-    # this is the amount of data that will be left in each bin after equalization
-    N = np.min(hist)#*nbin
-    # digitize data 
-    dataProb = np.digitize(yData, bins=bins[:-2], right=True)
-    # rescale such that we get desired trainingset length
+def balancedFolds(y):
+    """create balanced train/validate splitsby leave one out."""
+    splits, _ = splitIntoSets(y, nBins=5, nSets=10, splitMethod='unique', verbose=0)
+    folds = []
+    for i in range(len(splits)):
+        folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
+    return folds
     
-    
-  
-    
-   
-   
 def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
     """run LASSO to fit behavior and neural activity with a linear model."""
     linData = {}
@@ -338,18 +398,20 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
 
         # fit lasso and validate
-        #a = np.linspace(0.001,0.05,100)
+        a = np.logspace(-3,1,100)
         cv = 15
-        fold = KFold(cv, shuffle=False) 
-       
+        # unbalanced sets
+        #fold = KFold(cv, shuffle=False) 
+        # balanced sets
+        fold = balancedFolds(Y[trainingsInd])
         reg = linear_model.LassoCV(cv=fold, selection = 'random', verbose=0, \
-        eps=1e-3, max_iter=3000)#, normalize=False)
+        eps=1e-1, max_iter=3000, alphas=a)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         alphas = reg.alphas_
         ymean = np.mean(reg.mse_path_, axis =1)
         yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
         alphaNew = alphas[np.argmin(ymean)]
-        # calculate standard deviation rule
+#        # calculate standard deviation rule
 #        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
 #        reg = linear_model.Lasso(alpha=alphaNew)
 #        reg.fit(X[trainingsInd], Y[trainingsInd])
@@ -416,9 +478,10 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         trainingsInd, testInd = splits[label]['Indices']
         # fit elasticNet and validate
         l1_ratio = [0.5, 0.75, .9, .95, 0.99, 1]
-        cv = 15
+        #cv = 15
         a = np.linspace(0.0001,0.05,100)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=cv, verbose=0)
+        fold = balancedFolds(Y[trainingsInd])
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
@@ -541,11 +604,13 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
         X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
     # get weights
     pcs = np.vstack([results[fitmethod][label]['weights'] for label in behaviors])
+    print pcs.shape
     indices = np.argsort(pcs[0])
     
     comp = np.zeros((len(behaviors), len(X)))
     # show temporal components
     for wi, weights in enumerate(pcs):
+        print weights.shape
         comp[wi] = np.dot(X, weights)
     # calculate redicted neural dynamics  TODO
     score = np.ones(len(behaviors))
@@ -557,4 +622,4 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
     pcares['neuronWeights'] =  pcs.T
     pcares['neuronOrderPCA'] =  indices
     pcares['pcaComponents'] =  comp
-    
+    return pcares

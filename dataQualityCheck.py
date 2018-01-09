@@ -26,10 +26,10 @@ dataLog = "AML32_moving/AML32_datasets.txt"
 outLoc = "AML32_moving/Analysis/"
 
 # data parameters
-dataPars = {'medianWindow':13, # smooth eigenworms with median filter of that size, must be odd
-            'savGolayWindow':13, # savitzky-golay window for angle velocity derivative. must be odd
+dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
+            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'savGolayWindowGCamp': 13 # savitzky-golay window for red and green channel
+            'windowGCamp': 5 # gauss window for red and green channel
             }
 
 
@@ -37,7 +37,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = [key]
+    keyList = keyListAll
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -46,14 +46,14 @@ for key in keyListAll:
     
     pars ={'nCompPCA':10, # no of PCA components
             'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.6, # what fraction of data to use for training 
+            'trainingCut': 0.7, # what fraction of data to use for training 
             'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
             'useRank': 0, # use the rank transformed version of neural data for all analyses
           }
     
-    behaviors = ['AngleVelocity', 'Eigenworm3']
+    behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2']
     #behaviors = ['AngleVelocity']
 
     ###############################################    
@@ -62,13 +62,13 @@ for key in keyListAll:
     #
     ##############################################
     createIndicesTest = True 
-    overview = 1#False
-    svm = 1
+    overview = 0#False
+    svm = 0
     pca = 1#False
     hierclust = False
     linreg = False
     lasso = 1
-    elasticnet = 1#True
+    elasticnet = 0#True
     positionweights = 0#True
     resultsPredictionOverview = 1
     ###############################################    
@@ -88,10 +88,11 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
-        mp.plotVelocityTurns(dataSets, keyList)
+        #mp.plotBehaviorAverages(dataSets, keyList) 
+        #mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)
-        #mp.plotNeurons3D(dataSets, keyList, threed = False)  
-        mp.plotExampleCenterlines(dataSets, keyList, folder)
+        mp.plotNeurons3D(dataSets, keyList, threed = False)  
+        #mp.plotExampleCenterlines(dataSets, keyList, folder)
         plt.show() 
     ###############################################    
     # 
@@ -128,10 +129,13 @@ for key in keyListAll:
         print 'running PCA'
         for kindex, key in enumerate(keyList):
             resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+            #resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
         
         # overview of PCA results and weights
         mp.plotPCAresults(dataSets, resultDict, keyList, pars)
         plt.show()
+        # show correlates of PCA
+        mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
         #  plot 3D trajectory of PCA
         mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
         plt.show()
@@ -193,17 +197,18 @@ for key in keyListAll:
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key],splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
                 resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
+            
             tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
-                resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
+                resultDict[key]['LASSO'][tmpKey]=tmpDict[tmpKey]
         
         mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
         plt.show()
-        # overview of SVM results and weights
+        # overview of LASSO results and weights
         mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')
         plt.show()
         #  plot 3D trajectory of SVM
-        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'LASSO')
+        #mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'LASSO')
         plt.show()
         
         
@@ -253,8 +258,9 @@ for key in keyListAll:
         
         noNeur = []
         for key in keyList:
-            noNeur.append([resultDict[key]['Lasso']['AngleVelocity']['noNeurons'], resultDict[key]['Lasso']['Eigenworm3']['noNeurons']])
+            noNeur.append([resultDict[key]['LASSO']['AngleVelocity']['noNeurons'], resultDict[key]['LASSO']['Eigenworm3']['noNeurons']])
         noNeur = np.array(noNeur)
         plt.figure()
         plt.bar([1,2], np.mean(noNeur, axis=0),yerr=np.std(noNeur, axis=0) )
-            
+    
+    

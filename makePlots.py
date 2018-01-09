@@ -82,8 +82,60 @@ ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 # rename behaviors for plots
 names = {'AngleVelocity': 'Angular velocity',
          'Eigenworm3': 'Turns', 
-         'Eigenworm2': 'Head swing'
+         'Eigenworm2': 'Head swing',
+         'Eigenworm1': 'Head swing'
         }
+
+def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) : 
+    
+    dx = min(np.diff(x_data))
+   
+
+    for xd, yd, cl in zip(x_data, y_data, clrs) :
+        bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
+                        notch=False, patch_artist=True)
+        plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
+             linewidth=1, alpha=0.4)
+        plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=1, alpha=1.0)    
+        for cap in bp['caps']:
+            cap.set(color=cl, linewidth=1)       
+        for flier in bp['fliers']:
+            flier.set(marker='+', color=cl, alpha=1.0)            
+        for median in bp['medians']:
+            median.set(color=cl, linewidth=1) 
+        jitter = (np.random.random(len(yd)) - 0.5)*dx / 20 
+        dotxd = [xd - 0.25*dx]*len(yd) + jitter
+
+        # make alpha stronger
+        ax.plot(dotxd, yd, linestyle='None', marker='o', color=cl, \
+                markersize=3, alpha=0.5)  
+    ymin = min([min(m) for m in y_data])
+    ymax = max([max(m) for m in y_data])
+    dy = 10 ** np.floor(np.log10(ymin))
+    ymin, ymax = ymin-dy, ymax+dy
+    xmin, xmax = min(x_data)-0.5*dx, max(x_data)+0.5*dx
+    ax.set_xlim(xmin, xmax)        
+    ax.set_ylim(ymin, ymax)  
+    ax.set_xticks(x_data)
+
+    for loc, spine in ax.spines.items() :
+        if loc == 'left' :
+            spine.set_position(('outward', 0))  # outward by 5 points
+            spine.set_smart_bounds(True)
+        elif loc == 'bottom' :
+            spine.set_position(('outward', 5))  # outward by 5 points
+            spine.set_smart_bounds(True)            
+        else :
+            spine.set_color('none')  # don't draw spine
+    ax.yaxis.set_ticks_position('left') # turn off right ticks
+    ax.xaxis.set_ticks_position('bottom') # turn off top ticks
+    ax.get_xaxis().set_tick_params(direction='out')
+    ax.patch.set_facecolor('white') # ('none')
+    ax.set_xticklabels(lbls, rotation=30, fontsize=14)
+    
+    #ax.set_aspect(2.0 / (0.1*len(lbls)), adjustable=None, anchor=None)
+    #ax.set_aspect(0.01 / (len(y_data)), adjustable=None, anchor=None)        
+        
             
 def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     '''plot 3 projections into 2d for 3dim data sets. Takes an outer gridspec object to place plots.'''
@@ -111,6 +163,7 @@ def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
 
 def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
     """multicolor plot modified from francesco."""
+    lw = 1
     x = x[::cg]
     y = y[::cg]
     z = z[::cg]
@@ -118,9 +171,9 @@ def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
     if threedim:
         points = np.array([x,y,z]).transpose().reshape(-1,1,3)
         segs = np.concatenate([points[:-1],points[1:]],axis=1)
-        lc = Line3DCollection(segs, cmap=c, lw=0.5)
+        lc = Line3DCollection(segs, cmap=c, lw=lw)
         if etho:
-            lc = Line3DCollection(segs, cmap=c, lw=0.5, norm=ethonorm)
+            lc = Line3DCollection(segs, cmap=c, lw=lw, norm=ethonorm)
         lc.set_array(t)
         ax.add_collection3d(lc)
         ax.set_xlim(np.min(x),np.max(x))
@@ -129,9 +182,9 @@ def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
     else:
         points = np.array([x,y]).transpose().reshape(-1,1,2)
         segs = np.concatenate([points[:-1],points[1:]],axis=1)
-        lc = LineCollection(segs, cmap=c, lw=0.5)
+        lc = LineCollection(segs, cmap=c, lw=lw)
         if etho:
-            lc = LineCollection(segs, cmap=c, lw=0.5, norm=ethonorm)
+            lc = LineCollection(segs, cmap=c, lw=lw, norm=ethonorm)
         lc.set_array(t)
         ax.add_collection(lc)
         ax.set_xlim(np.min(x),np.max(x))
@@ -189,14 +242,46 @@ def plotExampleCenterlines(dataSets, keyList, folder)  :
     for dindex, key in enumerate(keyList):
         cl, wc = dh.loadCenterlines(folder.format(key))
         
-        for i, index in enumerate(np.arange(0,len(cl), int(len(cl)/10))):
+        for i, index in enumerate(np.arange(0,len(cl), int(len(cl)/9))):
             ax2 = plt.subplot(gs[dindex, i])
             x, y = cl[index][:,0], cl[index][:,1]
+            x -= np.mean(x)
+            y -= np.mean(y)
             ax2.plot(x,y)
             span = np.max([np.max(x)-np.min(x), np.max(y)-np.min(y)])
-            ax2.set_xlim([np.min(x)-10, np.max(x)+span])
-            ax2.set_ylim([np.min(y)-10, np.max(y)+span])
+            ax2.set_xlim([np.min(x)-10, np.min(x)+span])
+            ax2.set_ylim([np.min(y)-10, np.min(y)+span])
+    
+def plotBehaviorAverages(dataSets, keyList)  :
+    """plot the mean calcium signal given a behavior."""
+    print 'plot BTA'
+    nWorms = len(keyList)
+    fig = plt.figure('BehaviorAverage',(7, nWorms*3.4))
+    gs = gridspec.GridSpec(nWorms, 3)
+    for dindex, key in enumerate(keyList):
+        data = dataSets[key]['Behavior']['Ethogram']
+        Y = dataSets[key]['Neurons']['Activity'].T
+        for index, bi in enumerate([-1,1,2]):
+            indices = np.where(data==bi)[0]
+            m = np.mean(Y[indices], axis=0)
+            s = np.std(Y[indices], axis=0)
+            order = np.argsort(m)
+            low, high = np.percentile(Y[indices],[10,90], axis=0)
+            m = m[order]
+            s = s[order]
+            ax = plt.subplot(gs[dindex, index])
             
+            #ax.plot(m,s, 'o')
+            #ax.plot(m)
+            #ax.plot(low[order])
+            #ax.plot(high[order])
+            #Y = Y[:,[order]]
+            yNew = Y[indices]
+            ax.plot(yNew.T[order], alpha=0.01, color='#1c2f66')
+            #ax.plot(np.mean(yNew, axis=1))
+            ax.set_xlabel('neurons (sorted by mean)')
+            ax.set_ylabel(labelDict[bi])
+            #ax.fill_between(range(len(m)), m-s, m+s, alpha=0.5)
 ###############################################    
 # 
 # velocity versus angle veocity
@@ -327,7 +412,9 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
     ax1.set_xlabel('Time (s)')
     fig.add_subplot(ax1)        
     axcb = plt.Subplot(fig, inner_grid[0, 1])        
-    plt.colorbar(cax1, cax=axcb, use_gridspec = True)
+    cbar = plt.colorbar(cax1, cax=axcb, use_gridspec = True)
+    cbar.set_ticks([-2,0,2])
+    cbar.set_ticklabels(['<-2',0,'>2'])
     fig.add_subplot(axcb) 
     
     # plot the weights
@@ -336,33 +423,42 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
     # normalize by max for each group
     #pcs = np.divide(pcs.T,np.max(np.abs(pcs), axis=1)).T
     rank = np.arange(0, len(pcs))
-    
-    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,0][results['neuronOrderPCA']], step='pre')
-    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,1][results['neuronOrderPCA']], step='pre')       
-    ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,2][results['neuronOrderPCA']], step='pre')       
+    for i in range(np.min([3,pcs.shape[1]])):
+        y= pcs[:,i]
+        # normalize
+        #y-=np.min(y)
+        #y /=np.max(y)
+        ax2.fill_betweenx(rank, np.zeros(len(Neuro)),y[results['neuronOrderPCA']], step='pre', alpha=1.0-i*0.2)
+    #ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,1][results['neuronOrderPCA']], step='pre')       
+    #ax2.fill_betweenx(rank, np.zeros(len(Neuro)),pcs[:,2][results['neuronOrderPCA']], step='pre')       
     ax2.set_xlabel('Neuron weight')
     ax2.spines['left'].set_visible(False)
     ax2.set_yticks([])
     fig.add_subplot(ax2)
     
     ax3 = plt.Subplot(fig, inner_grid[1,0])
-    for i in range(3):
-        ax3.plot(time, 0.1*i+results['pcaComponents'][i], label=i, lw=0.5)
+    for i in range(np.min([len(results['pcaComponents']), 3])):
+        y = results['pcaComponents'][i]
+        # normalize
+        y-=np.min(y)
+        y /=np.max(y)
+        ax3.plot(time, i+y, label='Component {}'.format(i+1), lw=0.5)
+    #ax3.legend()
     ax3.set_ylabel('PCA components')
     ax3.set_xlabel('Time (s)')
     fig.add_subplot(ax3)
     ax4 = plt.Subplot(fig, inner_grid[1,2])
     nComp = results['nComp']
     
-    
-    
     if flag=='SVM':
         ax4.set_ylabel('F1 score')
         ax4.step(np.arange(nComp),results['expVariance'], where = 'pre')
     else:
-        ax4.fill_between(np.arange(nComp),results['expVariance'])
-        ax4.step(np.arange(nComp),np.cumsum(results['expVariance']), where = 'pre')
-        ax4.set_ylabel('Explained variance')
+        ax4.fill_between(np.arange(1,nComp+1),results['expVariance']*100, step='post', color='k', alpha=0.75)
+        #ax4.step(np.arange(1,nComp+1),np.cumsum(results['expVariance'])*100, where = 'pre')
+        ax4.plot(np.arange(1,nComp+1),np.cumsum(results['expVariance'])*100, 'ko-', lw=1)
+        ax4.set_ylabel('Explained variance (%)')
+        ax4.set_yticks([0,25,50,75,100])
     ax4.set_xlabel('Number of components')
     fig.add_subplot(ax4)    
     
@@ -393,7 +489,7 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
 # neuronal signal pca, plot in 3D with behavior labels
 #
 ############################################## 
-def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 6):
+def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 3):
     """Show neural manifold with behavior label."""
     nWorms = len(keyList)
     print 'colored by ', col
@@ -508,7 +604,7 @@ def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
 
     for kindex, key in enumerate(keyList):
         data = dataSets[key]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(1, 5,
+        inner_grid = gridspec.GridSpecFromSubplotSpec(3, 5,
         subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
         x,y,z = resultDict[key][flag]['pcaComponents'][:3,]
         
@@ -516,18 +612,22 @@ def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
         velo = dh.savitzky_golay(theta, window_size=17, order=5, deriv=1, rate=1)
         #velo = dh.savitzky_golay(x, window_size=7, order=3, deriv=2, rate=1)
         phase = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
-            
+        corrs = [data['Behavior']['CMSVelocity']*100, data['Behavior']['AngleVelocity'], data['Behavior']['Eigenworm3'],  data['Behavior']['Eigenworm1'], phase]
+        corrNames = ['CMS velocity', 'Phase velocity', 'Turns', 'Head angle', 'Head phase']        
         size, a = 0.5, 0.1
-        ax = fig3.add_subplot(inner_grid[0])
-        ax.scatter(velo, data['Behavior']['CMSVelocity'], s=size, alpha=a)
-        ax = fig3.add_subplot(inner_grid[1])
-        ax.scatter(velo, data['Behavior']['AngleVelocity'], s=size, alpha=a)
-        ax = fig3.add_subplot(inner_grid[2])
-        ax.scatter(velo, data['Behavior']['Eigenworm1'], s=size, alpha=a)
-        ax = fig3.add_subplot(inner_grid[3])
-        ax.scatter(velo, phase, s=size, alpha=a)
-        ax = fig3.add_subplot(inner_grid[4])
-        ax.scatter(velo, phase, s=size, alpha=a)
+        for pcix, pc in enumerate([x,y,z]):
+            for cix, correlate in enumerate(corrs):
+                ax = fig3.add_subplot(inner_grid[pcix, cix])
+                ax.scatter(pc, correlate, s=size, alpha=a)
+                ax.set_ylabel(corrNames[cix])
+#            ax = fig3.add_subplot(inner_grid[pcix, 1])
+#            ax.scatter(pc, data['Behavior']['AngleVelocity'], s=size, alpha=a)
+#            ax = fig3.add_subplot(inner_grid[pcix, 2])
+#            ax.scatter(pc, data['Behavior']['Eigenworm3'], s=size, alpha=a)
+#            ax = fig3.add_subplot(inner_grid[pcix,3])
+#            ax.scatter(pc, phase, s=size, alpha=a)
+#            ax = fig3.add_subplot(inner_grid[pcix,4])
+#            ax.scatter(np.diff(pc), data['Behavior']['Eigenworm3'][:-1], s=size, alpha=a)
     outer_grid.tight_layout(fig3)
         
 ###############################################    
@@ -561,7 +661,8 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         #    yTest = yPred
         # plot training and test set behavior and prediction
         ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
-        
+        ax1.axvspan(data['Neurons']['Time'][np.min(testInd)], data['Neurons']['Time'][np.max(testInd)], color=UCgray[1])
+        ax1.text(data['Neurons']['Time'][int(np.mean(testInd))], np.max(y),'Predicted', horizontalalignment='center')
         ax1.plot(data['Neurons']['Time'], yTrain, color=colorBeh[label], label = 'Training', alpha =0.4, lw=2)
         ax1.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior', lw=1)
         ax1.plot(data['Neurons']['Time'], yTest, color=colorPred[label], label = r'$R^2$ {0:.2f}'.format(results[label]['scorepredicted']), lw=1)
@@ -575,8 +676,8 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         
         # show how predictive each additional neuron is
         ax4 = plt.Subplot(fig, inner_grid[lindex, 2])
-        ax4.plot(results[label]['cumulativeScore'], color=colorPred[label],marker='o',  markerfacecolor="none",markersize=5)
-        ax4.plot(results[label]['individualScore'], color=colorBeh[label],marker='o', markerfacecolor="none", markersize=5)
+        ax4.plot(np.arange(1,len(results[label]['cumulativeScore'])+1),results[label]['cumulativeScore'], color=colorPred[label],marker='o',  markerfacecolor="none",markersize=5)
+        ax4.plot(np.arange(1,len(results[label]['cumulativeScore'])+1),results[label]['individualScore'], color=colorBeh[label],marker='o', markerfacecolor="none", markersize=5)
           
         ax4.set_ylabel(r'$R^2$ score')
         if lindex==len(behaviors)-1:
@@ -587,7 +688,7 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         if lindex==len(behaviors)-1:
             ax5.set_xlabel('True behavior')
         ax5.set_ylabel('Predicted')
-        ax5.scatter(y[testInd], yPred[testInd], alpha=0.05, color=colorPred[label])
+        ax5.scatter(y[testInd], yPred[testInd], alpha=0.05,s=1, color=colorPred[label])
         fig.add_subplot(ax5)
     # plot weights
         

@@ -13,15 +13,31 @@ from scipy.signal import medfilt
 from sklearn import preprocessing
 import makePlots as mp
 from scipy.ndimage.filters import gaussian_filter1d
+import h5py
+
+def calcFFT(data, time_step=1/6.):
+    """plot frequency of data"""
+    fft = []
+    for line in data:
+        #line -= np.mean(line)
+        ps = np.abs(np.fft.fft(line))**2
+        
+        
+        freqs = np.fft.fftfreq(line.size, time_step)
+        idx = np.argsort(freqs)
+    
+        
+        fft.append(ps[idx])
+    return freqs[idx], fft
 
 def makeEthogram(anglevelocity, pc3):
     """use rotated Eigenworms to create a new Ethogram."""
     etho = np.zeros((len(anglevelocity),1))
     # set forward and backward
     etho[np.where(anglevelocity>0)] = 1
-    etho[np.where(anglevelocity<0)] = -1
+    etho[np.where(anglevelocity<=0)] = -1
     # overwrite this in case of turns
-    etho[np.abs(pc3)>10] = 2
+    etho[np.abs(pc3)>8] = 2
     return etho
 
 def loadPoints(folder, straight = True):
@@ -59,12 +75,13 @@ def loadCenterlines(folder):
 def transformEigenworms(pc1, pc2, pc3, dataPars):
     """smooth Eigenworms and calculate associated metrics like velocity."""
     theta = np.unwrap(np.arctan2(pc2, pc1))
-    velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
+    #velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
+    velo = gaussian_filter1d(theta, dataPars['savGolayWindow'], order=1)
     
     # median filter the velocity and pca components 
     if dataPars['medianWindow'] < 3:
         return pc1, pc2, pc3, velo, theta
-    velo = scipy.signal.medfilt(velo, dataPars['medianWindow'])
+    #velo = scipy.signal.medfilt(velo, dataPars['medianWindow'])
     
 #    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
 #    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
@@ -111,8 +128,8 @@ def loadData(folder, dataPars):
     #vel = np.squeeze(np.sqrt((np.diff(xPos, axis=0)**2 + np.diff(yPos, axis=0)**2))/6.)
     #vel = np.pad(vel, (1,0), 'constant')
     # ethogram redone
-    #etho = makeEthogram(velo, pc3)
-    etho = ethoOrig
+    etho = makeEthogram(velo, pc3)
+    #etho = ethoOrig
     T = np.arange(pc1.shape[0])/6.
 #    print T, etho.shape, ethoOrig.shape
 #    mp.plotEthogram(ax, T, ethoOrig, alpha = 0.5, yValMax=1, yValMin=0, legend=0)
@@ -127,12 +144,17 @@ def loadData(folder, dataPars):
     R[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), R[~mask])
     mask = np.isnan(G)
     G[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), G[~mask])
-    if dataPars['savGolayWindowGCamp'] > 3:
-        # smooth with GCamp6 halftime = 1s
-        G = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in G])
-        R = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in R])
-    Y = G/R
-    Y =  np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=3) for line in Y])
+    
+    
+    
+    # smooth with GCamp6 halftime = 1s
+    #GS = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=11) for line in G])
+    #RS = np.array([savitzky_golay(line, window_size=dataPars['savGolayWindowGCamp'], order=11) for line in R])
+    RS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in R])       
+    GS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in G])       
+    YR = GS/RS
+    
+    #Y =  np.array([medfilt(line, 21) for line in Y])
     # ordering from correlation map/hie
     order = np.array(data['cgIdx']).T[0]-1
     # unpack neuron position (only one frame, randomly chosen)
@@ -143,12 +165,12 @@ def loadData(folder, dataPars):
         print 'No neuron positions:', folder
     # prep neural data by masking nans
     # store relevant indices
-    nonNan = np.arange(100, Y.shape[1]-100)
+    nonNan = np.arange(0, YR.shape[1])
     
-    #nonNan  = np.where(np.all(np.isfinite(np.array(data['rPhotoCorr'])),axis=0))[0]
+    nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
     #print nonNan
-    Y = Y[order]
-   
+    YR = YR[order]
+    
 #    # make values nicer
     #Y -= np.nanmin(Y, axis=0)
     #Y = (Y-np.mean(Y, axis=0))/np.nanmax(Y, axis=0)
@@ -161,14 +183,14 @@ def loadData(folder, dataPars):
 #    plt.colorbar()
 #    plt.show()
     # long-window size smoothing filter to subtract overall fluctuation in SNR
-    wind = 60
-    mean = np.mean(rolling_window(np.mean(Y,axis=0), window=2*wind), axis=1)
+    wind = 90
+    mean = np.mean(rolling_window(np.mean(YR,axis=0), window=2*wind), axis=1)
     #pad with normal mean in front to correctly center the mean values
-    mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(Y,axis=0)[:wind])))[:-wind]
+    mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(YR,axis=0)[:wind])))[:-wind]
     # do the same in the end
-    mean[-wind:] = np.repeat(np.mean(np.mean(Y,axis=0)[:-wind]), wind)
-    print len(mean), Y.shape
-    Y = Y-mean
+    mean[-wind:] = np.repeat(np.mean(np.mean(YR,axis=0)[:-wind]), wind)
+   
+    YN = YR-mean
 #    m, s = np.mean(Y, axis=0), np.std(Y, axis=0)
 #    plt.subplot(211)
 #    plt.plot(m, 'r', label='mean')
@@ -188,9 +210,37 @@ def loadData(folder, dataPars):
 #    plt.legend()
 #    plt.show()
     # zscore values 
-    Y =  preprocessing.scale(Y.T).T
+    Y =  preprocessing.scale(YN.T).T
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
+    # redo time axis in seconds for nan issues
+    T = np.arange(Y[:,nonNan].shape[1])/6.
+    
+    if 0:
+        #### show what pipeline does
+        titles= ['Bleaching corrected', 'Gaussian filter $\sigma=5$', 'Rolling mean (30 s) ', 'Z score']
+        for i, hm in enumerate([G[order]/R[order],YR, YN, Y]):
+            ax=plt.subplot(2,2,i+1)
+            low, high = np.percentile(hm, [2.28, 97.72])#[ 15.87, 84.13])
+            ax.set_title(titles[i])
+            cax1 = ax.imshow( hm, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=high, vmin=low)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel("Neuron")
+        plt.tight_layout()
+        plt.show()
+        
+        for i, hm in enumerate([G[order]/R[order],YR, YN, Y]):
+            ax=plt.subplot(2,2,i+1)
+            f, ps = calcFFT(hm, time_step=1/6.)
+            ax.set_title(titles[i])
+            m, s = np.mean(ps, axis=0), np.std(ps, axis=0)
+            ax.plot(f, m, 'r')
+            #ax.fill_between(f, m-s, m+s, alpha=0.2, color='r')
+            ax.set_yscale('log',nonposy='clip')
+            ax.set_xlabel('Frequency (Hz)')
+            ax.set_ylabel("Power spectrum")
+        plt.tight_layout()
+        plt.show()
     # create a dictionary structure of these data
     dataDict = {}
     dataDict['Behavior'] = {}
@@ -199,7 +249,7 @@ def loadData(folder, dataPars):
                 'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
-    dataDict['Neurons']['Time'] = T[nonNan]
+    dataDict['Neurons']['Time'] =  np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
     dataDict['Neurons']['Activity'] = Y[:,nonNan]
     dataDict['Neurons']['rankActivity'] = rankTransform(Y)[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
@@ -316,3 +366,36 @@ def rolling_window(a, window):
     
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
     
+
+def saveDictToHDF(filePath, d):
+    f = h5py.File(filePath,'w')
+    for fnKey in d.keys():
+        for amKey in d[fnKey].keys():
+            for attKey in d[fnKey][amKey].keys():
+                if type(d[fnKey][amKey][attKey]) is not dict:
+                    dataPath = '/%s/%s/%s'%(fnKey,amKey,attKey)
+                    f.create_dataset(dataPath,data=d[fnKey][amKey][attKey])
+                else:
+                    for bKey in d[fnKey][amKey][attKey].keys():
+                        dataPath = '/%s/%s/%s/%s'%(fnKey,amKey,attKey,bKey)
+                        f.create_dataset(dataPath,data=d[fnKey][amKey][attKey][bKey])
+    f.close()
+    return
+
+def loadDictFromHDF(filePath):
+    f = h5py.File(filePath,'r')
+    d = {}
+    for fnKey in f.keys():
+        d[fnKey] = {}
+        for amKey in f[fnKey].keys():
+            d[fnKey][amKey] = {}
+            for attKey in f[fnKey][amKey].keys():
+                if isinstance(f[fnKey][amKey][attKey], h5py.Dataset):
+                    d[fnKey][amKey][attKey] = f[fnKey][amKey][attKey][...]
+                else:
+                    d[fnKey][amKey][attKey] = {}
+                    for bKey in f[fnKey][amKey][attKey].keys():
+                        d[fnKey][amKey][attKey][bKey] = f[fnKey][amKey][attKey][bKey][...]
+    f.close()
+    return d
+
