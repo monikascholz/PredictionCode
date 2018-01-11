@@ -37,7 +37,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = keyListAll
+    keyList = [key]#keyListAll
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -46,15 +46,15 @@ for key in keyListAll:
     
     pars ={'nCompPCA':10, # no of PCA components
             'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.7, # what fraction of data to use for training 
+            'trainingCut': 0.6, # what fraction of data to use for training 
             'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
             'useRank': 0, # use the rank transformed version of neural data for all analyses
           }
     
-    behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2']
-    #behaviors = ['AngleVelocity']
+    behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2']
+    behaviors = ['Eigenworm3']
 
     ###############################################    
     # 
@@ -64,13 +64,13 @@ for key in keyListAll:
     createIndicesTest = True 
     overview = 0#False
     svm = 0
-    pca = 1#False
+    pca = 0#False
     hierclust = False
     linreg = False
     lasso = 1
     elasticnet = 0#True
     positionweights = 0#True
-    resultsPredictionOverview = 1
+    resultsPredictionOverview = 0
     ###############################################    
     # 
     # create training and test set indices
@@ -80,7 +80,9 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             resultDict[key] = {'Training':{}}
             for label in behaviors:
-                resultDict[key]['Training'][label] = {'Indices':  dr.createTrainingTestIndices(dataSets[key], pars, label=label)}
+                train, test = dr.createTrainingTestIndices(dataSets[key], pars, label=label)
+                resultDict[key]['Training'][label] = {'Train':train  }
+                resultDict[key]['Training'][label]['Test']=test
         print "Done generating trainingsets"
     ###############################################    
     # 
@@ -89,7 +91,7 @@ for key in keyListAll:
     ##############################################
     if overview:
         #mp.plotBehaviorAverages(dataSets, keyList) 
-        #mp.plotVelocityTurns(dataSets, keyList)
+        mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)
         mp.plotNeurons3D(dataSets, keyList, threed = False)  
         #mp.plotExampleCenterlines(dataSets, keyList, folder)
@@ -128,8 +130,8 @@ for key in keyListAll:
     if pca:
         print 'running PCA'
         for kindex, key in enumerate(keyList):
-            resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-            #resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
+            #resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+            resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
         
         # overview of PCA results and weights
         mp.plotPCAresults(dataSets, resultDict, keyList, pars)
@@ -192,7 +194,7 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print key
             splits = resultDict[key]['Training']
-            resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, splits, plot=1, behaviors = behaviors)
+            resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, splits, plot=0, behaviors = behaviors)
             # calculate how much more neurons contribute
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key],splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
@@ -205,8 +207,8 @@ for key in keyListAll:
         mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
         plt.show()
         # overview of LASSO results and weights
-        mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')
-        plt.show()
+        #mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')
+        #plt.show()
         #  plot 3D trajectory of SVM
         #mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'LASSO')
         plt.show()
@@ -242,7 +244,7 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print 'plotting linear model weights on positions',  key
             
-        mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='ElasticNet')
+        mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='LASSO')
         plt.show()
     #%%
     ###############################################    
@@ -251,7 +253,7 @@ for key in keyListAll:
     #
     ##############################################
     if resultsPredictionOverview:
-        fitmethod = 'Lasso'
+        fitmethod = 'LASSO'
         mp.plotLinearModelScatter(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'], random = 'none')
         # collect the relevant number of neurons
         

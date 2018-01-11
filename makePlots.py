@@ -14,6 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 from sklearn.decomposition import PCA
+from sklearn import linear_model
 from scipy.signal import medfilt
 from scipy.ndimage.filters import gaussian_filter1d
 #
@@ -80,62 +81,13 @@ ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 
 # rename behaviors for plots
-names = {'AngleVelocity': 'Angular velocity',
+names = {'AngleVelocity': 'Wave velocity',
          'Eigenworm3': 'Turns', 
          'Eigenworm2': 'Head swing',
          'Eigenworm1': 'Head swing'
         }
 
-def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) : 
-    
-    dx = min(np.diff(x_data))
-   
 
-    for xd, yd, cl in zip(x_data, y_data, clrs) :
-        bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
-                        notch=False, patch_artist=True)
-        plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
-             linewidth=1, alpha=0.4)
-        plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=1, alpha=1.0)    
-        for cap in bp['caps']:
-            cap.set(color=cl, linewidth=1)       
-        for flier in bp['fliers']:
-            flier.set(marker='+', color=cl, alpha=1.0)            
-        for median in bp['medians']:
-            median.set(color=cl, linewidth=1) 
-        jitter = (np.random.random(len(yd)) - 0.5)*dx / 20 
-        dotxd = [xd - 0.25*dx]*len(yd) + jitter
-
-        # make alpha stronger
-        ax.plot(dotxd, yd, linestyle='None', marker='o', color=cl, \
-                markersize=3, alpha=0.5)  
-    ymin = min([min(m) for m in y_data])
-    ymax = max([max(m) for m in y_data])
-    dy = 10 ** np.floor(np.log10(ymin))
-    ymin, ymax = ymin-dy, ymax+dy
-    xmin, xmax = min(x_data)-0.5*dx, max(x_data)+0.5*dx
-    ax.set_xlim(xmin, xmax)        
-    ax.set_ylim(ymin, ymax)  
-    ax.set_xticks(x_data)
-
-    for loc, spine in ax.spines.items() :
-        if loc == 'left' :
-            spine.set_position(('outward', 0))  # outward by 5 points
-            spine.set_smart_bounds(True)
-        elif loc == 'bottom' :
-            spine.set_position(('outward', 5))  # outward by 5 points
-            spine.set_smart_bounds(True)            
-        else :
-            spine.set_color('none')  # don't draw spine
-    ax.yaxis.set_ticks_position('left') # turn off right ticks
-    ax.xaxis.set_ticks_position('bottom') # turn off top ticks
-    ax.get_xaxis().set_tick_params(direction='out')
-    ax.patch.set_facecolor('white') # ('none')
-    ax.set_xticklabels(lbls, rotation=30, fontsize=14)
-    
-    #ax.set_aspect(2.0 / (0.1*len(lbls)), adjustable=None, anchor=None)
-    #ax.set_aspect(0.01 / (len(y_data)), adjustable=None, anchor=None)        
-        
             
 def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     '''plot 3 projections into 2d for 3dim data sets. Takes an outer gridspec object to place plots.'''
@@ -297,7 +249,7 @@ def plotVelocityTurns(dataSets, keyList):
         data = dataSets[key]
         ax = plt.subplot(gs[2*dindex])
         ax.set_title(key)
-        vel =data['Behavior']['CMSVelocity']
+        vel =np.copy(data['Behavior']['CMSVelocity'])
         vel = (vel-np.min(vel))/np.max(vel)
         vel += np.min(data['Behavior']['AngleVelocity'])
         vel *= np.max(data['Behavior']['AngleVelocity'])
@@ -440,8 +392,8 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
     for i in range(np.min([len(results['pcaComponents']), 3])):
         y = results['pcaComponents'][i]
         # normalize
-        y-=np.min(y)
-        y /=np.max(y)
+        y =y -np.min(y)
+        y =y/np.max(y)
         ax3.plot(time, i+y, label='Component {}'.format(i+1), lw=0.5)
     #ax3.legend()
     ax3.set_ylabel('PCA components')
@@ -520,12 +472,12 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
             
             cm = cyclon
         elif col == 'velocity':
-            colorBy = data['Behavior']['AngleVelocity']
+            colorBy = np.copy(data['Behavior']['AngleVelocity'])
             colorBy -= np.mean(data['Behavior']['AngleVelocity'])
             colorBy /= np.std(data['Behavior']['AngleVelocity'])
             cm = 'jet'
         elif col =='turns':
-            colorBy = data['Behavior']['Eigenworm3']
+            colorBy = np.copy(data['Behavior']['Eigenworm3'])
             colorBy -= np.mean(data['Behavior']['Eigenworm3'])
             colorBy /= np.std(data['Behavior']['Eigenworm3'])
             cm = 'jet'
@@ -599,27 +551,37 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
 def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
     """correlate PCA with all sorts of stuffs"""
     nWorms = len(keyList)
-    fig3 = plt.figure('{} Correlates'.format(flag),(6.8, nWorms*3.4))
-    outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
-
+    fig3 = plt.figure('{} Correlates'.format(flag),(3.4, 7))
+    #outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
+    outer_grid = gridspec.GridSpec(1, 1, hspace=0.25, wspace=0.25)
+    inner_grid = gridspec.GridSpecFromSubplotSpec(3, 1,
+        subplot_spec=outer_grid[0], hspace=0.5, wspace=0.35)
     for kindex, key in enumerate(keyList):
         data = dataSets[key]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(3, 5,
-        subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
+        
         x,y,z = resultDict[key][flag]['pcaComponents'][:3,]
         
         theta = np.unwrap(np.arctan2(y, z))
-        velo = dh.savitzky_golay(theta, window_size=17, order=5, deriv=1, rate=1)
+        #velo = dh.savitzky_golay(theta, window_size=17, order=5, deriv=1, rate=1)
         #velo = dh.savitzky_golay(x, window_size=7, order=3, deriv=2, rate=1)
         phase = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
-        corrs = [data['Behavior']['CMSVelocity']*100, data['Behavior']['AngleVelocity'], data['Behavior']['Eigenworm3'],  data['Behavior']['Eigenworm1'], phase]
-        corrNames = ['CMS velocity', 'Phase velocity', 'Turns', 'Head angle', 'Head phase']        
-        size, a = 0.5, 0.1
+        corrs = [data['Behavior']['CMSVelocity']*100, data['Behavior']['AngleVelocity'], data['Behavior']['Eigenworm3'],  data['Behavior']['Eigenworm1'], data['Behavior']['Ethogram']]
+        corrNames = ['CMS velocity', 'Phase velocity', 'Turns', 'Head angle', 'Ethogram']        
+        corrNames = ['Phase velocity']     
+        size, a = 2, 0.1
         for pcix, pc in enumerate([x,y,z]):
-            for cix, correlate in enumerate(corrs):
+            for cix, correlate in enumerate(corrs[1:2]):
                 ax = fig3.add_subplot(inner_grid[pcix, cix])
-                ax.scatter(pc, correlate, s=size, alpha=a)
+                # Train the model
+                regr = linear_model.LinearRegression()
+                regr.fit(pc.reshape(-1, 1), correlate.reshape(-1, 1))
+                r2 = regr.score(pc.reshape(-1, 1), correlate.reshape(-1, 1))
+                ax.scatter(pc, correlate, s=size, alpha=a, label= 'R2 = {:.2f}'.format(r2))
                 ax.set_ylabel(corrNames[cix])
+                ax.legend()
+                
+
+                
 #            ax = fig3.add_subplot(inner_grid[pcix, 1])
 #            ax.scatter(pc, data['Behavior']['AngleVelocity'], s=size, alpha=a)
 #            ax = fig3.add_subplot(inner_grid[pcix, 2])
@@ -647,7 +609,8 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         else:
             x = data['Neurons']['Activity']
         y = data['Behavior'][label]
-        trainingsInd, testInd = splits[label]['Indices']
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
+    
         # calculate y from model
         yPred = np.dot(weights, x) + intercept
         
@@ -663,15 +626,15 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         ax1 = plt.Subplot(fig, inner_grid[lindex, 0])
         ax1.axvspan(data['Neurons']['Time'][np.min(testInd)], data['Neurons']['Time'][np.max(testInd)], color=UCgray[1])
         ax1.text(data['Neurons']['Time'][int(np.mean(testInd))], np.max(y),'Predicted', horizontalalignment='center')
-        ax1.plot(data['Neurons']['Time'], yTrain, color=colorBeh[label], label = 'Training', alpha =0.4, lw=2)
+        #ax1.plot(data['Neurons']['Time'], yTrain, color=colorBeh[label], label = 'Training', alpha =0.4, lw=2)
         ax1.plot(data['Neurons']['Time'], y, color=colorBeh[label], label = 'Behavior', lw=1)
-        ax1.plot(data['Neurons']['Time'], yTest, color=colorPred[label], label = r'$R^2$ {0:.2f}'.format(results[label]['scorepredicted']), lw=1)
+        ax1.plot(data['Neurons']['Time'], yTest, color=colorPred[label], label = r'$R^2$ {0:.2f}'.format(float(results[label]['scorepredicted'])), lw=1)
         ax1.set_xlim(np.percentile(data['Neurons']['Time'], [0,100]))    
         ax1.set_ylabel(names[label])
         if lindex==len(behaviors)-1:
             ax1.set_xlabel('Time (s)')
         
-        ax1.legend(loc=(0.0,0.9), ncol = 2)
+        ax1.legend(loc=(0.0,0.95), ncol = 2)
         fig.add_subplot(ax1)
         
         # show how predictive each additional neuron is
@@ -802,6 +765,7 @@ def plotWeightLocations(dataSets, resultSet, keyList, fitmethod='ElasticNet'):
     for dindex, key in enumerate(keyList):
         data = dataSets[key]
         xS, yS, zS = data['Neurons']['Positions']
+        # pca weight locations to align
         if fitmethod == 'PCA':
             weightsAV = resultSet[key][fitmethod]['neuronWeights'][:,0]
             weightsEW = resultSet[key][fitmethod]['neuronWeights'][:,1]
@@ -814,7 +778,10 @@ def plotWeightLocations(dataSets, resultSet, keyList, fitmethod='ElasticNet'):
         indexAV = weightsAV != 0
         indexEW = weightsEW != 0
         # plot projections of neurons
-        s0,s1,s2 = 64, 32, 16 # size of gray, red, blue neurons
+        s0,s1,s2 = 64, 64, 32 # size of gray, red, blue neurons
+        #
+        s1 = np.abs(weightsAV[indexAV])/np.max(weightsAV)*64
+        s2 = np.abs(weightsEW[indexEW])/np.max(weightsEW)*32
         inner_grid = gridspec.GridSpecFromSubplotSpec(1, 3,
         subplot_spec=gs[dindex], hspace=0.25, wspace=0.5)
         ax1 = plt.Subplot(fig, inner_grid[0])
@@ -861,7 +828,7 @@ def scatterSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors)
         else:
             x = data['Neurons']['Activity']
         y = data['Behavior'][label]
-        trainingsInd, testInd = splits[label]['Indices']
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # calculate y from model
         yPred = np.dot(weights, x) + intercept
         
@@ -895,4 +862,116 @@ def plotLinearModelScatter(dataSets, resultSet, keyList, pars, fitmethod='LASSO'
         splits = resultSet[key]['Training']
         scatterSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors)
         
+def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod = "LASSO",  behaviors = ['AngleVelocity', 'Eigenworm3']):
+    """show box plots and paired plots for results."""
+    fig = plt.figure('Results {}'.format(fitmethod),(6.8,6.8))
+    gs = gridspec.GridSpec(2, 3, hspace=0.25, wspace=0.25)
+    keyListsAll = [keyList1, keyList2]
+    resultSetsAll= [resultSets1,resultSets2]
+    for i in range(2):
+        keyList= keyListsAll[i]
+        resultSets = resultSetsAll[i]
+        # plot paired R2 results for multiple neurons
+        for lindex, label in enumerate(behaviors):
+            r2s = [[np.max(np.concatenate([resultSets[key][fitmethod][label]['individualScore']])), resultSets[key][fitmethod][label]['cumulativeScore'][-1]] for key in keyList]
+            r2s =np.array(r2s)
+            
+            ax1 = plt.subplot(gs[i, lindex])
+            ax1.set_ylabel("{} $R^2$".format(fitmethod))
+            ax1.plot(np.ones(len(r2s))*0, r2s[:,0], 'o', color=colorBeh[label])
+            ax1.plot(np.ones(len(r2s))*1, r2s[:,1], 'o', color=colorBeh[label])
+            ax1.plot(r2s.T, 'k-')
+            ax1.set_xticks([0,1])
+            #ax1.set_ylim([0,1])
+            ax1.set_xlim([-0.5,1.5])
+            ax1.set_xticklabels(['best single neuron', 'group of neurons'],  rotation=30)
+            
+        Ns = np.array([np.array([resultSets[key][fitmethod][label]['noNeurons'] for label in behaviors]) for key in keyList])
+        print Ns.shape
+        colors = np.array([colorBeh[label] for label in behaviors])
+        labels = np.array([names[label] for label in behaviors])
+        locs = np.vstack([np.zeros(len(keyList)),np.ones(len(keyList))]).T
+        ax2 = plt.subplot(gs[i, 2])
+        ax2.set_ylabel("Number of neurons")
+        mkStyledBoxplot(fig, ax2, [0,1], Ns.T, colors, labels)
+        ax2.set_xlim([-0.5,1.5])
+    gs.tight_layout(fig)
+    
+    
+def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) : 
+    
+    dx = np.min(np.diff(x_data))
+    print dx
+
+    for xd, yd, cl in zip(x_data, y_data, clrs) :
         
+        bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
+                        notch=False, patch_artist=True)
+        plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
+             linewidth=1, alpha=0.4)
+        plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=1, alpha=1.0)    
+        for cap in bp['caps']:
+            cap.set(color=cl, linewidth=1)       
+        for flier in bp['fliers']:
+            flier.set(marker='+', color=cl, alpha=1.0)            
+        for median in bp['medians']:
+            median.set(color=cl, linewidth=1) 
+        jitter = (np.random.random(len(yd)) - 0.5)*dx / 20 
+        dotxd = [xd - 0.25*dx]*len(yd) + jitter
+
+        # make alpha stronger
+        ax.plot(dotxd, yd, linestyle='None', marker='o', color=cl, \
+                markersize=3, alpha=0.5)  
+#    ymin = min([min(m) for m in y_data])
+#    ymax = max([max(m) for m in y_data])
+#    dy = 10 ** np.floor(np.log10(ymin))
+#    ymin, ymax = ymin-dy, ymax+dy
+#    xmin, xmax = min(x_data)-0.5*dx, max(x_data)+0.5*dx
+#    ax.set_xlim(xmin, xmax)        
+#    ax.set_ylim(ymin, ymax)  
+    ax.set_xticks(x_data)
+
+#    for loc, spine in ax.spines.items() :
+#        if loc == 'left' :
+#            spine.set_position(('outward', 0))  # outward by 5 points
+#            spine.set_smart_bounds(True)
+#        elif loc == 'bottom' :
+#            spine.set_position(('outward', 5))  # outward by 5 points
+#            spine.set_smart_bounds(True)            
+#        else :
+#            spine.set_color('none')  # don't draw spine
+    ax.yaxis.set_ticks_position('left') # turn off right ticks
+    ax.xaxis.set_ticks_position('bottom') # turn off top ticks
+    ax.get_xaxis().set_tick_params(direction='out')
+    ax.patch.set_facecolor('white') # ('none')
+    ax.set_xticklabels(lbls, rotation=30)
+    
+    #ax.set_aspect(2.0 / (0.1*len(lbls)), adjustable=None, anchor=None)
+    #ax.set_aspect(0.01 / (len(y_data)), adjustable=None, anchor=None)        
+
+def averageResultsPCA(resultSets1,resultSets2, keyList1, keyList2,fitmethod = "PCA"):
+    """show box plots and paired plots for results."""
+    fig = plt.figure('Results {}'.format(fitmethod),(6.8,3.4))
+    gs = gridspec.GridSpec(1, 2, hspace=0.25, wspace=0.25)
+    keyListsAll = [keyList1, keyList2]
+    resultSetsAll= [resultSets1,resultSets2]
+    for i in range(2):
+        keyList= keyListsAll[i]
+        resultSets = resultSetsAll[i]
+        # plot paired R2 results for multiple neurons
+        
+        r2s = [[resultSets[key][fitmethod]['expVariance'][0], np.cumsum(resultSets[key][fitmethod]['expVariance'])[-1]] for key in keyList]
+        print r2s        
+        r2s =np.array(r2s)
+        
+        ax1 = plt.subplot(gs[i])
+        ax1.set_ylabel("{} explained variance".format(fitmethod))
+        ax1.plot(np.ones(len(r2s))*0, r2s[:,0], 'o', color=UCred[0])
+        ax1.plot(np.ones(len(r2s))*1, r2s[:,1], 'o', color=UCred[0])
+        #ax1.plot(r2s.T, 'k-')
+        ax1.set_xticks([0,1])
+        ax1.set_xlim([-0.5,1.5])
+        ax1.set_xticklabels(['best component', 'first {} components'.format(resultSets[key][fitmethod]['nComp'])],  rotation=30)
+        ax1.set_ylim([0,1])
+        
+    gs.tight_layout(fig)

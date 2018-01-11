@@ -126,7 +126,13 @@ def createTrainingTestIndices(data, pars, label):
     elif pars['trainingType'] == 'middle':
         cutoff = int((pars['trainingCut'])*timeLen/2.)
         tmpIndices = np.arange(timeLen)
-        testIndices = tmpIndices[cutoff:-cutoff]
+        if label =='Eigenworm3':
+            cutoff = int((1-pars['trainingCut'])*timeLen/4.)
+            loc = np.where(data['Behavior']['Ethogram']==2)[0]
+            loc = loc[np.argmin(np.abs(loc-timeLen/2.))]
+            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
+        else:
+            testIndices = tmpIndices[cutoff:-cutoff]
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
@@ -226,7 +232,7 @@ def timewarp(data):
     """creates a subsampled neuron signal for PCA that has equally represented behaviors."""
     # find out how much fwd and backward etc we have:
     #labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
-    neur = data['Neurons']['Activity']
+    neur = np.copy(data['Neurons']['Activity'])
     # find how often each behavior occurs
     indices = []
     for bindex, behavior in enumerate([-1,1,2]):
@@ -277,7 +283,8 @@ def discreteBehaviorPrediction(data, pars, splits):
         X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
     # use ethogram for behavior
     Y = data['Behavior']['Ethogram']
-    trainingsInd, testInd = splits['AngleVelocity']['Indices']
+    label = 'AngleVelocity'
+    trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     # create a linear SVC
     lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=10)
     
@@ -371,9 +378,9 @@ def stdevRule(x, y, std):
 #    
 #    plt.show()
     return xUpper
-def balancedFolds(y):
+def balancedFolds(y, nSets=5):
     """create balanced train/validate splitsby leave one out."""
-    splits, _ = splitIntoSets(y, nBins=5, nSets=10, splitMethod='unique', verbose=0)
+    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='unique', verbose=1)
     folds = []
     for i in range(len(splits)):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
@@ -384,7 +391,8 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
     linData = {}
     for label in behaviors:
         Y = data['Behavior'][label]
-        trainingsInd, testInd = splits[label]['Indices']
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
+        
         #Y = Y.reshape((-1,1))
         #scale = np.nanmean(Y)
         #Y-=scale
@@ -398,14 +406,18 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
 
         # fit lasso and validate
-        a = np.logspace(-3,1,100)
+        #a = np.logspace(-2,2,100)
         cv = 15
         # unbalanced sets
         #fold = KFold(cv, shuffle=False) 
         # balanced sets
-        fold = balancedFolds(Y[trainingsInd])
+        if label =='Eigenworm3':
+            a = np.logspace(-1,2,100)
+        else:
+            a = np.logspace(-2,1,100)
+        fold = balancedFolds(Y[trainingsInd], nSets=10)
         reg = linear_model.LassoCV(cv=fold, selection = 'random', verbose=0, \
-        eps=1e-1, max_iter=3000, alphas=a)#, normalize=False)
+         max_iter=3000)#, alphas=a)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         alphas = reg.alphas_
         ymean = np.mean(reg.mse_path_, axis =1)
@@ -445,12 +457,16 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             #plt.errorbar(,color= 'k')
             plt.tight_layout()            
             plt.show()
+        weights = reg.coef_
         # score model
-            
-        scorepred = reg.score(X[testInd], Y[testInd])#, sample_weight=np.power(Y[testInd], 2))
-        score = reg.score(X[trainingsInd], Y[trainingsInd])
+        if len(weights)>0:
+            scorepred = reg.score(X[testInd], Y[testInd])#, sample_weight=np.power(Y[testInd], 2))
+            score = reg.score(X[trainingsInd], Y[trainingsInd])
+        else:
+            scorepred = np.nan
+            score = reg.score(X[trainingsInd], Y[trainingsInd])
         linData[label] = {}
-        linData[label]['weights'] =  reg.coef_
+        linData[label]['weights'] =  weights
         linData[label]['intercepts'] = reg.intercept_
         linData[label]['alpha'] = alphaNew#reg.alpha_
         linData[label]['score'] = score
@@ -475,11 +491,11 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['rankActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
-        trainingsInd, testInd = splits[label]['Indices']
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
-        l1_ratio = [0.5, 0.75, .9, .95, 0.99, 1]
+        l1_ratio = [0.5]#[0.5, 0.75, .9, .95, 0.99, 1]
         #cv = 15
-        a = np.linspace(0.0001,0.05,100)
+        a = np.logspace(-3,1,100)
         fold = balancedFolds(Y[trainingsInd])
         reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
@@ -545,7 +561,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
             X = data['Neurons']['rankActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
-        trainingsInd, testInd = splits[label]['Indices']
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # individual predictive scores
         indScore = []
         sumScore = []

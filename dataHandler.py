@@ -167,7 +167,7 @@ def loadData(folder, dataPars):
     # store relevant indices
     nonNan = np.arange(0, YR.shape[1])
     
-    nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
+    #nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
     #print nonNan
     YR = YR[order]
     
@@ -377,6 +377,7 @@ def saveDictToHDF(filePath, d):
                     f.create_dataset(dataPath,data=d[fnKey][amKey][attKey])
                 else:
                     for bKey in d[fnKey][amKey][attKey].keys():
+                        
                         dataPath = '/%s/%s/%s/%s'%(fnKey,amKey,attKey,bKey)
                         f.create_dataset(dataPath,data=d[fnKey][amKey][attKey][bKey])
     f.close()
@@ -396,6 +397,7 @@ def loadDictFromHDF(filePath):
                     d[fnKey][amKey][attKey] = {}
                     for bKey in f[fnKey][amKey][attKey].keys():
                         d[fnKey][amKey][attKey][bKey] = f[fnKey][amKey][attKey][bKey][...]
+                        
     f.close()
     return d
 

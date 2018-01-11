@@ -47,9 +47,9 @@ def findRotationMatrix(xS, yS, zS):
 loc = 'AML32_moving'
 folder = "AML32_moving/{}_MS/"
 dataLog = "AML32_moving/AML32_datasets.txt"
-#loc = 'AML18_moving/'
-#folder = os.path.join(loc,"{}_MS/")
-#dataLog = os.path.join(loc,"AML18_datasets.txt")
+loc = 'AML18_moving/'
+folder = os.path.join(loc,"{}_MS/")
+dataLog = os.path.join(loc,"AML18_datasets.txt")
 # output is stored here
 outfile = os.path.join(loc,"Rotationmatrix.dat")
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)

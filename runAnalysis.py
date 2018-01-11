@@ -19,11 +19,14 @@ import dimReduction as dr
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
 folder = "AML32_moving/{}_MS/"
 dataLog = "AML32_moving/AML32_datasets.txt"
-##### GFP
-#folder = "AML18_moving/{}_MS/"
-#dataLog = "AML18_moving/AML18_datasets.txt"
-# output is stored here
-outLoc = "AML32_moving/Analysis/"
+outLoc = "AML32_moving/Analysis/Results.hdf5"
+if 0:
+    ##### GFP
+    folder = "AML18_moving/{}_MS/"
+    dataLog = "AML18_moving/AML18_datasets.txt"
+    outLoc = "AML18_moving/Analysis/Results.hdf5"
+    # output is stored here
+
 
 # data parameters
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
@@ -31,7 +34,6 @@ dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5 # gauss window for red and green channel
             }
-
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
@@ -51,7 +53,7 @@ pars ={'nCompPCA':10, # no of PCA components
         'useRank': 0, # use the rank transformed version of neural data for all analyses
       }
 
-behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2', 'CMSVelocity']
+behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2', 'CMSVelocity']
 #behaviors = ['AngleVelocity']
 
 ###############################################    
@@ -59,16 +61,11 @@ behaviors = ['AngleVelocity', 'Eigenworm3', 'Eigenworm2', 'CMSVelocity']
 # check which calculations to perform
 #
 ##############################################
-createIndicesTest = True 
-overview = 0#False
-svm = 0
-pca = 0#False
-hierclust = False
-linreg = False
+createIndicesTest = 1#True 
+svm = 1
+pca = 1#False
 lasso = 1
-elasticnet = 0#True
-positionweights = 0#True
-resultsPredictionOverview = 1
+elasticnet = 1#True
 ###############################################    
 # 
 # create training and test set indices
@@ -78,7 +75,9 @@ if createIndicesTest:
     for kindex, key in enumerate(keyList):
         resultDict[key] = {'Training':{}}
         for label in behaviors:
-            resultDict[key]['Training'][label] = {'Indices':  dr.createTrainingTestIndices(dataSets[key], pars, label=label)}
+            train, test = dr.createTrainingTestIndices(dataSets[key], pars, label=label)
+            resultDict[key]['Training'][label] = {'Train':train  }
+            resultDict[key]['Training'][label]['Test']=test
     print "Done generating trainingsets"
 
 ###############################################    
@@ -101,8 +100,8 @@ if svm:
 if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
-        resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-        #resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
+        #resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+        resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
 
 
 #%%
@@ -136,7 +135,7 @@ if elasticnet:
     for kindex, key in enumerate(keyList):
         print 'Running Elastic Net',  key
         splits = resultDict[key]['Training']
-        resultDict[key]['ElasticNet'] = dr.runElasticNet(dataSets[key], pars,splits, plot=1, behaviors = behaviors)
+        resultDict[key]['ElasticNet'] = dr.runElasticNet(dataSets[key], pars,splits, plot=0, behaviors = behaviors)
         # calculate how much more neurons contribute
         tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], splits,pars, fitmethod = 'ElasticNet', behaviors = behaviors, )
         for tmpKey in tmpDict.keys():
@@ -153,3 +152,4 @@ if elasticnet:
 # save data as HDF5 file
 #
 ##############################################
+dh.saveDictToHDF(outLoc, resultDict)
