@@ -49,13 +49,22 @@ def loadPoints(folder, straight = True):
         return [p[0] for p in points]
     else:
         return [p[1] for p in points]
+    
+def loadEigenBasis(filename):
+    """load the specific worm basis set."""
+    eigenworms = scipy.io.loadmat(filename)['eigbasis']
+    return eigenworms
+       
 
 def loadCenterlines(folder):
     """get centerlines from centerline.mat file"""
     tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
+
     clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
+    
     volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
-    #print volTime.shape
+    
+    
     clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))
     
     #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
@@ -64,13 +73,18 @@ def loadCenterlines(folder):
     #
     #if wormcentered:
     wc = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
+    # eigenprojections
+    ep = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['eigenProj'],1,0)
+    
     # reduce to volume time
     clNew = cl[clIndices.astype(int)]
+    wcNew = wc[clIndices.astype(int)]
+    epNew = ep[clIndices.astype(int)]
+    
 #    for cl in clNew[::10]:
 #        plt.plot(cl[:,0], cl[:,1])
 #    plt.show()
-    print 'Done loading centerlines'
-    return clNew, wc
+    return clNew, wcNew, epNew
     
 def transformEigenworms(pc1, pc2, pc3, dataPars):
     """smooth Eigenworms and calculate associated metrics like velocity."""
