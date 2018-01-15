@@ -166,6 +166,7 @@ def loadData(folder, dataPars):
     # prep neural data by masking nans
     # store relevant indices
     nonNan = np.arange(0, YR.shape[1])
+    #nonNan = np.arange(100, np.min([3600,YR.shape[1]]))#YR.shape[1]-100)
     
     #nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
     #print nonNan
