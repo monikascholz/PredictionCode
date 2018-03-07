@@ -28,6 +28,11 @@ outLoc = "AML32_moving/Analysis/Results.hdf5"
 folderCtrl = "AML18_moving/{}_MS/"
 dataLogCtrl = "AML18_moving/AML18_datasets.txt"
 outLoc2 = "AML18_moving/Analysis/Results.hdf5"
+# immobilized GCamp
+folderimm = "AML32_immobilized/{}_MS/"
+dataLogimm = "AML32_immobilized/AML32_immobilized_datasets.txt"
+outLoc3 = "AML32_immobilized/Analysis/Results.hdf5"
+
 # data parameters
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
             'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
@@ -35,13 +40,18 @@ dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size
             'windowGCamp': 5 # gauss window for red and green channel
             }
 
-
+# normal data
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
 resultDict = dh.loadDictFromHDF(outLoc) 
+# gfp data
 resultDictCtrl = dh.loadDictFromHDF(outLoc2)
 dataSetsCtrl = dh.loadMultipleDatasets(dataLogCtrl, pathTemplate=folderCtrl, dataPars = dataPars)
 keyListCtrl = np.sort(dataSetsCtrl.keys())
+# immobilized data
+resultDictimm = dh.loadDictFromHDF(outLoc3)
+dataSetsimm = dh.loadMultipleDatasets(dataLogimm, pathTemplate=folderimm, dataPars = dataPars)
+keyListimm = np.sort(dataSetsimm.keys())
 # analysis parameters
 
 pars ={'nCompPCA':10, # no of PCA components
@@ -55,6 +65,7 @@ pars ={'nCompPCA':10, # no of PCA components
 
 behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2']
 #behaviors = ['AngleVelocity']
+#behaviors = ['Eigenworm3']
 
 ###############################################    
 # 
@@ -94,7 +105,10 @@ mp.averageResultsLinear(resultDict,resultDictCtrl, keyList,keyListCtrl, fitmetho
 plt.show()
 #mp.averageResultsLinear(resultDict, resultDictCtrl, keyList,keyListCtrl, fitmethod = "ElasticNet",  behaviors = ['AngleVelocity', 'Eigenworm3'])
 #plt.show()
-mp.averageResultsPCA(resultDict, resultDictCtrl, keyList,keyListCtrl, fitmethod = "PCA")
+labelsPCA = ['GCamp6s', 'GFP', 'GCamp6s immobilized']
+colorsPCA = ['#007398', 'k', '#24c8ff']
+res, keys = [resultDict, resultDictCtrl,resultDictimm],[keyList,keyListCtrl, keyListimm]
+mp.averageResultsPCA(res, keys, labelsPCA,colorsPCA,fitmethod = "PCA")
 plt.show()
 ###############################################    
 # 
@@ -160,6 +174,8 @@ if pca:
 if lasso:
     
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
+    plt.show()
+    mp.plotLinearModelResults(dataSetsCtrl, resultDictCtrl, keyListCtrl[:2], pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
     plt.show()
     # overview of LASSO results and weights
     mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')

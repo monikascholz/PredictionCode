@@ -32,9 +32,10 @@ def splitIntoSets(y, nBins=5, nSets=5, splitMethod='auto', verbose=0):
     """get balanced training sets for a dataset y."""
     # Determine limits of array
     yLimits = np.array([np.min(y),np.max(y)])
-    yLimits = np.percentile(y, [2.28, 97.72])#
+    #yLimits = np.percentile(y, [2.28, 97.72])#
     if verbose >= 1:
         print 'Min and max y: ', yLimits
+        print 'Len(y): ', len(y)
 
     # Calculate bin edges and number of events in each bin
     nCounts,binEdges = np.histogram(y,nBins,yLimits)
@@ -52,11 +53,12 @@ def splitIntoSets(y, nBins=5, nSets=5, splitMethod='auto', verbose=0):
     binEdges[-1] += 1e-5
     binEdges[0], binEdges[-1] = np.min(y), np.max(y)+1e-5
     yBinIdx = np.digitize(y,binEdges) - 1
-
+    
     # Get event indices for each bin
     eventIndices = []
     for binIdx in range(nBins):
-        eventIndices.append(np.arange(len(y),dtype=int)[yBinIdx == binIdx])
+        #print np.where(yBinIdx == binIdx).shape
+        eventIndices.append(np.arange(len(y),dtype=int)[np.where(yBinIdx==binIdx)[0]])#[yBinIdx == binIdx])
     eventIndices = np.asarray(eventIndices)
 
     # Determine split method if auto is used
@@ -127,7 +129,7 @@ def createTrainingTestIndices(data, pars, label):
         cutoff = int((pars['trainingCut'])*timeLen/2.)
         tmpIndices = np.arange(timeLen)
         if label =='Eigenworm3':
-            cutoff = int((1-pars['trainingCut'])*timeLen/4.)
+            cutoff = int((1-pars['trainingCut'])*timeLen/2.)
             loc = np.where(data['Behavior']['Ethogram']==2)[0]
             loc = loc[np.argmin(np.abs(loc-timeLen/2.))]
             testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
@@ -355,6 +357,46 @@ def discreteBehaviorPrediction(data, pars, splits):
     return pcares
 ###############################################    
 # 
+# projection using behavior triggered averages
+#
+##############################################  
+def runBehaviorTriggeredAverage(data, pars):
+    """use averaging of behaviors to get neural activity corresponding."""
+    # modify data to be like scikit likes it
+    if pars['useRank']:
+            Y = data['Neurons']['rankActivity'].T
+    else:
+        Y = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+    # use ethogram for behavior
+    X = data['Behavior']['Ethogram']
+    
+        
+    orderFwd = np.argsort(np.std(Y, axis=0))
+    pcs = np.zeros((4, Y.shape[1]))
+    for index, bi in enumerate([1,-1, 2, 0]):
+        indices = np.where(X==bi)[0]
+        Ynew = Y[indices]
+        pcs[index] = np.mean(Ynew, axis=0)
+    # project data onto components
+    comp = np.zeros((4, len(Y)))
+    for wi, weights in enumerate(pcs):
+        comp[wi] = np.dot(Y, weights)
+        # backcalculate explained variance
+        
+    # calculate explained variance
+    #explained_variance_score()
+    # write to a results dictionary
+    pcares = {}
+    pcares['nComp'] =  4
+    pcares['expVariance'] =  np.arange(4)
+    pcares['neuronWeights'] =  pcs.T
+    pcares['neuronOrderPCA'] =  orderFwd
+    pcares['pcaComponents'] =  comp
+    return pcares
+    
+    
+###############################################    
+# 
 # LASSO
 #
 ##############################################    
@@ -380,7 +422,7 @@ def stdevRule(x, y, std):
     return xUpper
 def balancedFolds(y, nSets=5):
     """create balanced train/validate splitsby leave one out."""
-    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='unique', verbose=1)
+    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='auto', verbose=1)
     folds = []
     for i in range(len(splits)):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
@@ -407,17 +449,20 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 
         # fit lasso and validate
         #a = np.logspace(-2,2,100)
-        cv = 15
+        cv = 10
         # unbalanced sets
         #fold = KFold(cv, shuffle=False) 
         # balanced sets
         if label =='Eigenworm3':
-            a = np.logspace(-1,2,100)
+            a = np.logspace(-3,2,100)
         else:
-            a = np.logspace(-2,1,100)
-        fold = balancedFolds(Y[trainingsInd], nSets=10)
-        reg = linear_model.LassoCV(cv=fold, selection = 'random', verbose=0, \
-         max_iter=3000)#, alphas=a)#, normalize=False)
+            a = np.logspace(-5,-1,1000)
+        if label =='Eigenworm3':
+            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        else:
+            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        reg = linear_model.LassoCV(cv=fold,  verbose=0, \
+         max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         alphas = reg.alphas_
         ymean = np.mean(reg.mse_path_, axis =1)
@@ -427,7 +472,6 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
 #        reg = linear_model.Lasso(alpha=alphaNew)
 #        reg.fit(X[trainingsInd], Y[trainingsInd])
-        
         
         if plot:
             plt.subplot(221)
@@ -472,7 +516,8 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
-        print 'alpha', alphaNew, scorepred
+        linData[label]['output'] = reg.predict(X) # full output training and test
+        print 'alpha', alphaNew, 'r2', scorepred
     return linData
     
 ###############################################    
@@ -493,11 +538,11 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
-        l1_ratio = [0.5]#[0.5, 0.75, .9, .95, 0.99, 1]
+        l1_ratio = [0.5, 0.75, .9, .95, 0.99, 1]
         #cv = 15
-        a = np.logspace(-3,1,100)
-        fold = balancedFolds(Y[trainingsInd])
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0)
+        a = np.logspace(-3,-1,100)
+        fold = balancedFolds(Y[trainingsInd], nSets=10)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, alphas=a)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
@@ -512,6 +557,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[reg.coef_>0])
+        linData[label]['output'] = reg.predict(X) # full output training and test
         if plot:
             print 'alpha', reg.alpha_, 'l1_ratio', reg.l1_ratio_, 'r2', scorepred
             print reg.alphas_.shape, reg.mse_path_.shape
@@ -532,14 +578,15 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             #ax1.set_ylabel('PDF(weights)')
             plt.subplot(224)
             # use if only one l1_ratio
-            
-#            plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
-#            plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
-#            plt.show()
-            for l1index, l1 in enumerate(l1_ratio):
-                plt.plot(reg.alphas_[l1index], reg.mse_path_[l1index], 'k', alpha = 0.1)
-                plt.plot(reg.alphas_[l1index], np.mean(reg.mse_path_[l1index], axis =1))
-            plt.show()
+            if len(l1_ratio)==1:
+                plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
+                plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
+                plt.show()
+            else:
+                for l1index, l1 in enumerate(l1_ratio):
+                    plt.plot(reg.alphas_, reg.mse_path_[l1index], 'k', alpha = 0.1)
+                    plt.plot(reg.alphas_, np.mean(reg.mse_path_[l1index], axis =1))
+                plt.show()
     return linData
 
 ###############################################    

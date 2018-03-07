@@ -17,16 +17,22 @@ import dimReduction as dr
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
 #folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-folder = "AML32_moving/{}_MS/"
-dataLog = "AML32_moving/AML32_datasets.txt"
-outLoc = "AML32_moving/Analysis/Results.hdf5"
-if 0:
-    ##### GFP
+typ='AML32'
+if typ =='AML32': 
+    folder = "AML32_moving/{}_MS/"
+    dataLog = "AML32_moving/AML32_datasets.txt"
+    outLoc = "AML32_moving/Analysis/Results.hdf5"
+##### GFP
+elif typ =='AML18': 
     folder = "AML18_moving/{}_MS/"
     dataLog = "AML18_moving/AML18_datasets.txt"
     outLoc = "AML18_moving/Analysis/Results.hdf5"
-    # output is stored here
+# output is stored here
 
+elif typ =='AML32imm': 
+    folder = "AML32_immobilized/{}_MS/"
+    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
+    outLoc = "AML32_immobilized/Analysis/Results.hdf5"
 
 # data parameters
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
@@ -65,7 +71,7 @@ createIndicesTest = 1#True
 svm = 1
 pca = 1#False
 lasso = 1
-elasticnet = 1#True
+elasticnet = 0#True
 ###############################################    
 # 
 # create training and test set indices
@@ -100,8 +106,10 @@ if svm:
 if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
-        #resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-        resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
+        if typ=='AML32imm':
+            resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+        else:
+            resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
 
 
 #%%

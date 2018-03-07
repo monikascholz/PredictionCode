@@ -21,41 +21,67 @@ from sklearn import linear_model
 ###############################
 # transform by linear fit in 2d followed by rotation. 
 ###############################
+
 def findRotationMatrix(xS, yS, zS):
     """calculate rotation matrix to have corrected eigenworm projections."""
+    dist = zS**2+xS**2
     #make transformation of z-y plane using angle from linear fit
-    yS = np.reshape(yS, (-1,1))
+    xS = np.reshape(xS, (-1,1))
     zS = np.reshape(zS, (-1,1))
-    #use ransac to obtain a fit of all non-turn points 
-    #(use the fact there are more non-turns than turn points
-    reg = linear_model.RANSACRegressor()
-    reg.fit(zS, yS)
-    #use ransac outliers to fit
-    # turns only - fit to align to z-axis
-    turns = np.where(reg.inlier_mask_==False)[0]
+    turns = np.argpartition(dist, -250)[:-250]
+#    #use ransac to obtain a fit of all non-turn points 
+#    #(use the fact there are more non-turns than turn points
+#    reg = linear_model.RANSACRegressor()
+#    reg.fit(zS, xS)
+#    #use ransac outliers to fit
+#    # turns only - fit to align to z-axis
+#    turns = np.where(reg.inlier_mask_==False)[0]
     # fit outliers (turns) only
     reg = linear_model.LinearRegression()
-    reg.fit(yS[turns], zS[turns]) 
+    reg.fit(xS[turns], zS[turns]) 
     # outliers need to align with z
     theta = np.pi/2.-np.arctan(reg.coef_[0])[0]
     c, s = np.cos(theta), np.sin(theta)
-    R = np.matrix([[1,0,0],[0,c, -s], [0,s, c]])
+    R = np.matrix([[0,1,0],[c,0, -s], [s,0, c]])
 
     return R
 
 # load data
-loc = 'AML32_moving'
-folder = "AML32_moving/{}_MS/"
-dataLog = "AML32_moving/AML32_datasets.txt"
-loc = 'AML18_moving/'
-folder = os.path.join(loc,"{}_MS/")
-dataLog = os.path.join(loc,"AML18_datasets.txt")
+
+dataPars = {'medianWindow':1, # smooth eigenworms with median filter of that size, must be odd
+            'savGolayWindow':13, # savitzky-golay window for angle velocity derivative. must be odd
+            'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
+            'windowGCamp': 5 # savitzky-golay window for red and green channel
+            }
+
+typ='AML70'
+
+# GCamp6s; lite-1
+if typ =='AML70': 
+    folder = "AML70_moving/{}_MS/"
+    dataLog = "AML70_moving/AML70_datasets.txt"
+    outLoc = "AML70_moving/Analysis/"
+# GCamp6s 
+if typ =='AML32': 
+    folder = "AML32_moving/{}_MS/"
+    dataLog = "AML32_moving/AML32_datasets.txt"
+    outLoc = "AML32_moving/Analysis/"
+##### GFP
+elif typ =='AML18': 
+    folder = "AML18_moving/{}_MS/"
+    dataLog = "AML18_moving/AML18_datasets.txt"
+    outLoc = "AML18_moving/Analysis/"
 # output is stored here
-outfile = os.path.join(loc,"Rotationmatrix.dat")
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder)
+elif typ =='AML32imm': 
+    folder = "AML32_immobilized/{}_MS/"
+    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"#loc = 'AML18_moving/'
+#folder = os.path.join(loc,"{}_MS/")
+#dataLog = os.path.join(loc,"AML18_datasets.txt")
+## output is stored here
+outfile = os.path.join(outLoc,"../Rotationmatrix.dat")
+dataSets = dh.loadMultipleDatasets(dataLog,folder, dataPars)
 nWorms = len(dataSets)
-overwrite = False#False # if True fits new rotation matrix and overwrites old one!
-print "Remember to import unrotated Eigenworms by setting rotate=Fals ein dataHandler.loadData()"
+overwrite = True#False # if True fits new rotation matrix and overwrites old one!
 ###############################
 # concatenate Eigenworms from all datasets -- create new rotation matrix
 ###############################
@@ -81,6 +107,7 @@ if overwrite:
 else:
     R = np.loadtxt(outfile)
 
+print 'Done loading data'
 
 
 # show projections for each dataset
@@ -89,11 +116,11 @@ gs = gridspec.GridSpec(nWorms,1, hspace=1, wspace=1, top=0.95, bottom = 0.25, le
 
 for kindex, key in enumerate(dataSets.keys()):
     data = dataSets[key]
-    xN, yN, zN = data['Behavior']['Eigenworm1'], data['Behavior']['Eigenworm2'], data['Behavior']['Eigenworm3']
+    xS, yS, zS = data['Behavior']['Eigenworm1'], data['Behavior']['Eigenworm2'], data['Behavior']['Eigenworm3']
         
     gsobj = gs[kindex]        
     #make transformation of z-y plane using angle from linear fit
-    xS,yS, zS = np.array(np.dot(-R, np.vstack([xN,yN,zN])))
+    xN,yN, zN = np.array(np.dot(R, np.vstack([xS,yS,zS])))
     plt.title(key)
     axes = mp. plot2DProjections(xN,yN, zN, fig, gsobj)
     # plot old point clouds

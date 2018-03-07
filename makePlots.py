@@ -17,7 +17,8 @@ from sklearn.decomposition import PCA
 from sklearn import linear_model
 from scipy.signal import medfilt
 from scipy.ndimage.filters import gaussian_filter1d
-#
+from sklearn.metrics import explained_variance_score
+from scipy.ndimage.filters import gaussian_filter
 import dataHandler as dh
 # change axes
 axescolor = 'k'
@@ -69,11 +70,13 @@ colors = np.concatenate([cmap[name](np.linspace(0, 1, N))
 cyclon, _ = mpl.colors.from_levels_and_colors(levels, colors)
 
 # continous behavior colors - training
-colorBeh = {'AngleVelocity':'#DC143C', 'Eigenworm3':'#4876FF', 'Eigenworm2':'#4caf50'}
+colorBeh = {'AngleVelocity':'#DC143C', 'Eigenworm3':'#4876FF', 'Eigenworm2':'#4caf50', 'CMSVelocity':'#555555'}
 # continous behavior colors - prediction
-colorPred = {'AngleVelocity':'#6e0a1e', 'Eigenworm3':'#1c2f66', 'Eigenworm2':'#265728'}
+colorPred = {'AngleVelocity':'#6e0a1e', 'Eigenworm3':'#1c2f66', 'Eigenworm2':'#265728', 'CMSVelocity':'#333333'}
 # discrete behaviors
-colDict = {-1:'red',0:'k',1:'green',2:'blue'}
+#colDict = {-1:'red',0:'k',1:'green',2:'blue'}
+# same colors as manifolds
+colDict = {-1:'#C21807', 0: UCgray[1], 1:'#4AA02C', 2:'#0F52BA'}
 labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
 # color the ethogram
 ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb('#C21807'), UCgray[1], mpl.colors.to_rgb('#4AA02C'), mpl.colors.to_rgb('#0F52BA')], name='etho', N=None)
@@ -87,8 +90,6 @@ names = {'AngleVelocity': 'Wave velocity',
          'Eigenworm1': 'Head swing'
         }
 
-
-            
 def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     '''plot 3 projections into 2d for 3dim data sets. Takes an outer gridspec object to place plots.'''
     s, a = 0.05, 0.25
@@ -150,12 +151,13 @@ def circle_scatter(axes, x_array, y_array, radius=0.5, **kwargs):
         axes.add_patch(circle)
     return True
 
-def plotHeatmap(T, Y, ax = None):
+def plotHeatmap(T, Y, ax = None, vmin=-2, vmax=2):
     """nice looking heatmap for neural dynamics."""
     if ax is None:
         ax = plt.gca()
-    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=2, vmin=-2)
+    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=vmax, vmin=vmin)
     ax.set_xlabel('Time (s)')
+    ax.set_yticks([0, len(Y)])
     ax.set_ylabel("Neuron")
     return cax1
     
@@ -164,10 +166,11 @@ def plotEigenworms(T, E, label, color = 'k'):
     plt.plot(T, E, color = color, lw=1)
     plt.ylabel(label)
     plt.xlabel('Time (s)')
+    plt.xlim([0, np.max(T)])
 
 def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
     """make a block graph ethogram for elegans behavior"""
-    colDict = {-1:'red',0:'k',1:'green',2:'blue'}
+    #colDict = {-1:'red',0:'k',1:'green',2:'blue'}
     labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
     #y1 = np.where(etho==key,1,0)
     
@@ -209,30 +212,95 @@ def plotBehaviorAverages(dataSets, keyList)  :
     print 'plot BTA'
     nWorms = len(keyList)
     fig = plt.figure('BehaviorAverage',(7, nWorms*3.4))
-    gs = gridspec.GridSpec(nWorms, 3)
+    gs = gridspec.GridSpec(4, nWorms)
+    #gs = gridspec.GridSpec(nWorms, 1)
     for dindex, key in enumerate(keyList):
         data = dataSets[key]['Behavior']['Ethogram']
         Y = dataSets[key]['Neurons']['Activity'].T
-        for index, bi in enumerate([-1,1,2]):
+        orderFwd = np.argsort(np.std(Y, axis=0))
+        for index, bi in enumerate([1,-1, 2, 0]):
             indices = np.where(data==bi)[0]
-            m = np.mean(Y[indices], axis=0)
-            s = np.std(Y[indices], axis=0)
+            Ynew = Y[indices]
+            m = np.mean(Ynew, axis=0)
+            s = np.std(Ynew, axis=0)
             order = np.argsort(m)
-            low, high = np.percentile(Y[indices],[10,90], axis=0)
-            m = m[order]
-            s = s[order]
-            ax = plt.subplot(gs[dindex, index])
-            
-            #ax.plot(m,s, 'o')
-            #ax.plot(m)
-            #ax.plot(low[order])
-            #ax.plot(high[order])
-            #Y = Y[:,[order]]
-            yNew = Y[indices]
-            ax.plot(yNew.T[order], alpha=0.01, color='#1c2f66')
-            #ax.plot(np.mean(yNew, axis=1))
+            low, high = np.percentile(Ynew,[10,90], axis=0)
+            #    orderFwd = order
+            ax = plt.subplot(gs[index, dindex])
+
+            plotHeatmap(np.arange(len(m)), np.mean(Ynew[:,orderFwd], axis=0)[np.newaxis,:], ax = ax, vmax=1, vmin=-1)
+            ax.step(np.arange(len(m)), m[orderFwd],where='mid', alpha=1, color=colDict[bi])
+
             ax.set_xlabel('neurons (sorted by mean)')
             ax.set_ylabel(labelDict[bi])
+
+            
+def plotBehaviorOrderedNeurons(dataSets, keyList, behaviors):
+    """plot the neural data as ordered by behaviors."""
+    print 'plot neurons ordered by behavior'
+    nWorms = len(keyList)
+    fig = plt.figure('BehaviorOrdered Neurons',(7, nWorms*3.4))
+    gs = gridspec.GridSpec(nWorms,1)
+    #gs = gridspec.GridSpec(nWorms, 1)
+    for dindex, key in enumerate(keyList):
+        inner_grid = gridspec.GridSpecFromSubplotSpec(2, len(behaviors),
+            subplot_spec=gs[dindex], hspace=0.5, wspace=0.35, height_ratios=[0.25,1])
+        for bindex, beh in enumerate(behaviors):
+            x = dataSets[key]['Behavior'][beh]
+            Y = dataSets[key]['Neurons']['Activity']
+            T = dataSets[key]['Neurons']['Time']
+            
+            xOrder = np.argsort(x)
+            
+            #plot sorted behavior
+            ax = plt.Subplot(fig, inner_grid[0, bindex])
+            ax.plot(x[xOrder], color=colorBeh[beh])
+            ax.set_xlim([0, len(xOrder)])
+            ax.set_ylabel(beh)
+            fig.add_subplot(ax)
+            # find interesting locations:
+            if beh == 'AngleVelocity':
+                ax.axvline(np.where(x[xOrder]>0)[0][0])
+            if beh=='Eigenworm3':
+                ax.axvline(np.where(np.sort(x)<10)[0][-1])
+                ax.axvline(np.where(np.sort(x)>10)[0][0])
+            #plot neural signal sorted
+            ax = plt.Subplot(fig, inner_grid[1, bindex])
+            plotHeatmap(np.arange(len(Y)), gaussian_filter(Y[:,xOrder], (5,1)), ax =ax,vmin=-1, vmax=1)
+            ax.set_xlabel('Neural activity ordered by behavior')
+            # find interesting locations:
+            if beh == 'AngleVelocity':
+                ax.axvline(np.where(x[xOrder]>0)[0][0])
+            if beh=='Eigenworm3':
+                ax.axvline(np.where(np.sort(x)<10)[0][-1])
+                ax.axvline(np.where(np.sort(x)>10)[0][0])
+            #
+            fig.add_subplot(ax)
+            
+def plotBehaviorNeuronCorrs(dataSets, keyList, behaviors):
+    """plot the neural data as ordered by behaviors."""
+    print 'plot neurons behavior correlations.'
+    #gs = gridspec.GridSpec(nWorms, 1)
+    for dindex, key in enumerate(keyList):
+        fig = plt.figure('Behavior correlates Neurons {}'.format(dindex),(12, 12))
+        gs = gridspec.GridSpec(2, 1)
+        
+        Y = dataSets[key]['Neurons']['Activity']
+        nNeur = len(Y)
+        nRows = int(np.sqrt(nNeur))+1
+        
+        for bindex, beh in enumerate(behaviors):
+            inner_grid = gridspec.GridSpecFromSubplotSpec(nRows,nRows,\
+            subplot_spec=gs[bindex], hspace=0.05, wspace=0.05)
+            x = dataSets[key]['Behavior'][beh]
+            for n in range(nNeur):
+                ax = plt.subplot(inner_grid[int(n/nRows), n%nRows])
+                ax.scatter(x,Y[n], color=colorBeh[beh], s=0.25, alpha=0.1, label=explained_variance_score(x, Y[n]))
+                
+                ax.get_xaxis().set_visible(False)
+                ax.get_yaxis().set_visible(False)
+                ax.legend()
+        gs.tight_layout(fig)
             #ax.fill_between(range(len(m)), m-s, m+s, alpha=0.5)
 ###############################################    
 # 
@@ -249,10 +317,12 @@ def plotVelocityTurns(dataSets, keyList):
         data = dataSets[key]
         ax = plt.subplot(gs[2*dindex])
         ax.set_title(key)
-        vel =np.copy(data['Behavior']['CMSVelocity'])
-        vel = (vel-np.min(vel))/np.max(vel)
-        vel += np.min(data['Behavior']['AngleVelocity'])
+        vel = np.copy(data['Behavior']['CMSVelocity'])
+        vel = (vel-np.min(vel))
+        vel /= np.max(vel)
+        
         vel *= np.max(data['Behavior']['AngleVelocity'])
+        vel += np.min(data['Behavior']['AngleVelocity'])
         yMin, yMax = np.min(data['Behavior']['AngleVelocity']), np.max(data['Behavior']['AngleVelocity'])
         plotEthogram(ax, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25, yValMin=yMin,yValMax=yMax )        
         plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
@@ -289,12 +359,13 @@ def plotDataOverview(dataSets, keyList):
         ax2 = plt.subplot(gs[2*dindex:2*dindex+2,1])
         plt.colorbar(hm, cax=ax2)
              
-        
         ax3 = plt.subplot(gs[2*dindex,2])
         yMin, yMax = np.min(data['Behavior']['AngleVelocity']), np.max(data['Behavior']['AngleVelocity'])
         #print len(data['Neurons']['Time']),  len(data['Behavior']['Ethogram'])
         plotEthogram(ax3, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25, yValMin=yMin,yValMax=yMax )        
         plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
+        # plot cms velocity
+        
         
         ax4 = plt.subplot(gs[2*dindex+1,2])
         yMin, yMax = np.nanmin(data['Behavior']['Eigenworm3']), np.nanmax(data['Behavior']['Eigenworm3'])
@@ -303,6 +374,47 @@ def plotDataOverview(dataSets, keyList):
         #plot cms motion        
         ax5 = plt.subplot(gs[2*dindex:2*dindex+2,3])
         ax5.plot(data['Behavior']['X'], data['Behavior']['Y'])
+    plt.tight_layout()
+    plt.show()
+###############################################    
+# 
+# full figures
+#
+##############################################    
+def plotDataOverview2(dataSets, keyList, resultDict):
+    """plot ethogram and heatmap plus behaviors"""
+    nWorms = len(keyList)
+    fig = plt.figure('Overview',(10, nWorms*6.8))
+    gs = gridspec.GridSpec(nWorms*4,2, width_ratios=[1,0.1], height_ratios=np.tile([2,0.5,1,1],nWorms))
+    for dindex, key in enumerate(keyList):
+        print 'Plotting overview of ', key
+        order =  resultDict[key]['PCA']['neuronOrderPCA']
+        data = dataSets[key]
+        ax = plt.subplot(gs[4*dindex, 0])
+        ax.set_title(key)
+        hm = plotHeatmap(data['Neurons']['Time'], data['Neurons']['Activity'][order])
+        ax2 = plt.subplot(gs[4*dindex,1])
+        plt.colorbar(hm, cax=ax2)
+             
+        
+        ax3 = plt.subplot(gs[4*dindex+1,0])
+        #yMin, yMax = np.min(data['Behavior']['AngleVelocity']), np.max(data['Behavior']['AngleVelocity'])
+        #print len(data['Neurons']['Time']),  len(data['Behavior']['Ethogram'])
+        plotEthogram(ax3, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 1, yValMin=0,yValMax=1 )        
+        #plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
+        
+        ax4 = plt.subplot(gs[4*dindex+2, 0])
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['AngleVelocity'], color = colorBeh['AngleVelocity'],label = names['AngleVelocity'])
+        
+        #yMin, yMax = np.nanmin(data['Behavior']['Eigenworm3']), np.nanmax(data['Behavior']['Eigenworm3'])
+        #plotEthogram(ax4, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25,yValMin=yMin,yValMax=yMax)
+        #plotEigenworms(data['Neurons']['Time'], data['Behavior']['Eigenworm3'],color = colorBeh['Eigenworm3'], label = names['Eigenworm3'])
+        
+        ax5 = plt.subplot(gs[4*dindex+3, 0])
+        yMin, yMax = np.nanmin(data['Behavior']['Eigenworm3']), np.nanmax(data['Behavior']['Eigenworm3'])
+        #plotEthogram(ax5, data['Neurons']['Time'],  data['Behavior']['Ethogram'], alpha = 0.25,yValMin=yMin,yValMax=yMax)
+        plotEigenworms(data['Neurons']['Time'], data['Behavior']['Eigenworm3'],color = colorBeh['Eigenworm3'], label = names['Eigenworm3'])
+        
     plt.tight_layout()
     plt.show()
 
@@ -396,8 +508,9 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
         y =y/np.max(y)
         ax3.plot(time, i+y, label='Component {}'.format(i+1), lw=0.5)
     #ax3.legend()
-    ax3.set_ylabel('PCA components')
+    ax3.set_ylabel('Neural activity components')
     ax3.set_xlabel('Time (s)')
+    ax3.set_xlim([np.min(time), np.max(time)])
     fig.add_subplot(ax3)
     ax4 = plt.Subplot(fig, inner_grid[1,2])
     nComp = results['nComp']
@@ -483,7 +596,7 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
             cm = 'jet'
         elif col=='time':
             colorBy = data['Neurons']['Time']
-            cm = 'jet'
+            cm = 'magma'
         else:
             colorBy = np.reshape(np.array(data['Behavior']['Ethogram']), (-1, ))
             cm = ethocmap
@@ -865,7 +978,7 @@ def plotLinearModelScatter(dataSets, resultSet, keyList, pars, fitmethod='LASSO'
 def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod = "LASSO",  behaviors = ['AngleVelocity', 'Eigenworm3']):
     """show box plots and paired plots for results."""
     fig = plt.figure('Results {}'.format(fitmethod),(6.8,6.8))
-    gs = gridspec.GridSpec(2, 3, hspace=0.25, wspace=0.25)
+    gs = gridspec.GridSpec(2, 3, hspace=0.25, wspace=0.25, width_ratios=[1,1,2])
     keyListsAll = [keyList1, keyList2]
     resultSetsAll= [resultSets1,resultSets2]
     for i in range(2):
@@ -873,7 +986,9 @@ def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod 
         resultSets = resultSetsAll[i]
         # plot paired R2 results for multiple neurons
         for lindex, label in enumerate(behaviors):
-            r2s = [[np.max(np.concatenate([resultSets[key][fitmethod][label]['individualScore']])), resultSets[key][fitmethod][label]['cumulativeScore'][-1]] for key in keyList]
+            print [np.concatenate([resultSets[key][fitmethod][label]['individualScore']]) for key in keyList]
+            
+            r2s = [[np.max(np.concatenate([resultSets[key][fitmethod][label]['individualScore']])), resultSets[key][fitmethod][label]['cumulativeScore'][-1]] for key in keyList if len(resultSets[key][fitmethod][label]['individualScore'])>0]
             r2s =np.array(r2s)
             
             ax1 = plt.subplot(gs[i, lindex])
@@ -890,7 +1005,7 @@ def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod 
         print Ns.shape
         colors = np.array([colorBeh[label] for label in behaviors])
         labels = np.array([names[label] for label in behaviors])
-        locs = np.vstack([np.zeros(len(keyList)),np.ones(len(keyList))]).T
+        
         ax2 = plt.subplot(gs[i, 2])
         ax2.set_ylabel("Number of neurons")
         mkStyledBoxplot(fig, ax2, [0,1], Ns.T, colors, labels)
@@ -901,10 +1016,9 @@ def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod 
 def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) : 
     
     dx = np.min(np.diff(x_data))
-    print dx
-
+    
     for xd, yd, cl in zip(x_data, y_data, clrs) :
-        
+        print xd, yd, cl
         bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
                         notch=False, patch_artist=True)
         plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
@@ -949,29 +1063,44 @@ def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) :
     #ax.set_aspect(2.0 / (0.1*len(lbls)), adjustable=None, anchor=None)
     #ax.set_aspect(0.01 / (len(y_data)), adjustable=None, anchor=None)        
 
-def averageResultsPCA(resultSets1,resultSets2, keyList1, keyList2,fitmethod = "PCA"):
+def averageResultsPCA( resultSetsAll, keyListsAll,labels,colors,fitmethod = "PCA"):
     """show box plots and paired plots for results."""
     fig = plt.figure('Results {}'.format(fitmethod),(6.8,3.4))
     gs = gridspec.GridSpec(1, 2, hspace=0.25, wspace=0.25)
-    keyListsAll = [keyList1, keyList2]
-    resultSetsAll= [resultSets1,resultSets2]
+    #keyListsAll = [keyList1, keyList2]
+    #resultSetsAll= [resultSets1,resultSets2]
+    
+    # plot paired R2 results for multiple neurons
+    r2s = []
+    for ki,keyList in enumerate(keyListsAll):
+        resultSets = resultSetsAll[ki]
+        r2s.append([resultSets[key][fitmethod]['expVariance'][0] for key in keyList])
+    
+    cumr2s = []
+    for ki,keyList in enumerate(keyListsAll):
+        resultSets = resultSetsAll[ki]
+        cumr2s.append([np.cumsum(resultSets[key][fitmethod]['expVariance'])[-1] for key in keyList])
+    
+    ydata= [r2s, cumr2s]
+    titles = ['first component', 'first {} components'.format(resultSets[key][fitmethod]['nComp'])]
     for i in range(2):
-        keyList= keyListsAll[i]
-        resultSets = resultSetsAll[i]
-        # plot paired R2 results for multiple neurons
         
-        r2s = [[resultSets[key][fitmethod]['expVariance'][0], np.cumsum(resultSets[key][fitmethod]['expVariance'])[-1]] for key in keyList]
-        print r2s        
-        r2s =np.array(r2s)
+        y =np.array(ydata[i])
         
         ax1 = plt.subplot(gs[i])
+        ax1.set_title(titles[i])
         ax1.set_ylabel("{} explained variance".format(fitmethod))
-        ax1.plot(np.ones(len(r2s))*0, r2s[:,0], 'o', color=UCred[0])
-        ax1.plot(np.ones(len(r2s))*1, r2s[:,1], 'o', color=UCred[0])
+        
+        mkStyledBoxplot(fig, ax1, range(len(labels)), y, colors, labels)
+        #ax1.plot(np.ones(len(r2s))*0, r2s[:,0], 'o', color=colors[i], label=labels[i])
+        #ax1.plot(np.ones(len(r2s))*1, r2s[:,1], 'o', color=colors[i])
         #ax1.plot(r2s.T, 'k-')
-        ax1.set_xticks([0,1])
-        ax1.set_xlim([-0.5,1.5])
-        ax1.set_xticklabels(['best component', 'first {} components'.format(resultSets[key][fitmethod]['nComp'])],  rotation=30)
+        ax1.legend()
+        #ax1.set_xticks([0,1])
+        ax1.set_xlim([-0.5,len(labels)+0.5])
+        #ax1.set_xticklabels(['best component', 'first {} components'.format(resultSets[key][fitmethod]['nComp'])],  rotation=30)
         ax1.set_ylim([0,1])
+            
+        
         
     gs.tight_layout(fig)

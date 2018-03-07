@@ -17,13 +17,29 @@ import dimReduction as dr
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
 #folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-folder = "AML32_moving/{}_MS/"
-dataLog = "AML32_moving/AML32_datasets.txt"
+typ='AML32'
+
+# GCamp6s; lite-1
+if typ =='AML70': 
+    folder = "AML70_moving/{}_MS/"
+    dataLog = "AML70_moving/AML70_datasets.txt"
+    outLoc = "AML70_moving/Analysis/"
+# GCamp6s 
+if typ =='AML32': 
+    folder = "AML32_moving/{}_MS/"
+    dataLog = "AML32_moving/AML32_datasets.txt"
+    outLoc = "AML32_moving/Analysis/"
 ##### GFP
-#folder = "AML18_moving/{}_MS/"
-#dataLog = "AML18_moving/AML18_datasets.txt"
+elif typ =='AML18': 
+    folder = "AML18_moving/{}_MS/"
+    dataLog = "AML18_moving/AML18_datasets.txt"
+    outLoc = "AML18_moving/Analysis/"
 # output is stored here
-outLoc = "AML32_moving/Analysis/"
+
+
+elif typ =='AML32imm': 
+    folder = "AML32_immobilized/{}_MS/"
+    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
 
 # data parameters
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
@@ -37,7 +53,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = [key]#keyListAll
+    keyList = keyListAll[:]
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -54,23 +70,24 @@ for key in keyListAll:
           }
     
     behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2']
-    behaviors = ['Eigenworm3']
+    #behaviors = ['Eigenworm3']
 
     ###############################################    
     # 
     # check which calculations to perform
     #
     ##############################################
-    createIndicesTest = True 
-    overview = 0#False
+    createIndicesTest = 1#True 
+    overview = 1#False
+    bta = 0
     svm = 0
     pca = 0#False
     hierclust = False
     linreg = False
     lasso = 1
-    elasticnet = 0#True
-    positionweights = 0#True
-    resultsPredictionOverview = 0
+    elasticnet = 1#True
+    positionweights = 1#True
+    resultsPredictionOverview = 1
     ###############################################    
     # 
     # create training and test set indices
@@ -90,13 +107,29 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
-        #mp.plotBehaviorAverages(dataSets, keyList) 
+        mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
+        mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
         mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)
-        mp.plotNeurons3D(dataSets, keyList, threed = False)  
+        #mp.plotNeurons3D(dataSets, keyList, threed = False)  
         #mp.plotExampleCenterlines(dataSets, keyList, folder)
         plt.show() 
+        
     ###############################################    
+    # 
+    # use behavior triggered averaging to create non-othogonal axes
+    #
+    ##############################################
+    if bta:
+        for kindex, key in enumerate(keyList):
+            print 'running BTA'
+            
+            resultDict[key]['BTA'] =dr.runBehaviorTriggeredAverage(dataSets[key], pars)
+        mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'BTA')
+        plt.show()
+        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'BTA')
+        plt.show()
+        ###############################################    
     # 
     # use svm to predict discrete behaviors
     #
@@ -130,23 +163,31 @@ for key in keyListAll:
     if pca:
         print 'running PCA'
         for kindex, key in enumerate(keyList):
-            #resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-            resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
+            if typ=='AML32imm':
+                print 'running normal pca'
+                resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+            else:
+                resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
         
+        # overview of data ordered by PCA
+        mp.plotDataOverview2(dataSets, keyList, resultDict)
         # overview of PCA results and weights
         mp.plotPCAresults(dataSets, resultDict, keyList, pars)
         plt.show()
-        # show correlates of PCA
-        mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
-        #  plot 3D trajectory of PCA
-        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
-        plt.show()
         mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
         plt.show()
-        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
-        plt.show()
-        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'turns')
-        plt.show()
+        if typ!='AML32imm':
+            # show correlates of PCA
+            mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
+            #  plot 3D trajectory of PCA
+            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
+            plt.show()
+            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
+            plt.show()
+            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
+            plt.show()
+            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'turns')
+            plt.show()
         #%%
         ###############################################    
         # 
@@ -194,7 +235,7 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print key
             splits = resultDict[key]['Training']
-            resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, splits, plot=0, behaviors = behaviors)
+            resultDict[key]['LASSO'] = dr.runLasso(dataSets[key], pars, splits, plot=1, behaviors = behaviors)
             # calculate how much more neurons contribute
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key],splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
