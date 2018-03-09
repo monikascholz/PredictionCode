@@ -422,7 +422,7 @@ def stdevRule(x, y, std):
     return xUpper
 def balancedFolds(y, nSets=5):
     """create balanced train/validate splitsby leave one out."""
-    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='auto', verbose=1)
+    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='unique', verbose=1)
     folds = []
     for i in range(len(splits)):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
@@ -542,7 +542,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         #cv = 15
         a = np.logspace(-3,-1,100)
         fold = balancedFolds(Y[trainingsInd], nSets=10)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0)#, alphas=a)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])

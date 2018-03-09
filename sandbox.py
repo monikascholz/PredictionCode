@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Nov  1 2017
-Attempt to reproduce Ashley's work and test stability of LASSO versus Clustering+Ridge and elastic net algorithms.
+sandboxing
+
 @author: mscholz
 """
 
@@ -17,9 +18,66 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 from sklearn.linear_model import LassoCV, LassoLarsCV, LassoLarsIC
-import pyemma.coordinates as coor
+#import pyemma.coordinates as coor
 
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+
+# try to do error estimates of data
+
+
+# standard modules
+import numpy as np
+import matplotlib.pylab as plt
+import h5py
+# custom modules 
+import dataHandler as dh
+import makePlots as mp
+import dimReduction as dr
+
+    
+###############################################    
+# 
+#    load data into dictionary
+#
+##############################################  
+#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
+#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
+#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
+typ='AML32'
+
+# GCamp6s; lite-1
+if typ =='AML70': 
+    folder = "AML70_moving/{}_MS/"
+    dataLog = "AML70_moving/AML70_datasets.txt"
+    outLoc = "AML70_moving/Analysis/"
+# GCamp6s 
+if typ =='AML32': 
+    folder = "AML32_moving/{}_MS/"
+    dataLog = "AML32_moving/AML32_datasets.txt"
+    outLoc = "AML32_moving/Analysis/"
+##### GFP
+elif typ =='AML18': 
+    folder = "AML18_moving/{}_MS/"
+    dataLog = "AML18_moving/AML18_datasets.txt"
+    outLoc = "AML18_moving/Analysis/"
+# output is stored here
+
+
+elif typ =='AML32imm': 
+    folder = "AML32_immobilized/{}_MS/"
+    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
+
+# data parameters
+dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
+            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
+            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
+            'windowGCamp': 5 # gauss window for red and green channel
+            }
+
+
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
+keyListAll = np.sort(dataSets.keys())
 
 
 

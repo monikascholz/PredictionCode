@@ -34,8 +34,7 @@ elif typ =='AML18':
     folder = "AML18_moving/{}_MS/"
     dataLog = "AML18_moving/AML18_datasets.txt"
     outLoc = "AML18_moving/Analysis/"
-# output is stored here
-
+# immobile GCamp6
 
 elif typ =='AML32imm': 
     folder = "AML32_immobilized/{}_MS/"
@@ -53,7 +52,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = keyListAll[:]
+    keyList = keyListAll
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -107,7 +106,7 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
-        mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
+        #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
         mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
         mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)

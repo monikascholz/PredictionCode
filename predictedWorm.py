@@ -65,7 +65,7 @@ for key in resultDict.keys()[:1]:
                         data['Behavior']['Eigenworm3'],  data['Behavior']['AngleVelocity'],  data['Behavior']['Theta']
     pcdh = np.vstack([pc1,pc2, pc3])
     # for now get one LASSO worm
-    cl, wc, ep = dh.loadCenterlines(folder.format(key))
+    cl, _ = dh.loadCenterlines(folder.format(key))
     # get rotation matrix
     RMatrix = np.loadtxt(folder.format(key)+'../'+'Rotationmatrix.dat')
     # get reference points from CL we will need for recreation

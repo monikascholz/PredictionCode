@@ -239,19 +239,16 @@ def plotBehaviorOrderedNeurons(dataSets, keyList, behaviors):
     """plot the neural data as ordered by behaviors."""
     print 'plot neurons ordered by behavior'
     nWorms = len(keyList)
-    fig = plt.figure('BehaviorOrdered Neurons',(7, nWorms*3.4))
+    fig = plt.figure('BehaviorOrdered Neurons',(12, nWorms*3.4))
     gs = gridspec.GridSpec(nWorms,1)
     #gs = gridspec.GridSpec(nWorms, 1)
     for dindex, key in enumerate(keyList):
         inner_grid = gridspec.GridSpecFromSubplotSpec(2, len(behaviors),
-            subplot_spec=gs[dindex], hspace=0.5, wspace=0.35, height_ratios=[0.25,1])
+            subplot_spec=gs[dindex], hspace=0.5, wspace=0.35, height_ratios=[0.5,1])
         for bindex, beh in enumerate(behaviors):
             x = dataSets[key]['Behavior'][beh]
             Y = dataSets[key]['Neurons']['Activity']
-            T = dataSets[key]['Neurons']['Time']
-            
             xOrder = np.argsort(x)
-            
             #plot sorted behavior
             ax = plt.Subplot(fig, inner_grid[0, bindex])
             ax.plot(x[xOrder], color=colorBeh[beh])
@@ -259,23 +256,27 @@ def plotBehaviorOrderedNeurons(dataSets, keyList, behaviors):
             ax.set_ylabel(beh)
             fig.add_subplot(ax)
             # find interesting locations:
-            if beh == 'AngleVelocity':
-                ax.axvline(np.where(x[xOrder]>0)[0][0])
-            if beh=='Eigenworm3':
-                ax.axvline(np.where(np.sort(x)<10)[0][-1])
-                ax.axvline(np.where(np.sort(x)>10)[0][0])
+            ax.axvline(np.where(x[xOrder]>0)[0][0], color='k', lw=1, linestyle='--')
+#            if beh == 'AngleVelocity':
+#                ax.axvline(np.where(x[xOrder]>0)[0][0])
+#            if beh=='Eigenworm3':
+#                ax.axvline(np.where(np.sort(x)<-10)[0][-1])
+#                ax.axvline(np.where(np.sort(x)>10)[0][0])
+            ax.set_xticks([])
             #plot neural signal sorted
-            ax = plt.Subplot(fig, inner_grid[1, bindex])
-            plotHeatmap(np.arange(len(Y)), gaussian_filter(Y[:,xOrder], (5,1)), ax =ax,vmin=-1, vmax=1)
-            ax.set_xlabel('Neural activity ordered by behavior')
+            ax2 = plt.Subplot(fig, inner_grid[1, bindex], sharex=ax)
+            plotHeatmap(np.arange(len(Y[0])), gaussian_filter(Y[:,xOrder], (1,5)), ax =ax2,vmin=-0.5, vmax=1)
+            ax2.set_xlabel('Neural activity ordered by behavior')
             # find interesting locations:
-            if beh == 'AngleVelocity':
-                ax.axvline(np.where(x[xOrder]>0)[0][0])
-            if beh=='Eigenworm3':
-                ax.axvline(np.where(np.sort(x)<10)[0][-1])
-                ax.axvline(np.where(np.sort(x)>10)[0][0])
+            ax2.axvline(np.where(x[xOrder]>0)[0][0], color='w', lw=1)
+#            if beh == 'AngleVelocity':
+#                ax2.axvline(np.where(x[xOrder]>0)[0][0], color='w', lw=0.5)
+#            if beh=='Eigenworm3':
+#                ax2.axvline(np.where(np.sort(x)<-10)[0][-1], color='w', lw=0.5)
+#                ax2.axvline(np.where(np.sort(x)>10)[0][0], color='w', lw=0.5)
             #
-            fig.add_subplot(ax)
+            fig.add_subplot(ax2)
+    gs.tight_layout(fig)
             
 def plotBehaviorNeuronCorrs(dataSets, keyList, behaviors):
     """plot the neural data as ordered by behaviors."""

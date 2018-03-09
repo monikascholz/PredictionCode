@@ -51,9 +51,11 @@ def loadPoints(folder, straight = True):
     else:
         return [p[1] for p in points]
     
-def loadEigenBasis(filename):
+def loadEigenBasis(filename, nComp=3):
     """load the specific worm basis set."""
-    eigenworms = scipy.io.loadmat(filename)['eigbasis']
+    eigenworms = scipy.io.loadmat(filename)['eigbasis'][:nComp]
+    # ncomponents controls how many we use
+    eigenworms = resize(eigenworms, (nComp,99))
     return eigenworms
 
 def deconvolveCalcium(Y, show=False):
@@ -78,7 +80,8 @@ def deconvolveCalcium(Y, show=False):
         ax.set_ylabel("Power spectrum")
 
         Ydec = []
-             line by line fft of neural signal
+        
+        #     line by line fft of neural signal
         frq, fft = calcFFT(Y, time_step=1/6.)
         for line in fft:
             plt.plot(frq, line, 'r', alpha=0.1)
@@ -96,23 +99,37 @@ def deconvolveCalcium(Y, show=False):
     return Ydec
     
 
-def estimateEigenwormError(clFull, eigenworms, volTime):
+def estimateEigenwormError(folder, eigenworms, show=False):
     """use the high resolution behavior to get a variance estimate.
     This will be wrong or meaningless if the centerlines were copied between frames."""
-    loadCenterlines(folder, full = True)
-    pcsNew, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
-    # reshape by indices of volume. First and last entry will be wonky
-    clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))
+    # calculate centerline projections for full movie
+    clFull, clIndices = loadCenterlines(folder, full = True)
+    print 'done laoding'
+    pcsNew, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
+    print pcsNew.shape
+    print 'doone projecting'
     # split array by indices into blocks corresponding to volumes
-    pcs = np.split(pcsNew, clIndices)
-    print pcs.shape
-    # calculate standard deviation
-    pcsErr = np.std(pcs, axis=0)
-    print pcsErr.shape
+    pcs = np.split(pcsNew, clIndices, axis=1)
+
+    # calculate standard deviation and mean
+    pcsM = np.array([np.nanmean(p, axis=1) for p in pcs]).T
+    pcsErr = np.array([np.nanstd(p, axis=1) for p in pcs]).T
+    #length = np.array([len(p[0]) for p in pcs]).T
     #
-    plt.plot(pcsNew[0])
-    plt.plot(pcsNew[0])
-    
+    if show:
+        i=2 # which eigenworm
+        plt.figure('Eigenworm error')
+        plt.subplot(211)
+        plt.plot(pcsNew[i][clIndices], label='discret eigenworms')
+        plt.plot(pcsM[i], label='averaged eigenworms', color='r')
+        plt.fill_between(range(len(pcsM[i])), pcsM[i]-pcsErr[i], pcsM[i]+pcsErr[i], alpha=0.5, color='r')
+        plt.subplot(212)
+        m, err = np.sort(pcsM[i]), pcsErr[i][np.argsort(pcsM[i])]
+        plt.plot(np.sort(pcsNew[i][clIndices]), label='discret eigenworms')
+        plt.plot(m, label='averaged eigenworms', color='r')
+        plt.fill_between(range(len(pcsM[i])), m-err, m+err, alpha=0.5, color='r')
+        plt.show()
+    return pcsM, pcsErr
 
 def calculateEigenwormsFromCL(cl, eigenworms):
     """takes (x,y) pairs from centerlines and returns eigenworm coefficients."""
@@ -146,33 +163,36 @@ def calculateCLfromEW(pcsNew, eigenworms, meanAngle, lengths, refPoint):
 
 def loadCenterlines(folder, full = False):
     """get centerlines from centerline.mat file"""
-    tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
-    clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
-    volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
-    clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))
+    
     #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
     cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
     #if wormcentered:
-    wc = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
-    # eigenprojections
-    ep = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['eigenProj'],1,0)
-    if full:
-        # get all recorded centerlines during high-res movie
-        clIndices = np.arange(int(np.min(clIndices), int(np.max(clIndices))))
+    #    wc = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
+        # eigenprojections
+    #ep = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['eigenProj'],1,0)
     
-    # reduce to volume time
-    clNew = cl[clIndices.astype(int)]
-    wcNew = wc[clIndices.astype(int)]
-    epNew = ep[clIndices.astype(int)]
+        # get all recorded centerlines during high-res movie
+        #clIndices = np.arange(int(np.min(clIndices), int(np.max(clIndices))))
+      
+    # get relevnt indices
+    tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
+    clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
+    volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
+    clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))  
+    if not full:
+        # reduce to volume time
+        cl = cl[clIndices.astype(int)]
+    #wcNew = wc[clIndices.astype(int)]
+    #epNew = ep[clIndices.astype(int)]
     
 #    for cl in clNew[::10]:
 #        plt.plot(cl[:,0], cl[:,1])
 #    plt.show()
-    return clNew, wcNew, epNew
+    return cl ,clIndices.astype(int)
     
 def transformEigenworms(pc1, pc2, pc3, dataPars):
     """smooth Eigenworms and calculate associated metrics like velocity."""
-    theta = np.unwrap(np.arctan2(pc2, pc1))
+    theta = np.unwrap(np.arctan2(pc1, pc2))
     #velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
     velo = gaussian_filter1d(theta, dataPars['savGolayWindow'], order=1)
     # median filter the velocity and pca components 
@@ -202,6 +222,7 @@ def preprocessNeuralData(R, G, dataPars):
     RS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in R])       
     GS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in G])       
     YR = GS/RS
+    meansubtract = False
     if meansubtract:
         # long-window size smoothing filter to subtract overall fluctuation in SNR
         wind = 90
@@ -221,22 +242,22 @@ def loadData(folder, dataPars):
     """load matlab data."""
     data = scipy.io.loadmat(folder+'heatDataMS.mat')
     ew= 1
+    
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
 #    # get eigenworm file
     if ew:
-        ewfile = "eigenWorms.mat"
-        # ncomponents controls how many we use
-        nComp = 3
-        eigenworms = loadEigenBasis(ewfile)[:nComp]
-        eigenworms = resize(eigenworms, (nComp,99))
         # deal with eigenworms -- get them directly from centerlines
-        cl, wc, ep = loadCenterlines(folder)
-    #    # get prefactors from eigenworm projection
-        pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
+        cl, _ = loadCenterlines(folder)
+        # get prefactors from eigenworm projection
+        #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
+        print 'creating eigenworm projections'
+        eigenworms = loadEigenBasis(filename = 'eigenWorms.mat', nComp=3)
+        pcs, pcsErr = estimateEigenwormError(folder, eigenworms)
         print 'Done loading eigenworms '
     else:
-        pcs = np.vstack([pc12[:,1],pc12[:,0], pc3[:,0]])
+        cl = None
+        pcs = np.vstack([pc12[:,0],pc12[:,1], pc3[:,0]])
     
     # Rotate Eigenworms
     if dataPars['rotate']:
@@ -267,9 +288,9 @@ def loadData(folder, dataPars):
     R = np.array(data['rPhotoCorr'])
     G = np.array(data['gPhotoCorr'])
     Y = preprocessNeuralData(R, G, dataPars)
-    
+    order = np.array(data['cgIdx']).T[0]-1
     # store relevant indices
-    nonNan = np.arange(0, YR.shape[1])
+    nonNan = np.arange(0, Y.shape[1])
     nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
     
     # create a time axis in seconds
@@ -283,6 +304,8 @@ def loadData(folder, dataPars):
     except KeyError:
         neuroPos = []
         print 'No neuron positions:', folder
+    
+    Y = Y[order]
     YD = deconvolveCalcium(Y) 
     if 0:
         #### show what pipeline does
@@ -311,18 +334,20 @@ def loadData(folder, dataPars):
         plt.show()
     # create a dictionary structure of these data
     dataDict = {}
-    
-    dataDict['CL'] = 
+    # store centerlines subsampled to volumes
+    dataDict['CL'] = cl
     dataDict['Behavior'] = {}
 
-    tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho, xPos, yPos]
-    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', 'Eigenworm3',\
+    tmpData = [vel[:,0], pc1, pc2, pc3, pcsErr[0], pcsErr[1], pcsErr[2],velo, theta, etho, xPos, yPos]
+    for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', \
+    'Eigenworm3','Eigenworm1Err', 'Eigenworm2Err', 'Eigenworm3Err',\
                 'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
     dataDict['Neurons']['Time'] =  np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
     dataDict['Neurons']['Activity'] = Y[:,nonNan]
     dataDict['Neurons']['rankActivity'] = rankTransform(Y)[:,nonNan]
+    dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
     return dataDict
     
