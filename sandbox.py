@@ -21,10 +21,9 @@ from sklearn.linear_model import LassoCV, LassoLarsCV, LassoLarsIC
 #import pyemma.coordinates as coor
 
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
+import pycpd as cpd
 
-
-# try to do error estimates of data
-
+# try to do error estimates of dat
 
 # standard modules
 import numpy as np
@@ -35,6 +34,87 @@ import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
 
+from pycpd import deformable_registration, rigid_registration
+
+
+def runReg(X,Y,Y0, dim3, registration, **kwargs):
+    """registatrion: pycpd function"""
+    from functools import partial
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    import numpy as np
+    import time
+    
+     
+    def visualize(iteration, error, X, Y, ax):
+        if dim3:
+            plt.cla()
+            ax.scatter(X[:,0],  X[:,1], X[:,2], color='red', s=1)
+            ax.scatter(Y[:,0],  Y[:,1], Y[:,2], color='blue', s=1)
+            plt.draw()
+            print("iteration %d, error %.9f" % (iteration, error))
+            plt.pause(0.1)
+        else:
+            plt.cla()
+            ax.scatter(X[:,0],  X[:,1], color='red', s=5)
+            ax.scatter(Y[:,0],  Y[:,1], color='blue', alpha=0.5, s=5)
+            plt.draw()
+            print("iteration %d, error %.9f" % (iteration, error))
+            plt.pause(0.1)
+    
+    if dim3:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(211, projection='3d')
+        ax1.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+        ax1.scatter(Y0[:,0],  Y0[:,1], Y0[:,2], color='blue')
+        ax = fig.add_subplot(212, projection='3d')
+        ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+        ax.scatter(Y[:,0],  Y[:,1], Y[:,2], color='blue')
+    else:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(211)
+        ax1.scatter(X[:,0],  X[:,1], color='red')
+        ax1.scatter(Y0[:,0],  Y0[:,1], color='blue')
+        ax = fig.add_subplot(212)
+        ax.scatter(X[:,0],  X[:,1], color='red')
+        ax.scatter(Y[:,0],  Y[:,1], color='blue')
+    #reg = cpd.deformable_registration(X, Y, tolerance=1e-6)
+    callback = partial(visualize, ax=ax)
+    reg = registration(X, Y, **kwargs)
+    reg.register(callback)
+    
+    plt.show()
+    # return deformed Y
+    return reg.TY
+# use 3d neuron atlas positions?
+dim3 = False
+
+if dim3:
+    neuronAtlasFile = 'NeuronPositions.mat'
+    neuronAtlas = scipy.io.loadmat(neuronAtlasFile)
+    # load matlab neuron positions from atlas
+    Xref = np.hstack([neuronAtlas['x'], neuronAtlas['y'],neuronAtlas['z']])
+    relevantIds = (Xref[:,1]<-2.0)#*(Xref[:,1]<-3.0)
+    Xref = Xref[relevantIds]
+    print len(Xref)
+    #Xref = Xref[Xref[:,0]<2.7]
+    ax = plt.subplot(111, projection='3d')
+    ax.scatter(Xref[:,0],  Xref[:,1], Xref[:,2], color='red')
+    plt.show()
+    
+
+
+# load 2d new location file
+else:
+    neuron2D = 'celegans277positionsKaiser.csv'
+    neuronAtlas2Dlabels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
+    neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
+    
+    
+    relevantIds = (neuronAtlas2D[:,0]>-0.0)#*(Xref[:,0]<0.1)
+    X = neuronAtlas2D[relevantIds]
+    X[:,0] = -X[:,0]
     
 ###############################################    
 # 
@@ -44,7 +124,7 @@ import dimReduction as dr
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
 #folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML32'
+typ='AML18'
 
 # GCamp6s; lite-1
 if typ =='AML70': 
@@ -76,12 +156,212 @@ dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size
             }
 
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
-keyListAll = np.sort(dataSets.keys())
+#dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 2)
+#keyList = np.sort(dataSets.keys())
+#pos = []
+#for kindex, key in enumerate(keyList):
+#    pos.append(dataSets[key]['Neurons']['Positions'].T)
+    # deformable
+    #neurPosdef = neurPos + 05*(0.5-np.random.random_sample(neurPos.shape))
+    #reg = cpd.deformable_registration(neurPos, neurPosdef)
+
+binx, biny = 20,20
+
+wormPos = []
+# for now hard code ventral
+ventral = [-1,1,1]
+for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:3]):
+    folderName = folder.format(line[0])
+
+    pts = np.array(dh.loadPoints(folderName, straight = True))
+    nNeur = [len(pt) for pt in pts]
+    Y0 = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
+    pts = np.array(dh.loadPoints(folderName, straight = False))    
+    #YS = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
+    print Y0.shape
+    fig = plt.figure('Atlas and points')
+    ax = fig.add_subplot(5,1,lindex+2)
+    # invert y-axis if ventral side up
+    Y0[:,1] = Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*100
+    
+    ax.scatter(Y0[:,0],  Y0[:,1], color='green', alpha=0.5, s =5)
+   
+
+    
+    #ax.scatter(YS[:,0],  YS[:,1], color='k', alpha=0.5, s=1)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    
+    
+     # plot marginals
+    H, xedge, yedge = np.histogram2d(Y0[:,0],  Y0[:,1], bins=(binx,biny))
+    fig = plt.figure('Hist')
+    ax = fig.add_subplot(10,2,2*lindex+3)    
+    plt.step(np.arange(binx), np.sum(H, axis=1))
+    ax = fig.add_subplot(10,2,2*lindex+4)    
+    plt.step(np.arange(biny), np.sum(H, axis=0))
+    #ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
+    wormPos.append(Y0)
+    
+fig = plt.figure('Atlas and points')
+ax = fig.add_subplot(611)
+
+ax.scatter(X[:,0],  X[:,1], color='red', s=5)
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+
+H, xedge, yedge = np.histogram2d(X[:,0],  X[:,1], bins=(binx,biny))
+fig = plt.figure('Hist')
+ax = fig.add_subplot(10,2,1)  
+plt.step(np.arange(binx), np.sum(H, axis=1))
+ax = fig.add_subplot(10,2,2)  
+plt.step(np.arange(biny), np.sum(H, axis=0))
+#ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
+  
+    
+plt.show()
+
+registration = cpd.affine_registration
+Y0 = runReg(wormPos[0],wormPos[1],wormPos[1], dim3, registration, tolerance=1e-3, maxIterations=150)
+    
+    
+registration = cpd.deformable_registration
 
 
+Y0 = runReg(wormPos[0],Y0,Y0, dim3, registration, tolerance=1e-5, maxIterations=150)
 
+print X.shape
+# to atlas
+registration = cpd.affine_registration
+Y0 = runReg(X,wormPos[1],wormPos[1], dim3, registration, tolerance=1e-3, maxIterations=150)
+    
+    
+registration = cpd.deformable_registration
+Y0 = runReg(X,Y0,Y0, dim3, registration, tolerance=1e-5, maxIterations=150)
+    
+    
+    
+    #
+for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[1:2]):
+    folder = folder.format(line[0])
 
+    pts = np.array(dh.loadPoints(folder,straight = True))
+    print len(pts)
+    print pts.shape
+    
+    
+    
+    #rigid
+    nNeur = [len(pt) for pt in pts]
+    Y0 = np.array(pts[np.max(nNeur)])
+    fig = plt.figure('Atlas and points')
+    ax = fig.add_subplot(211)
+    
+    ax.scatter(Y0[:,0],  Y0[:,1], color='green')
+    
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
+    
+    ax = fig.add_subplot(212)
+    
+    ax.scatter(X[:,0],  X[:,1], color='red')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
+    plt.show()
+    if not dim3:
+        Y0 = Y0[:,:2]
+        # flip x axis
+        Y0[:,1] = -Y0[:,1]
+        Y0[:,0] = -Y0[:,0]
+    print Y0.shape
+    
+    # subsample X
+    #X = X[np.random.randint(0,len(Xref), (len(Xref)-50))]
+    #SHIFT TO CENTER
+    Y0 = Y0-np.mean(Y0, axis=0)
+    Y0 += np.mean(X, axis=0)
+    #adjust range
+    Y0 /= np.ptp(Y0, axis=0)
+    Y0 *= np.ptp(X, axis=0)
+    
+    #Y0[:,0] = pos[1][:,1]
+    
+    #Y0[:,1] = np.max(Y0[:,1])-Y0[:,1]
+    Y = np.copy(Y0)
+    registration = cpd.rigid_registration
+    Y0 = runReg(X,Y,Y0, dim3, registration, tolerance=1e-3, maxIterations=100)
+    
+    
+    Y = np.copy(Y0)
+    registration = cpd.deformable_registration
+    runReg(X,Y,Y0, dim3, registration, tolerance=1e-18)
+    
+    
+
+#threed = 1
+#
+#if threed:
+#    from functools import partial
+#    from scipy.io import loadmat
+#    import matplotlib.pyplot as plt
+#    from mpl_toolkits.mplot3d import Axes3D
+#    from pycpd import deformable_registration
+#    import numpy as np
+#    import time
+#    
+#    def visualize(iteration, error, X, Y, ax):
+#        plt.cla()
+#        ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#        ax.scatter(Y[:,0],  Y[:,1], Y[:,2], color='blue')
+#        plt.draw()
+#        print("iteration %d, error %.5f" % (iteration, error))
+#        plt.pause(0.1)
+#    
+#    
+#    fig = plt.figure()
+#    ax1 = fig.add_subplot(211, projection='3d')
+#    ax1.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#    ax1.scatter(Y0[:,0],  Y0[:,1], Y0[:,2], color='blue')
+#    ax = fig.add_subplot(212, projection='3d')
+#    ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#    ax.scatter(Y[:,0],  Y[:,1], Y[:,2], color='blue')
+#    
+#    
+#    #reg = cpd.deformable_registration(X, Y, tolerance=1e-6)
+#    callback = partial(visualize, ax=ax)
+#    reg = cpd.rigid_registration(X, Y)
+#    reg.register(callback)
+#    Y0 = reg.TY
+#    plt.show()
+#    
+#    fig = plt.figure('Rigid results')
+#    ax = fig.add_subplot(211, projection='3d')
+#    ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#    ax.scatter(Y0[:,0],  Y0[:,1], Y0[:,2], color='blue')
+#    ax = fig.add_subplot(212, projection='3d')
+#    ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#    
+#    ax.scatter(Y0[:,0],  Y0[:,1], Y0[:,2], color='blue')
+#    plt.show()
+#    
+#    
+#    fig = plt.figure('Deformable iteration')
+#    ax = fig.add_subplot(111, projection='3d')
+#    callback = partial(visualize, ax=ax)
+#    
+#    #reg = cpd.deformable_registration(X, Y, tolerance=1e-6)
+#    reg = cpd.deformable_registration(X, Y0, tolerance=1e-8, )
+#    out = reg.register(callback)
+#    plt.show()
+#    Y0 = reg.TY
+#    fig = plt.figure('Deformable Final results')
+#    ax = fig.add_subplot(111, projection='3d')
+#    ax.scatter(X[:,0],  X[:,1], X[:,2], color='red')
+#    ax.scatter(Y[:,0],  Y[:,1], Y[:,2], color='blue')
+#    ax.scatter(Y0[:,0],  Y0[:,1], Y0[:,2], color='green')
+#    plt.show()
 #def rankTransform(neuroMap):
 #    """takes a matrix and transforms values into rank within the colum. ie. neural dynamics: for each neuron
 #    calculate its rank at the current time."""

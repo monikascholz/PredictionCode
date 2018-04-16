@@ -43,13 +43,14 @@ def makeEthogram(anglevelocity, pc3):
     etho[np.abs(pc3)>10] = 2
     return etho
 
-def loadPoints(folder, straight = True):
+def loadPoints(folder,  straight = True):
     """get tracked points from Pointfile."""
     points = np.squeeze(scipy.io.loadmat(folder+'pointStatsNew.mat')['pointStatsNew'])
+    
     if straight:
-        return [p[0] for p in points]
-    else:
         return [p[1] for p in points]
+    else:
+        return [p[2] for p in points]
     
 def loadEigenBasis(filename, nComp=3):
     """load the specific worm basis set."""
@@ -104,10 +105,9 @@ def estimateEigenwormError(folder, eigenworms, show=False):
     This will be wrong or meaningless if the centerlines were copied between frames."""
     # calculate centerline projections for full movie
     clFull, clIndices = loadCenterlines(folder, full = True)
-    print 'done laoding'
+    print 'done loading'
     pcsNew, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
-    print pcsNew.shape
-    print 'doone projecting'
+    print 'done projecting'
     # split array by indices into blocks corresponding to volumes
     pcs = np.split(pcsNew, clIndices, axis=1)
 
@@ -161,13 +161,13 @@ def calculateCLfromEW(pcsNew, eigenworms, meanAngle, lengths, refPoint):
     clApprox = refPoint[:, np.newaxis] + np.cumsum(tVecs, axis=1)
     return clApprox       
 
-def loadCenterlines(folder, full = False):
+def loadCenterlines(folder, full = False, wormcentered = False):
     """get centerlines from centerline.mat file"""
     
     #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
     cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
-    #if wormcentered:
-    #    wc = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
+    if wormcentered:
+        cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
         # eigenprojections
     #ep = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['eigenProj'],1,0)
     
@@ -238,10 +238,10 @@ def preprocessNeuralData(R, G, dataPars):
     Y =  preprocessing.scale(YN.T).T
     return Y
 
-def loadData(folder, dataPars):
+def loadData(folder, dataPars, ew=1):
     """load matlab data."""
     data = scipy.io.loadmat(folder+'heatDataMS.mat')
-    ew= 1
+    
     
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
@@ -257,6 +257,7 @@ def loadData(folder, dataPars):
         print 'Done loading eigenworms '
     else:
         cl = None
+        # reorder for rotation
         pcs = np.vstack([pc12[:,0],pc12[:,1], pc3[:,0]])
     
     # Rotate Eigenworms
@@ -335,7 +336,7 @@ def loadData(folder, dataPars):
     # create a dictionary structure of these data
     dataDict = {}
     # store centerlines subsampled to volumes
-    dataDict['CL'] = cl
+    dataDict['CL'] = cl[nonNan]
     dataDict['Behavior'] = {}
 
     tmpData = [vel[:,0], pc1, pc2, pc3, pcsErr[0], pcsErr[1], pcsErr[2],velo, theta, etho, xPos, yPos]
@@ -352,7 +353,7 @@ def loadData(folder, dataPars):
     return dataDict
     
     
-def loadMultipleDatasets(dataLog, pathTemplate, dataPars):
+def loadMultipleDatasets(dataLog, pathTemplate, dataPars, nDatasets = None):
     """load matlab files containing brainscanner data. 
     string dataLog: file containing Brainscanner names with timestamps e.g. BrainScanner20160413_133747.
     path pathtemplate: relative or absoluet location of the dataset with a formatter replacing the folder name. e.g.
@@ -361,7 +362,7 @@ def loadMultipleDatasets(dataLog, pathTemplate, dataPars):
     return: dict of dictionaries with neuron and behavior data
     """
     datasets={}
-    for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)):
+    for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:nDatasets]):
         folder = pathTemplate.format(line[0])
         datasets[line[0]] = loadData(folder, dataPars)
     return datasets

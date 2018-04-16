@@ -128,13 +128,13 @@ def createTrainingTestIndices(data, pars, label):
     elif pars['trainingType'] == 'middle':
         cutoff = int((pars['trainingCut'])*timeLen/2.)
         tmpIndices = np.arange(timeLen)
-        if label =='Eigenworm3':
-            cutoff = int((1-pars['trainingCut'])*timeLen/2.)
-            loc = np.where(data['Behavior']['Ethogram']==2)[0]
-            loc = loc[np.argmin(np.abs(loc-timeLen/2.))]
-            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
-        else:
-            testIndices = tmpIndices[cutoff:-cutoff]
+#        if label =='Eigenworm3':
+#            cutoff = int((1-pars['trainingCut'])*timeLen/2.)
+#            loc = np.where(data['Behavior']['Ethogram']==2)[0]
+#            loc = loc[np.argmin(np.abs(loc-timeLen/2.))]
+#            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
+#        else:
+        testIndices = tmpIndices[cutoff:-cutoff]
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
@@ -538,11 +538,11 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
-        l1_ratio = [0.5, 0.75, .9, .95, 0.99, 1]
+        l1_ratio = [0.5,0.75, .9, .95, 1]
         #cv = 15
         a = np.logspace(-3,-1,100)
         fold = balancedFolds(Y[trainingsInd], nSets=10)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0)#, alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)#, alphas=a)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
@@ -581,12 +581,13 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             if len(l1_ratio)==1:
                 plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
                 plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
-                plt.show()
+                
             else:
                 for l1index, l1 in enumerate(l1_ratio):
-                    plt.plot(reg.alphas_, reg.mse_path_[l1index], 'k', alpha = 0.1)
-                    plt.plot(reg.alphas_, np.mean(reg.mse_path_[l1index], axis =1))
-                plt.show()
+                    plt.plot(reg.alphas_[l1index], reg.mse_path_[l1index], 'k', alpha = 0.1)
+                    plt.plot(reg.alphas_[l1index], np.mean(reg.mse_path_[l1index], axis =1))
+            plt.tight_layout()
+            plt.show()
     return linData
 
 ###############################################    
@@ -613,7 +614,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         indScore = []
         sumScore = []
         if fitmethod == 'ElasticNet':
-            print results[fitmethod][label]['alpha'], results[fitmethod][label]['l1_ratio']
+            print 'Elastic Net params:', results[fitmethod][label]['alpha'], results[fitmethod][label]['l1_ratio']
         # TODO: check why individual fits not as stable
         for count, wInd in enumerate(weightsInd):
             if np.abs(weights[wInd]) >0:

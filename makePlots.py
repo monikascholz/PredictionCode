@@ -520,7 +520,7 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
         ax4.set_ylabel('F1 score')
         ax4.step(np.arange(nComp),results['expVariance'], where = 'pre')
     else:
-        ax4.fill_between(np.arange(1,nComp+1),results['expVariance']*100, step='post', color='k', alpha=0.75)
+        ax4.fill_between(np.arange(0.5,nComp+0.5),results['expVariance']*100, step='post', color='k', alpha=0.75)
         #ax4.step(np.arange(1,nComp+1),np.cumsum(results['expVariance'])*100, where = 'pre')
         ax4.plot(np.arange(1,nComp+1),np.cumsum(results['expVariance'])*100, 'ko-', lw=1)
         ax4.set_ylabel('Explained variance (%)')

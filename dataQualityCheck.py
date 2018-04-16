@@ -44,7 +44,7 @@ elif typ =='AML32imm':
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
             'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5 # gauss window for red and green channel
+            'windowGCamp': 5  # gauss window for red and green channel
             }
 
 
@@ -61,7 +61,7 @@ for key in keyListAll:
     
     pars ={'nCompPCA':10, # no of PCA components
             'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.6, # what fraction of data to use for training 
+            'trainingCut': 0.65, # what fraction of data to use for training 
             'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
@@ -77,13 +77,13 @@ for key in keyListAll:
     #
     ##############################################
     createIndicesTest = 1#True 
-    overview = 1#False
+    overview = 0#False
     bta = 0
     svm = 0
     pca = 0#False
     hierclust = False
     linreg = False
-    lasso = 1
+    lasso = 0
     elasticnet = 1#True
     positionweights = 1#True
     resultsPredictionOverview = 1
@@ -284,7 +284,7 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print 'plotting linear model weights on positions',  key
             
-        mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='LASSO')
+        mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='ElasticNet')
         plt.show()
     #%%
     ###############################################    
@@ -293,16 +293,19 @@ for key in keyListAll:
     #
     ##############################################
     if resultsPredictionOverview:
-        fitmethod = 'LASSO'
-        mp.plotLinearModelScatter(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'], random = 'none')
+        fitmethod = 'ElasticNet'
+        mp.plotLinearModelScatter(dataSets, resultDict, keyList, pars, fitmethod=fitmethod, behaviors = ['AngleVelocity', 'Eigenworm3'], random = 'none')
         # collect the relevant number of neurons
         
         
         noNeur = []
         for key in keyList:
-            noNeur.append([resultDict[key]['LASSO']['AngleVelocity']['noNeurons'], resultDict[key]['LASSO']['Eigenworm3']['noNeurons']])
+            noNeur.append([resultDict[key][fitmethod]['AngleVelocity']['noNeurons'], resultDict[key][fitmethod]['Eigenworm3']['noNeurons']])
         noNeur = np.array(noNeur)
         plt.figure()
         plt.bar([1,2], np.mean(noNeur, axis=0),yerr=np.std(noNeur, axis=0) )
-    
+        plt.scatter(np.ones(len(noNeur[:,0]))+0.5, noNeur[:,0])
+        plt.scatter(np.ones(len(noNeur[:,0]))+1.5, noNeur[:,1])
+        plt.xticks([1,2], ['velocity', 'Turns'])
+        plt.show()
     
