@@ -134,7 +134,10 @@ def createTrainingTestIndices(data, pars, label):
 #            loc = loc[np.argmin(np.abs(loc-timeLen/2.))]
 #            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
 #        else:
+        # this makes a centered box
         testIndices = tmpIndices[cutoff:-cutoff]
+        # this makes a box that starts in the center
+        testIndices = tmpIndices[int(timeLen/2.):2*cutoff]
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
@@ -420,9 +423,9 @@ def stdevRule(x, y, std):
 #    
 #    plt.show()
     return xUpper
-def balancedFolds(y, nSets=5):
+def balancedFolds(y, nSets=5,  splitMethod = 'unique'):
     """create balanced train/validate splitsby leave one out."""
-    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod='unique', verbose=1)
+    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod=splitMethod, verbose=1)
     folds = []
     for i in range(len(splits)):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
@@ -534,15 +537,27 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
+        elif pars['useDeconv']:
+            X = data['Neurons']['deconvolvedActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
-        l1_ratio = [0.5,0.75, .9, .95, 1]
+        if label =='Eigenworm3':
+            #l1_ratio = [0.5, 0.7, 0.8, .9, .95, 0.99, 1]
+            l1_ratio = [ 0.95]
+            #fold =10
+            fold = balancedFolds(Y[trainingsInd], nSets=10)
+        else:
+            #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
+            l1_ratio = [0.95]
+            fold = 5
+        
         #cv = 15
         a = np.logspace(-3,-1,100)
-        fold = balancedFolds(Y[trainingsInd], nSets=10)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)#, alphas=a)
+        
+        #fold = 5
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-10, n_alphas=100)#, alphas=a)
         #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
@@ -624,7 +639,11 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                 elif fitmethod == 'ElasticNet':
                     
                     reg = linear_model.ElasticNet(alpha = results[fitmethod][label]['alpha'],
-                                                  l1_ratio = results[fitmethod][label]['l1_ratio'])
+                                                  l1_ratio = results[fitmethod][label]['l1_ratio'], tol=1e-10, selection='random')
+                xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
+                reg.fit(xTmp[trainingsInd], Y[trainingsInd])
+                sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
+                
                 xTmp = np.reshape(X[:,wInd], (-1,1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 indScore.append(reg.score(xTmp[testInd], Y[testInd]))
@@ -633,10 +652,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
 #                plt.show()
                 # fit up to n neurons
                 #reg = linear_model.Lasso(alpha = results[fitmethod][label]['alpha'])
-                xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
-                reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 
-                sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
 #                plt.subplot(311)
 #                plt.plot(Y[trainingsInd])
 #                plt.plot(reg.predict(xTmp[trainingsInd]))

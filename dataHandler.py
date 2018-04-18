@@ -52,9 +52,13 @@ def loadPoints(folder,  straight = True):
     else:
         return [p[2] for p in points]
     
-def loadEigenBasis(filename, nComp=3):
+def loadEigenBasis(filename, nComp=3, new = True):
     """load the specific worm basis set."""
-    eigenworms = scipy.io.loadmat(filename)['eigbasis'][:nComp]
+    if new:
+        eigenworms = np.loadtxt('Eigenworms.dat')[:nComp]
+        print eigenworms.shape
+    else:
+        eigenworms = scipy.io.loadmat(filename)['eigbasis'][:nComp]
     # ncomponents controls how many we use
     eigenworms = resize(eigenworms, (nComp,99))
     return eigenworms
@@ -190,11 +194,23 @@ def loadCenterlines(folder, full = False, wormcentered = False):
 #    plt.show()
     return cl ,clIndices.astype(int)
     
-def transformEigenworms(pc1, pc2, pc3, dataPars):
-    """smooth Eigenworms and calculate associated metrics like velocity."""
-    theta = np.unwrap(np.arctan2(pc1, pc2))
+def transformEigenworms(pcs, dataPars):
+    """interpolate, smooth Eigenworms and calculate associated metrics like velocity."""
+    pc3, pc1, pc2 = pcs
+    #mask nans in eigenworms by linear interpolation
+    mask1 = np.isnan(pc1)
+    mask2 = np.isnan(pc2)
+    mask3 = np.isnan(pc3)
+    if np.any(mask1):
+        pc1[mask1] = np.interp(np.flatnonzero(mask1), np.flatnonzero(~mask1), pc1[~mask1])
+    if np.any(mask2):
+        pc2[mask2] = np.interp(np.flatnonzero(mask2), np.flatnonzero(~mask2), pc2[~mask2])
+    if np.any(mask3):
+        pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc3[~mask3])
+        
+    theta = np.unwrap(np.arctan2(pc2, pc1))
     #velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
-    velo = gaussian_filter1d(theta, dataPars['savGolayWindow'], order=1)
+    velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
     # median filter the velocity and pca components 
     if dataPars['medianWindow'] < 3:
         return pc1, pc2, pc3, velo, theta
@@ -206,7 +222,7 @@ def transformEigenworms(pc1, pc2, pc3, dataPars):
     pc1 = gaussian_filter1d(pc1, dataPars['medianWindow'])
     pc2 = gaussian_filter1d(pc2, dataPars['medianWindow'])
     pc3 = gaussian_filter1d(pc3, dataPars['medianWindow'])
-    
+   
     return pc1, pc2, pc3, velo, theta
 
 
@@ -222,7 +238,7 @@ def preprocessNeuralData(R, G, dataPars):
     RS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in R])       
     GS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in G])       
     YR = GS/RS
-    meansubtract = False
+    meansubtract = True
     if meansubtract:
         # long-window size smoothing filter to subtract overall fluctuation in SNR
         wind = 90
@@ -241,8 +257,7 @@ def preprocessNeuralData(R, G, dataPars):
 def loadData(folder, dataPars, ew=1):
     """load matlab data."""
     data = scipy.io.loadmat(folder+'heatDataMS.mat')
-    
-    
+
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
 #    # get eigenworm file
@@ -252,38 +267,26 @@ def loadData(folder, dataPars, ew=1):
         # get prefactors from eigenworm projection
         #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
         print 'creating eigenworm projections'
-        eigenworms = loadEigenBasis(filename = 'eigenWorms.mat', nComp=3)
+        eigenworms = loadEigenBasis(filename = 'eigenWorms.mat', nComp=3, new=True)
         pcs, pcsErr = estimateEigenwormError(folder, eigenworms)
         print 'Done loading eigenworms '
     else:
         cl = None
         # reorder for rotation
-        pcs = np.vstack([pc12[:,0],pc12[:,1], pc3[:,0]])
-    
-    # Rotate Eigenworms
-    if dataPars['rotate']:
-        # load rotation matrix
-        R = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
-        pcs = np.array(np.dot(R, pcs))
-    pc1, pc2, pc3 = pcs
-    #mask nans in eigenworms by linear interpolation
-    mask1 = np.isnan(pc1)
-    mask2 = np.isnan(pc2)
-    mask3 = np.isnan(pc3)
-    if np.any(mask1):
-        pc1[mask1] = np.interp(np.flatnonzero(mask1), np.flatnonzero(~mask1), pc1[~mask1])
-    if np.any(mask2):
-        pc2[mask2] = np.interp(np.flatnonzero(mask2), np.flatnonzero(~mask2), pc2[~mask2])
-    if np.any(mask3):
-        pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc3[~mask3])
+        pcs = np.vstack([pc3[:,0],pc12[:,1], pc12[:,0]])
+        # Rotate Eigenworms
+        if dataPars['rotate']:
+            # load rotation matrix
+            R = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
+            pcs = np.array(np.dot(R, pcs))
     
     # do Eigenworm transformations and calculate velocity etc.
 #    # median filter the Eigenworms
-    pc1, pc2, pc3, velo, theta = transformEigenworms(pc1, pc2, pc3, dataPars)
-
+    pc1, pc2, pc3, velo, theta = transformEigenworms(pcs, dataPars)
+    print 'mean velocity', np.mean(velo)
     # ethogram redone
     etho = makeEthogram(velo, pc3)
-    #etho = ethoOrig
+    etho = ethoOrig
     
     #load neural data
     R = np.array(data['rPhotoCorr'])

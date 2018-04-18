@@ -41,8 +41,8 @@ elif typ =='AML32imm':
     dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
 
 # data parameters
-dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
-            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
+dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':15, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5  # gauss window for red and green channel
             }
@@ -61,15 +61,16 @@ for key in keyListAll:
     
     pars ={'nCompPCA':10, # no of PCA components
             'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.65, # what fraction of data to use for training 
+            'trainingCut': 0.7, # what fraction of data to use for training 
             'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
             'useRank': 0, # use the rank transformed version of neural data for all analyses
+            'useDeconv': 0, # use the rank transformed version of neural data for all analyses
           }
     
-    behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2']
-    #behaviors = ['Eigenworm3']
+    behaviors = ['AngleVelocity']#, 'Eigenworm3']#, 'Eigenworm2']
+    behaviors = ['Eigenworm3']
 
     ###############################################    
     # 

@@ -36,13 +36,6 @@ def recrWorm(av, turns, thetaTrue, r):
     
     
 def main():    
-    # load old eigenworms that we use in the pipeline
-    ewfile = "eigenWorms.mat"
-    # ncomponents controls how many we use
-    nComp = 3
-    eigenworms = dh.loadEigenBasis(ewfile)[:nComp]
-    eigenworms = resize(eigenworms, (nComp,99))
-    
     
     dataPars = {'medianWindow':1, # smooth eigenworms with median filter of that size, must be odd
                 'savGolayWindow':7, # savitzky-golay window for angle velocity derivative. must be odd
@@ -57,22 +50,30 @@ def main():
     # load datasets from hdf5 in a dictionary
     dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 1)
     keyList = np.sort(dataSets.keys())
-    resultDict = dh.loadDictFromHDF(outLoc)
-    for key in resultDict.keys()[:1]:
-        # get data handler eigenworms
-        data = dh.loadData(folder.format(key), dataPars)
     
-        pc1, pc2, pc3, avTrue, thetaTrue = data['Behavior']['Eigenworm1'],data['Behavior']['Eigenworm2'],\
+    # for debugging recreate an existing, approximated shape
+    data = dataSets[keyList[0]]
+    pc1, pc2, pc3, avTrue, thetaTrue = data['Behavior']['Eigenworm1'],data['Behavior']['Eigenworm2'],\
                             data['Behavior']['Eigenworm3'],  data['Behavior']['AngleVelocity'],  data['Behavior']['Theta']
-        pcdh = np.vstack([pc1,pc2, pc3])
-        # for now get one LASSO worm
-        cl= data['CL']# dh.loadCenterlines(folder.format(key))
-        # get rotation matrix
-        RMatrix = np.loadtxt(folder.format(key)+'../'+'Rotationmatrix.dat')
-        # get reference points from CL we will need for recreation
-        # getting the same eigenworms as are written in heatmap data
-        pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, eigenworms)
-        pcs = np.array(np.dot(RMatrix, np.vstack([pcsNew[0],pcsNew[1], pcsNew[2]])))
+    
+    cl= data['CL']
+    
+    #resultDict = dh.loadDictFromHDF(outLoc)
+#    for key in resultDict.keys()[:1]:
+#        # get data handler eigenworms
+#        data = dh.loadData(folder.format(key), dataPars)
+#    
+#        pc1, pc2, pc3, avTrue, thetaTrue = data['Behavior']['Eigenworm1'],data['Behavior']['Eigenworm2'],\
+#                            data['Behavior']['Eigenworm3'],  data['Behavior']['AngleVelocity'],  data['Behavior']['Theta']
+#        pcdh = np.vstack([pc1,pc2, pc3])
+#        # for now get one LASSO worm
+#        cl= data['CL']# dh.loadCenterlines(folder.format(key))
+#        # get rotation matrix
+#        RMatrix = np.loadtxt(folder.format(key)+'../'+'Rotationmatrix.dat')
+#        # get reference points from CL we will need for recreation
+#        # getting the same eigenworms as are written in heatmap data
+#        pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, eigenworms)
+#        pcs = np.array(np.dot(RMatrix, np.vstack([pcsNew[0],pcsNew[1], pcsNew[2]])))
         
         
         

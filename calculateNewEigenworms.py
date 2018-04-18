@@ -36,10 +36,10 @@ newEigenworms = pca.components_
 print 'Explained variance with 4 components: ', np.cumsum(pca.explained_variance_ratio_)[3]
 
 # save data as file
-np.savetxt('Eigenworms.dat', newEigenworms)
+#np.savetxt('Eigenworms.dat', newEigenworms)
 
 # plot old Eigenworms for comparison
-oldEigenworms = dh.loadEigenBasis(filename = 'eigenWorms.mat', nComp=4)
+oldEigenworms = dh.loadEigenBasis(filename = 'eigenWorms.mat', nComp=4, new=False)
 
 ax4 = plt.subplot(511)
 ax4.fill_between(np.arange(0.5,nComp+0.5),pca.explained_variance_ratio_*100, step='post', color='k', alpha=0.75)
@@ -67,13 +67,22 @@ pcs = np.array(np.dot(RMatrix, np.vstack([pcsOld[2],pcsOld[1], pcsOld[0]])))
 pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, newEigenworms)
 pcsNew = pcsNew[[2,1,0]]
 
-plt.subplot(4,1,1)
+plt.subplot(5,1,1)
 plt.scatter(pcs[0],pcs[1], label= 'old', alpha=0.05, s=1)
 plt.scatter(pcsNew[0]+25,pcsNew[1], label='new', alpha=0.05, s=1)
 plt.legend()
 for i in range(3):
-    plt.subplot(4,1,i+2)
+    plt.subplot(5,1,i+2)
     plt.plot(pcs[i], label='old')
     plt.plot(pcsNew[i], label='new')
     plt.legend()
+    # plot new angle velocity
+    
+theta = np.unwrap(np.arctan2(pcs[0], pcs[1]))
+velo = dh.gaussian_filter1d(theta, 15, order=1)
+thetaNew = np.unwrap(np.arctan2(pcsNew[0], pcsNew[1]))
+veloNew = dh.gaussian_filter1d(thetaNew, 15, order=1)
+plt.subplot(5,1,5)
+plt.plot(velo)
+plt.plot(veloNew)
 plt.show()
