@@ -17,7 +17,7 @@ import dimReduction as dr
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
 #folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML32'
+typ='AML70'
 
 # GCamp6s; lite-1
 if typ =='AML70': 
@@ -42,13 +42,13 @@ elif typ =='AML32imm':
 
 # data parameters
 dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':15, # sgauss window for angle velocity derivative. must be odd
+            'gaussWindow':10, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5  # gauss window for red and green channel
             }
 
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 4)
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
@@ -69,8 +69,8 @@ for key in keyListAll:
             'useDeconv': 0, # use the rank transformed version of neural data for all analyses
           }
     
-    behaviors = ['AngleVelocity']#, 'Eigenworm3']#, 'Eigenworm2']
-    behaviors = ['Eigenworm3']
+    behaviors = ['AngleVelocity','Eigenworm3']#, 'Eigenworm2']
+    #behaviors = ['Eigenworm3']
 
     ###############################################    
     # 

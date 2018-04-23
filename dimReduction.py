@@ -127,6 +127,7 @@ def createTrainingTestIndices(data, pars, label):
         testIndices = np.sort(tmpindices[cutoff:])
     elif pars['trainingType'] == 'middle':
         cutoff = int((pars['trainingCut'])*timeLen/2.)
+        testTime = int((1-pars['trainingCut'])*timeLen)
         tmpIndices = np.arange(timeLen)
 #        if label =='Eigenworm3':
 #            cutoff = int((1-pars['trainingCut'])*timeLen/2.)
@@ -135,9 +136,9 @@ def createTrainingTestIndices(data, pars, label):
 #            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
 #        else:
         # this makes a centered box
-        testIndices = tmpIndices[cutoff:-cutoff]
+        #testIndices = tmpIndices[cutoff:-cutoff]
         # this makes a box that starts in the center
-        testIndices = tmpIndices[int(timeLen/2.):2*cutoff]
+        testIndices = tmpIndices[int(timeLen/2.):int(timeLen/2.)+testTime]
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
@@ -425,7 +426,7 @@ def stdevRule(x, y, std):
     return xUpper
 def balancedFolds(y, nSets=5,  splitMethod = 'unique'):
     """create balanced train/validate splitsby leave one out."""
-    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod=splitMethod, verbose=1)
+    splits, _ = splitIntoSets(y, nBins=5, nSets=nSets, splitMethod=splitMethod, verbose=0)
     folds = []
     for i in range(len(splits)):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
@@ -543,22 +544,25 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
+        cv = 5
         if label =='Eigenworm3':
-            #l1_ratio = [0.5, 0.7, 0.8, .9, .95, 0.99, 1]
-            l1_ratio = [ 0.95]
+            l1_ratio = [0.95]
+            #l1_ratio = [0.95]
             #fold =10
-            fold = balancedFolds(Y[trainingsInd], nSets=10)
+            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+            a = np.logspace(-2,-0.5,200)
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
-            fold = 5
+            fold = cv
+            a = np.logspace(-3,0,200)
         
         #cv = 15
-        a = np.logspace(-3,-1,100)
-        
+        #a = np.logspace(-3,-1,100)
         #fold = 5
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-10, n_alphas=100)#, alphas=a)
-        #reg = linear_model.ElasticNetCV(cv=cv, verbose=1)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-10, alphas=a)
+        reg.fit(X[trainingsInd], Y[trainingsInd])
+
         reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
         score = reg.score(X[trainingsInd], Y[trainingsInd])
@@ -596,11 +600,15 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             if len(l1_ratio)==1:
                 plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.1)
                 plt.plot(reg.alphas_, np.mean(reg.mse_path_, axis =1))
-                
             else:
-                for l1index, l1 in enumerate(l1_ratio):
-                    plt.plot(reg.alphas_[l1index], reg.mse_path_[l1index], 'k', alpha = 0.1)
-                    plt.plot(reg.alphas_[l1index], np.mean(reg.mse_path_[l1index], axis =1))
+                if len(reg.alphas_.shape)>1:
+                    for l1index, l1 in enumerate(l1_ratio):
+                        plt.plot(reg.alphas_[lindex], reg.mse_path_[l1index], 'k', alpha = 0.1)
+                        plt.plot(reg.alphas_[lindex], np.mean(reg.mse_path_[l1index], axis =1))
+                else:
+                    for l1index, l1 in enumerate(l1_ratio):
+                        plt.plot(reg.alphas_, reg.mse_path_[l1index], 'k', alpha = 0.1)
+                        plt.plot(reg.alphas_, np.mean(reg.mse_path_[l1index], axis =1))
             plt.tight_layout()
             plt.show()
     return linData
@@ -630,6 +638,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         sumScore = []
         if fitmethod == 'ElasticNet':
             print 'Elastic Net params:', results[fitmethod][label]['alpha'], results[fitmethod][label]['l1_ratio']
+            print 'Elastic Net R2:', results[fitmethod][label]['scorepredicted'], results[fitmethod][label]['score']
         # TODO: check why individual fits not as stable
         for count, wInd in enumerate(weightsInd):
             if np.abs(weights[wInd]) >0:

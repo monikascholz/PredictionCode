@@ -35,10 +35,12 @@ elif typ =='AML32imm':
     outLoc = "AML32_immobilized/Analysis/Results.hdf5"
 
 # data parameters
-dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
-            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
+# data parameters
+dataPars = {'medianWindow':11, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':11, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5 # gauss window for red and green channel
+            'windowGCamp': 5,  # gauss window for red and green channel
+            
             }
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
@@ -57,6 +59,7 @@ pars ={'nCompPCA':10, # no of PCA components
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
+        'useDeconv':False # use deconvolved calcium signal
       }
 
 behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2', 'CMSVelocity']
@@ -71,7 +74,7 @@ createIndicesTest = 1#True
 svm = 1
 pca = 1#False
 lasso = 1
-elasticnet = 0#True
+elasticnet = 1#True
 ###############################################    
 # 
 # create training and test set indices

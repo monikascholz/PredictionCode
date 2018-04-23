@@ -17,6 +17,46 @@ from scipy.ndimage.filters import gaussian_filter1d
 import h5py
 from scipy.special import erf
 
+def deconvolveCalcium(Y, show=False):
+    """deconvolve with GCamp6s response digitized from Nature volume 499, pages 295–300 (18 July 2013)
+        doi:10.1038/nature12354"""
+    # fit function -- fitted with least squares from digitized data
+    pars =  [ 0.38036106 , 0.00565365 , 1.00621729 , 0.31627363 ]
+    def fitfunc(x,A,m, tau1, s):
+        return A*erf((x-m)/s)*np.exp(-x/tau1)
+    gcampXN = np.linspace(0,Y.shape[1]/6., Y.shape[1])
+    gcampYN = fitfunc(gcampXN, *pars)
+    Ydec = np.real(np.fft.ifft(np.fft.fft(Y, axis = 1)/np.fft.fft(gcampYN)))*np.sum(gcampYN)
+    if show:
+        plt.subplot(221)
+        plt.plot(gcampX, gcampY)
+        plt.plot(gcampXN[:18], gcampYN[:18])
+        ax = plt.subplot(222)
+        frq, psGC = calcFFT(gcampYN, time_step=1/6.)
+        plt.plot(frq, psGC)
+        ax.set_yscale('log',nonposy='clip')
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel("Power spectrum")
+
+        Ydec = []
+        
+        #     line by line fft of neural signal
+        frq, fft = calcFFT(Y, time_step=1/6.)
+        for line in fft:
+            plt.plot(frq, line, 'r', alpha=0.1)
+
+        ax.set_yscale('log',nonposy='clip')
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel("Power spectrum")
+        plt.show()
+        vmax, vmin=1,0
+        ax = plt.subplot(223)
+        cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',vmax=vmax, vmin=vmin)
+        ax = plt.subplot(224)
+        pcax1 = ax.imshow(Ydec, aspect='auto', interpolation='none', origin='lower',vmax=vmax, vmin=vmin)
+        plt.show()
+    return Ydec
+
 def calcFFT(data, time_step=1/6.):
     """plot frequency of data"""
     fft = []
@@ -63,46 +103,6 @@ def loadEigenBasis(filename, nComp=3, new = True):
     eigenworms = resize(eigenworms, (nComp,99))
     return eigenworms
 
-def deconvolveCalcium(Y, show=False):
-    """deconvolve with GCamp6s response digitized from Nature volume 499, pages 295–300 (18 July 2013)
-        doi:10.1038/nature12354"""
-    # fit function -- fitted with least squares from digitized data
-    pars =  [ 0.38036106 , 0.00565365 , 1.00621729 , 0.31627363 ]
-    def fitfunc(x,A,m, tau1, s):
-        return A*erf((x-m)/s)*np.exp(-x/tau1)
-    gcampXN = np.linspace(0,Y.shape[1]/6., Y.shape[1])
-    gcampYN = fitfunc(gcampXN, *pars)
-    Ydec = np.real(np.fft.ifft(np.fft.fft(Y, axis = 1)/np.fft.fft(gcampYN)))*np.sum(gcampYN)
-    if show:
-        plt.subplot(221)
-        plt.plot(gcampX, gcampY)
-        plt.plot(gcampXN[:18], gcampYN[:18])
-        ax = plt.subplot(222)
-        frq, psGC = calcFFT(gcampYN, time_step=1/6.)
-        plt.plot(frq, psGC)
-        ax.set_yscale('log',nonposy='clip')
-        ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel("Power spectrum")
-
-        Ydec = []
-        
-        #     line by line fft of neural signal
-        frq, fft = calcFFT(Y, time_step=1/6.)
-        for line in fft:
-            plt.plot(frq, line, 'r', alpha=0.1)
-
-        ax.set_yscale('log',nonposy='clip')
-        ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel("Power spectrum")
-        plt.show()
-        vmax, vmin=1,0
-        ax = plt.subplot(223)
-        cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',vmax=vmax, vmin=vmin)
-        ax = plt.subplot(224)
-        pcax1 = ax.imshow(Ydec, aspect='auto', interpolation='none', origin='lower',vmax=vmax, vmin=vmin)
-        plt.show()
-    return Ydec
-    
 
 def estimateEigenwormError(folder, eigenworms, show=False):
     """use the high resolution behavior to get a variance estimate.
@@ -113,11 +113,11 @@ def estimateEigenwormError(folder, eigenworms, show=False):
     pcsNew, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
     print 'done projecting'
     # split array by indices into blocks corresponding to volumes
-    pcs = np.split(pcsNew, clIndices, axis=1)
+    pcsSplit = np.split(pcsNew, clIndices, axis=1)
 
     # calculate standard deviation and mean
-    pcsM = np.array([np.nanmean(p, axis=1) for p in pcs]).T
-    pcsErr = np.array([np.nanstd(p, axis=1) for p in pcs]).T
+    pcsM = np.array([np.nanmean(p, axis=1) for p in pcsSplit]).T
+    pcsErr = np.array([np.nanstd(p, axis=1) for p in pcsSplit]).T
     #length = np.array([len(p[0]) for p in pcs]).T
     #
     if show:
@@ -133,7 +133,7 @@ def estimateEigenwormError(folder, eigenworms, show=False):
         plt.plot(m, label='averaged eigenworms', color='r')
         plt.fill_between(range(len(pcsM[i])), m-err, m+err, alpha=0.5, color='r')
         plt.show()
-    return pcsM, pcsErr
+    return pcsM, pcsErr, pcsNew[:,clIndices.astype(int)]
 
 def calculateEigenwormsFromCL(cl, eigenworms):
     """takes (x,y) pairs from centerlines and returns eigenworm coefficients."""
@@ -196,7 +196,7 @@ def loadCenterlines(folder, full = False, wormcentered = False):
     
 def transformEigenworms(pcs, dataPars):
     """interpolate, smooth Eigenworms and calculate associated metrics like velocity."""
-    pc3, pc1, pc2 = pcs
+    pc3, pc2, pc1 = pcs
     #mask nans in eigenworms by linear interpolation
     mask1 = np.isnan(pc1)
     mask2 = np.isnan(pc2)
@@ -208,7 +208,7 @@ def transformEigenworms(pcs, dataPars):
     if np.any(mask3):
         pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc3[~mask3])
         
-    theta = np.unwrap(np.arctan2(pc2, pc1))
+    theta = np.unwrap(np.arctan2(pc1, pc2))
     #velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
     velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
     # median filter the velocity and pca components 
@@ -219,8 +219,8 @@ def transformEigenworms(pcs, dataPars):
 #    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
 #    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
 #    pc3 = scipy.signal.medfilt(pc3, dataPars['medianWindow'])
-    pc1 = gaussian_filter1d(pc1, dataPars['medianWindow'])
-    pc2 = gaussian_filter1d(pc2, dataPars['medianWindow'])
+#    pc1 = gaussian_filter1d(pc1, dataPars['medianWindow'])
+#    pc2 = gaussian_filter1d(pc2, dataPars['medianWindow'])
     pc3 = gaussian_filter1d(pc3, dataPars['medianWindow'])
    
     return pc1, pc2, pc3, velo, theta
@@ -238,7 +238,7 @@ def preprocessNeuralData(R, G, dataPars):
     RS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in R])       
     GS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in G])       
     YR = GS/RS
-    meansubtract = True
+    meansubtract = False
     if meansubtract:
         # long-window size smoothing filter to subtract overall fluctuation in SNR
         wind = 90
@@ -268,7 +268,7 @@ def loadData(folder, dataPars, ew=1):
         #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
         print 'creating eigenworm projections'
         eigenworms = loadEigenBasis(filename = 'eigenWorms.mat', nComp=3, new=True)
-        pcs, pcsErr = estimateEigenwormError(folder, eigenworms)
+        _, pcsErr, pcs = estimateEigenwormError(folder, eigenworms)
         print 'Done loading eigenworms '
     else:
         cl = None
@@ -287,6 +287,10 @@ def loadData(folder, dataPars, ew=1):
     # ethogram redone
     etho = makeEthogram(velo, pc3)
     etho = ethoOrig
+    # mask nans in ethogram
+    ethomask = np.isnan(etho)
+    if np.any(ethomask):
+        etho[ethomask] = 0
     
     #load neural data
     R = np.array(data['rPhotoCorr'])
@@ -340,6 +344,7 @@ def loadData(folder, dataPars, ew=1):
     dataDict = {}
     # store centerlines subsampled to volumes
     dataDict['CL'] = cl[nonNan]
+    dataDict['goodVolumes'] = nonNan
     dataDict['Behavior'] = {}
 
     tmpData = [vel[:,0], pc1, pc2, pc3, pcsErr[0], pcsErr[1], pcsErr[2],velo, theta, etho, xPos, yPos]
