@@ -1,0 +1,36 @@
+PCA of neural dynamics
+-----------------------
+- Using a rank transform on the neuronal data gets us the forward loop of the manifold and nice shapes overall
+- Not enough reversal times to get a nice y-shape
+- Doing time-warping in neural dynamics does not improve manifold
+- derivative of neural data is not helpful. Results in a hairball in PCA space.
+
+-> How much smoothing should we do? What timescales are we expecting? Can we be informed by Xiaowen's data what to discard? New procesure includes a rescaling (subtract mean, divide by std) - raw this leads to a messy hairball, when smoothed it seems ok.
+
+- Do PCA on the same data we use for prediction (just a 13 frame sav golay filter), but plot with a 6 frame (1 sec) smoothing window. Same as Kato (Uses 3 frame = 1 sec smoother for his plots)
+
+
+
+1) need smooth savitzky Golay filter for angle velocity: Use window 13, order 3 for derivative
+2) median filter size 13 for all Eigenworms and velocity.
+=> reason: GCAmp6s halftime = 1 sec
+
+neural data: smooth before ratio with w=13 savitzky-golay, order 3
+- calculate PCA on derivative as Kato. Idk why this is somehow better but ok.
+
+Prediction fitting
+-----------------------
+We get good fits with or without rank, but definitely need a median filter on behavior. This could be centerline noise, or it is the fluorophore smoothing the calcium signal. Need to make some calculations to justify what smoothing to use.
+1) Median filter
+-----------------------
+- median filter improves r^2 but leads to inclusion of more and more neurons in LASSO. I am dubious about that.
+
+
+Training: Middle is ok for velocity, but both velocity and turns improve dramatically with 'random' training. I think this is due to the fact that we don't have enough data to sample well and the first half is not entirely representative of the second half. This is obvious when fitting a trajectory without turns, we are basically fitting noise in that case.
+
+Red channel sanity check: Check how well (or badly) the red channel does in predicting all three components. It appears that Red<Green<Ratio (good!)
+
+We need a better measure than R2 of how good the prediction is. Idk yet how to do that.
+
+
+
