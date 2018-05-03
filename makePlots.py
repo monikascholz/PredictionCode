@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib as mpl
 import os
 #
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
@@ -19,6 +20,7 @@ from scipy.signal import medfilt
 from scipy.ndimage.filters import gaussian_filter1d
 from sklearn.metrics import explained_variance_score
 from scipy.ndimage.filters import gaussian_filter
+#custom
 import dataHandler as dh
 # change axes
 axescolor = 'k'
@@ -36,9 +38,9 @@ mpl.rcParams["legend.frameon"]=False
 mpl.rcParams["legend.labelspacing"]=0.25
 mpl.rcParams["legend.labelspacing"]=0.25
 #mpl.rcParams['text.usetex'] =True
-mpl.rcParams["axes.labelsize"]=  12
-mpl.rcParams["xtick.labelsize"]=  12
-mpl.rcParams["ytick.labelsize"]=  12
+mpl.rcParams["axes.labelsize"]=  10
+mpl.rcParams["xtick.labelsize"]=  10
+mpl.rcParams["ytick.labelsize"]=  10
 mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
 mpl.rc('text.latex', preamble='\usepackage{sfmath}')
 plt.rcParams['image.cmap'] = 'viridis'
@@ -89,6 +91,138 @@ names = {'AngleVelocity': 'Wave velocity',
          'Eigenworm2': 'Head swing',
          'Eigenworm1': 'Head swing'
         }
+
+def make_animation(fig, ax, data1, data2, frames):
+    """use pythons built-in animation tools to make a centerline animation."""
+    x1,y1 = data1[0].T
+    x2,y2 = data2[0].T
+    line1, = ax.plot(x1,y1, lw=20, color = '0.5')
+    line2, = ax.plot(x2, y2, lw=20, color='r')
+    def init():
+        line1.set_data([], [])
+        line2.set_data([], [])
+        return line1,line2
+    # animation function.  This is called sequentially
+    def animate(i, data1, data2= None):
+        x1,y1 = data1[i].T
+        x2,y2 = data2[i].T
+        
+        line1.set_data(x1, y1)
+        line2.set_data(x2, y2)
+        return line1, line2
+        
+    
+    anim = animation.FuncAnimation(fig, animate, init_func=init,fargs=[data1, data2],
+                               frames=frames, interval=200, blit=True)
+    plt.show()
+
+
+def make_animation2(fig, ax, data1, data2, frames, color = 'gray'):
+    """use pythons built-in animation tools to make a centerline animation."""
+    def width(x):
+        """empirical worm width...i.e., I eyeballed a function."""
+        a,b,x0 = 10., 20., 90
+        return  15*((1 / (1 + np.exp(-x/a)))*(1- 1 / (1 + np.exp(-(x-x0)/b))))
+        
+    
+    def init():
+        points = data1[0].reshape(-1, 1, 2)
+        segments = np.hstack([points[:-1], points[1:]])
+        lwidths = width(np.linspace(0,100, len(segments)))
+        lc1 = LineCollection(segments, linewidths=lwidths,color=color)
+        ax.add_collection(lc1)
+        if data2 is not None:
+            points2 = data2[0].reshape(-1, 1, 2)
+            segments2 = np.hstack([points2[:-1], points2[1:]])
+            
+            lc2 = LineCollection(segments2, linewidths=lwidths,color=color)
+            ax.add_collection(lc2)
+            return lc1, lc2,
+        return lc1
+    lc1, lc2 = init()
+    # animation function.  This is called sequentially
+    def animate(i, data1, data2= None):
+        points = data1[i].reshape(-1, 1, 2)
+        segments = np.hstack([points[:-1], points[1:]])
+        lc1.set_segments(segments)
+        if data2 is not None:
+            points2 = data2[i].reshape(-1, 1, 2)
+            segments2 = np.hstack([points2[:-1], points2[1:]])
+            lc2.set_segments(segments2)
+            return lc1, lc2
+        #line2.set_data(x2, y2)
+        return lc1,# line2
+        
+    
+    anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
+                               frames=frames, interval=200, blit=True)
+    plt.show()
+    
+def width(x):
+        """empirical worm width...i.e., I eyeballed a function."""
+        a,b,x0 = 5, 10., 100
+        return  35*((1 / (1 + np.exp(-x/a)))*(1 - 1 / (1 + np.exp(-(x-x0)/b)))-0.5)
+    
+def createWorm(x, y):
+    """creates vertices for a worm from centerline points x1, y1. """
+    lwidths = width(np.linspace(0,100, len(x)))
+    # create orthogonal vectors
+    e1 = np.vstack([np.diff(y), -np.diff(x)])
+    e1 /= np.linalg.norm(e1, axis =0)
+    e1 = np.pad(e1, ((0,0),(0,1)), 'constant')
+    a = np.vstack([x,y])+lwidths*e1
+    b = np.vstack([x,y])-lwidths*e1
+    return np.concatenate([a, b[:,::-1]], axis=1).T
+        
+def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
+    """use pythons built-in animation tools to make a centerline animation."""
+    
+        
+    def init():
+        x1,y1 = data1[0].T
+        
+        Vertices1 = createWorm(x1, y1)
+
+        p1.set_xy(Vertices1)
+        patch1=ax.add_patch(p1)
+        if data2 is not None:
+            x2,y2 = data2[0].T
+            Vertices2 = createWorm(x2, y2)
+
+            p2.set_xy(Vertices2)
+            patch2 = ax.add_patch(p2)
+            
+            return patch1, patch2
+        return patch1
+        
+    p1 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
+    p2 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
+    patch1, patch2= init()
+    
+    # animation function.  This is called sequentially
+    def animate(i, data1, data2= None):
+        x1,y1 = data1[i].T
+        
+        Vertices = createWorm(x1, y1)
+
+        p1.set_xy(Vertices)
+        patch1=ax.add_patch(p1)
+        if data2 is not None:
+            x2,y2 = data2[i].T
+            Vertices2 = createWorm(x2, y2)
+            p2.set_xy(Vertices2)
+            patch2=ax.add_patch(p2)
+
+            return patch1, patch2
+        return patch1
+        
+    anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
+                               frames=frames, interval=166, blit=True)
+    if save:
+        anim.save('im.mp4')
+    plt.show()
+    
+
 
 def plot2DProjections(xS,yS, zS, fig, gsobj, colors = ['r', 'b', 'orange']):
     '''plot 3 projections into 2d for 3dim data sets. Takes an outer gridspec object to place plots.'''
@@ -155,9 +289,9 @@ def plotHeatmap(T, Y, ax = None, vmin=-2, vmax=2):
     """nice looking heatmap for neural dynamics."""
     if ax is None:
         ax = plt.gca()
-    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=vmax, vmin=vmin)
+    cax1 = ax.imshow(Y, aspect='auto', interpolation='none', origin='lower',extent=[T[0],T[-1],len(Y),0],vmax=vmax, vmin=vmin)
     ax.set_xlabel('Time (s)')
-    ax.set_yticks([0, len(Y)])
+    ax.set_yticks(np.arange(0, len(Y),25))
     ax.set_ylabel("Neuron")
     return cax1
     
@@ -472,7 +606,6 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
     
     ax1 = plt.Subplot(fig, inner_grid[0, 0])
     # plot neurons ordered by weight in first PCA component
-    
     cax1 = plotHeatmap(time,  Neuro[results['neuronOrderPCA']], ax= ax1)
     ax1.set_xlabel('Time (s)')
     fig.add_subplot(ax1)        
@@ -526,9 +659,9 @@ def singlePCAResult(fig, gridloc, Neuro, results, time, flag):
         ax4.set_ylabel('Explained variance (%)')
         ax4.set_yticks([0,25,50,75,100])
     ax4.set_xlabel('Number of components')
-    fig.add_subplot(ax4)    
+    fig.add_subplot(ax4)
     
-def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
+def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA',testset=None ):
     """make an overview figure with PCA weights and components."""
     nWorms = len(keyList)
     fig = plt.figure('{}'.format(flag),(6.8, nWorms*3.4))
@@ -541,6 +674,9 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
         else:
             Neuro = data['Neurons']['Activity']
         time = data['Neurons']['Time']
+        if testset is not None:
+            Neuro = Neuro[:,testset]
+            time = data['Neurons']['Time'][testset]
         results = resultSet[key][flag]
        
         gridloc=outer_grid[kindex]
@@ -548,30 +684,29 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA'):
         
     outer_grid.tight_layout(fig)        
     
-
     
 ###############################################    
 # 
 # neuronal signal pca, plot in 3D with behavior labels
 #
 ############################################## 
-def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 3):
+def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 3, colorBy=None):
     """Show neural manifold with behavior label."""
     nWorms = len(keyList)
     print 'colored by ', col
     fig2 = plt.figure('{} projections'.format(flag),(6.8, nWorms*3.4))
     fig3 = plt.figure('{} temporal'.format(flag),(6.8, nWorms*3.4))
-    outer_grid2 = gridspec.GridSpec(nWorms, 3, hspace=0.25, wspace=0.25)
     fig1 = plt.figure('{} manifold'.format(flag),(6.8, nWorms*3.4))
+    outer_grid2 = gridspec.GridSpec(nWorms, 3, hspace=0.25, wspace=0.25)
     outer_grid = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
+    outer_grid1 = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
     
     
     for kindex, key in enumerate(keyList):
         data = dataSets[key]
-        inner_grid = gridspec.GridSpecFromSubplotSpec(1, 2,
-            subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35, width_ratios=[1,0.2])
-        
-        inner_grid2 = gridspec.GridSpecFromSubplotSpec(3, 1,
+        inner_grid1 = gridspec.GridSpecFromSubplotSpec(1, 2,
+            subplot_spec=outer_grid1[kindex], hspace=0.5, wspace=0.35, width_ratios=[1,0.2])
+        inner_grid3 = gridspec.GridSpecFromSubplotSpec(3, 1,
             subplot_spec=outer_grid[kindex], hspace=0.5, wspace=0.35)
         
         results = resultSet[key][flag]
@@ -581,32 +716,36 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
         z = gaussian_filter1d(z, smooth)
         
         etho=False
-        if col == 'phase':
-            colorBy = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
-            
-            cm = cyclon
-        elif col == 'velocity':
-            colorBy = np.copy(data['Behavior']['AngleVelocity'])
-            colorBy -= np.mean(data['Behavior']['AngleVelocity'])
-            colorBy /= np.std(data['Behavior']['AngleVelocity'])
-            cm = 'jet'
-        elif col =='turns':
-            colorBy = np.copy(data['Behavior']['Eigenworm3'])
-            colorBy -= np.mean(data['Behavior']['Eigenworm3'])
-            colorBy /= np.std(data['Behavior']['Eigenworm3'])
-            cm = 'jet'
-        elif col=='time':
-            colorBy = data['Neurons']['Time']
-            cm = 'magma'
+        if colorBy is None:
+            if col == 'phase':
+                colorBy = np.arctan2(data['Behavior']['Eigenworm2'],data['Behavior']['Eigenworm1'])/np.pi
+                cm = cyclon
+            elif col == 'velocity':
+                colorBy = np.copy(data['Behavior']['AngleVelocity'])
+                colorBy -= np.mean(data['Behavior']['AngleVelocity'])
+                colorBy /= np.std(data['Behavior']['AngleVelocity'])
+                cm = 'jet'
+            elif col =='turns':
+                colorBy = np.copy(data['Behavior']['Eigenworm3'])
+                colorBy -= np.mean(data['Behavior']['Eigenworm3'])
+                colorBy /= np.std(data['Behavior']['Eigenworm3'])
+                cm = 'jet'
+            elif col=='time':
+                colorBy = data['Neurons']['Time']
+                cm = 'magma'
+            else:
+                colorBy = np.reshape(np.array(data['Behavior']['Ethogram']), (-1, ))
+                cm = ethocmap
+                etho = True
         else:
-            colorBy = np.reshape(np.array(data['Behavior']['Ethogram']), (-1, ))
+            # manually set the color by values given in col
             cm = ethocmap
-            etho = True
+            
         #etho[np.isnan(etho)] = 1
         #print ethocmap[0], ethocmap[1]
         #ax3 = plt.Subplot(fig, outer_grid[kindex])
         coarsegrain = 1
-        ax4 = fig1.add_subplot(inner_grid[0,0], projection = '3d')
+        ax4 = fig1.add_subplot(inner_grid1[0,0], projection = '3d')
         cax = multicolor(ax4,x,y,z,colorBy,c = cm, threedim = True, etho=etho,  cg =coarsegrain)
         ax4.set_ylabel('{} components 2'.format(flag))
         ax4.set_xlabel('{} components 1'.format(flag))
@@ -614,7 +753,7 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
         if etho:
             
             #axcb = plt.Subplot(fig1, inner_grid[0, 1])     
-            axcb = fig1.add_subplot(inner_grid[0, 1])
+            axcb = fig1.add_subplot(inner_grid1[0, 1])
             cbar = plt.colorbar(cax, cax=axcb, use_gridspec = True, norm=ethonorm, drawedges=False)
             cbar.ax.get_yaxis().set_ticks([])
             for j, lab in enumerate(['Reverse','Pause','Forward','Turn']):
@@ -622,9 +761,9 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
             cbar.ax.get_yaxis().labelpad = 15
             #fig1.add_subplot(axcb) 
         else:
-            axcb = fig1.add_subplot(inner_grid[0, 1])
+            axcb = fig1.add_subplot(inner_grid1[0, 1])
             cbar= plt.colorbar(cax, cax = axcb, use_gridspec=True)
-        
+            cbar.ax.get_yaxis().labelpad = 15
         cbar.outline.set_visible(False)
         cbar.ax.set_ylabel(col, rotation=270)
 
@@ -646,20 +785,21 @@ def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = '
         ax3.set_xlabel('Z')
         
         # temporal evolution
-        ax4 = fig3.add_subplot(inner_grid2[0])
+        ax4 = fig3.add_subplot(inner_grid3[0])
         multicolor(ax4,data['Neurons']['Time'],x,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         ax4.set_ylabel('PCA 1')
-        ax4 = fig3.add_subplot(inner_grid2[1])
+        ax4 = fig3.add_subplot(inner_grid3[1])
         multicolor(ax4,data['Neurons']['Time'],y,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         
         ax4.set_ylabel('PCA 2')
-        ax4 = fig3.add_subplot(inner_grid2[2])
+        ax4 = fig3.add_subplot(inner_grid3[2])
         multicolor(ax4,data['Neurons']['Time'],z,x,colorBy,c = cm,threedim = False, etho=etho,  cg =coarsegrain)
         
         ax4.set_xlabel('Time (s)')
         ax4.set_ylabel('PCA 3')
     outer_grid2.tight_layout(fig2)
     outer_grid.tight_layout(fig3)
+    outer_grid1.tight_layout(fig1)
 
 
 def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
@@ -712,8 +852,8 @@ def plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA'):
 #
 ##############################################  
 def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
-    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 4,
-                subplot_spec=gridloc, hspace=1, wspace=0.5, width_ratios=[3,1,1,1])
+    inner_grid = gridspec.GridSpecFromSubplotSpec(len(behaviors), 5,
+                subplot_spec=gridloc, hspace=1, wspace=0.5, width_ratios=[3,1,1,1,1])
     for lindex, label in enumerate(behaviors):
         #weights, intercept, alpha, _,_ = resultSet[key][fitmethod][label]
         weights = results[label]['weights']
@@ -765,10 +905,17 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         if lindex==len(behaviors)-1:
             ax5.set_xlabel('True behavior')
         ax5.set_ylabel('Predicted')
-        ax5.scatter(y[testInd], yPred[testInd], alpha=0.05,s=1, color=colorPred[label])
+        ax5.scatter(y[testInd], yPred[testInd], alpha=0.05,s=5, color=colorPred[label])
         fig.add_subplot(ax5)
-    # plot weights
+        # plot cumulative MSE of fits
+        ax6 = plt.Subplot(fig, inner_grid[lindex, 4])
+        if lindex==len(behaviors)-1:
+            ax6.set_xlabel('Number of neuronsr')
+        ax6.set_ylabel('MSE')
+        ax6.plot(np.arange(1,len(results[label]['MSE'])+1),results[label]['MSE'], color=colorPred[label],marker='o',  markerfacecolor="none",markersize=5)
+        fig.add_subplot(ax6)
         
+    # plot weights
     ax3 = plt.Subplot(fig, inner_grid[:,1])
     for lindex, label in enumerate(behaviors):
         weights = results[label]['weights']

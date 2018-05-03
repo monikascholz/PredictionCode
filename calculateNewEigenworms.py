@@ -6,19 +6,20 @@ new eigenbasis from all datasets.
 """
 import dataHandler as dh
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pylab as plt
 from sklearn.decomposition import PCA
-
+import makePlots as mp
 
 # datasets for eigenworm calculation. More than are used for LASSO since 
 #it includes animals that had bad neural tracking but ok cl
-dataLog = "AML32_moving/AML32_datasets.txt"
-pathTemplate = "AML32_moving/{}_MS/"
+dataLog = "AML32_moving/AML32_moving_datasets.txt"
+pathTemplate = "AML32_moving/"
 
 # load centerline data and concatenate
 allCenterlines = []
 for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)):
-        folder = pathTemplate.format(line[0])
+        folder = ''.join([pathTemplate, line[0], '_MS'])
         # get all centerlines, alrady relative angles 'wormcentered' and mean angle subtracted
         allCenterlines.append(dh.loadCenterlines(folder, full = True, wormcentered = True)[0])
         
@@ -39,7 +40,8 @@ print 'Explained variance with 4 components: ', np.cumsum(pca.explained_variance
 #np.savetxt('Eigenworms.dat', newEigenworms)
 
 # plot old Eigenworms for comparison
-oldEigenworms = dh.loadEigenBasis(filename = 'eigenWorms.mat', nComp=4, new=False)
+oldEigenworms = dh.loadEigenBasis(filename = 'utility/eigenWorms.mat', nComp=4, new=False)
+
 
 ax4 = plt.subplot(511)
 ax4.fill_between(np.arange(0.5,nComp+0.5),pca.explained_variance_ratio_*100, step='post', color='k', alpha=0.75)
@@ -56,16 +58,38 @@ plt.legend()
 plt.show()
 # load a centerline dataset
 for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:1]):
-        folder = pathTemplate.format(line[0])
+        folder = ''.join([pathTemplate, line[0], '_MS'])
         # get all centerlines, alrady relative angles 'wormcentered' and mean angle subtracted
         cl = dh.loadCenterlines(folder, full = True)[0]
 # project a dataset on old and new Eigenworms
 pcsOld, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, oldEigenworms)
-RMatrix = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
-pcs = np.array(np.dot(RMatrix, np.vstack([pcsOld[2],pcsOld[1], pcsOld[0]])))
-
+#RMatrix = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
+#pcs = np.array(np.dot(RMatrix, np.vstack([pcsOld[2],pcsOld[1], pcsOld[0]])))
+pcs = [pcsOld[1],pcsOld[0], pcsOld[2]]
 pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, newEigenworms)
 pcsNew = pcsNew[[2,1,0]]
+
+# calculate base shapes of old and new eigenworms
+for i in range(3):
+    pcs = np.zeros(3)
+    pcs[i] = 10
+    clOld = dh.calculateCLfromEW(pcs, oldEigenworms[:3], meanAngle, lengths, refPoint)[0]
+    clNew = dh.calculateCLfromEW(pcs, newEigenworms[:3], meanAngle, lengths, refPoint)[0]
+    print clOld.shape, clNew.shape
+    ax = plt.subplot(3,1,i+1,  adjustable='box')
+    ax.axis('equal')
+    old = mp.createWorm(clOld[:,0]+500, clOld[:,1])
+    new = mp.createWorm(clNew[:,0], clNew[:,1])
+    p1 = mpl.patches.Polygon(old, closed=True, fc='C0', ec='none')
+    p2 = mpl.patches.Polygon(new, closed=True, fc='C1', ec='none')
+    ax.add_patch(p1)
+    ax.add_patch(p2)
+    plt.plot(clOld[:,0]+500,clOld[:,1])
+    plt.plot(clNew[:,0],clNew[:,1])
+    ax.set_xlim(200, 1200)
+    ax.set_ylim(500, 800)
+plt.show()
+
 
 plt.subplot(5,1,1)
 plt.scatter(pcs[0],pcs[1], label= 'old', alpha=0.05, s=1)
@@ -85,4 +109,7 @@ veloNew = dh.gaussian_filter1d(thetaNew, 15, order=1)
 plt.subplot(5,1,5)
 plt.plot(velo)
 plt.plot(veloNew)
+plt.ylabel('Wave velocity')
+plt.xlabel('frames')
 plt.show()
+

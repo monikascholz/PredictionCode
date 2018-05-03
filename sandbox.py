@@ -107,7 +107,7 @@ if dim3:
 
 # load 2d new location file
 else:
-    neuron2D = 'celegans277positionsKaiser.csv'
+    neuron2D = 'utility/celegans277positionsKaiser.csv'
     neuronAtlas2Dlabels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
     neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
     
@@ -124,7 +124,7 @@ else:
 #folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
 #folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
 #dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML18'
+typ='AML70imm'
 
 # GCamp6s; lite-1
 if typ =='AML70': 
@@ -148,6 +148,10 @@ elif typ =='AML32imm':
     folder = "AML32_immobilized/{}_MS/"
     dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
 
+# immobile GCamp6 -lite-1
+elif typ =='AML70imm': 
+    folder = "AML70_immobilized/{}_MS/"
+    dataLog = "AML70_immobilized/AML70imm_datasets.txt"
 # data parameters
 dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
             'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
@@ -170,7 +174,7 @@ binx, biny = 20,20
 wormPos = []
 # for now hard code ventral
 ventral = [-1,1,1]
-for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:3]):
+for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:1]):
     folderName = folder.format(line[0])
 
     pts = np.array(dh.loadPoints(folderName, straight = True))
@@ -178,12 +182,16 @@ for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:3]):
     Y0 = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
     pts = np.array(dh.loadPoints(folderName, straight = False))    
     #YS = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
-    print Y0.shape
+    print 'before', Y0.shape
+    Y0 = Y0[np.isfinite(Y0[:,0])]
+    print 'after',Y0.shape
     fig = plt.figure('Atlas and points')
-    ax = fig.add_subplot(5,1,lindex+2)
+    ax = fig.add_subplot(2,1,lindex+2)
     # invert y-axis if ventral side up
-    Y0[:,1] = Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*100
-    
+    Y0[:,1] = Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
+    Y0[:,0] -= 200# Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
+    # make 2D
+    Y0 = Y0[:,:2]
     ax.scatter(Y0[:,0],  Y0[:,1], color='green', alpha=0.5, s =5)
    
 
@@ -194,46 +202,50 @@ for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:3]):
     
     
      # plot marginals
-    H, xedge, yedge = np.histogram2d(Y0[:,0],  Y0[:,1], bins=(binx,biny))
-    fig = plt.figure('Hist')
-    ax = fig.add_subplot(10,2,2*lindex+3)    
-    plt.step(np.arange(binx), np.sum(H, axis=1))
-    ax = fig.add_subplot(10,2,2*lindex+4)    
-    plt.step(np.arange(biny), np.sum(H, axis=0))
+#    H, xedge, yedge = np.histogram2d(Y0[:,0],  Y0[:,1], bins=(binx,biny))
+#    fig = plt.figure('Hist')
+#    ax = fig.add_subplot(10,2,2*lindex+3)    
+#    plt.step(np.arange(binx), np.sum(H, axis=1))
+#    ax = fig.add_subplot(10,2,2*lindex+4)    
+#    plt.step(np.arange(biny), np.sum(H, axis=0))
     #ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
     wormPos.append(Y0)
     
 fig = plt.figure('Atlas and points')
-ax = fig.add_subplot(611)
+ax = fig.add_subplot(211)
 
 ax.scatter(X[:,0],  X[:,1], color='red', s=5)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
-H, xedge, yedge = np.histogram2d(X[:,0],  X[:,1], bins=(binx,biny))
-fig = plt.figure('Hist')
-ax = fig.add_subplot(10,2,1)  
-plt.step(np.arange(binx), np.sum(H, axis=1))
-ax = fig.add_subplot(10,2,2)  
-plt.step(np.arange(biny), np.sum(H, axis=0))
-#ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
+#H, xedge, yedge = np.histogram2d(X[:,0],  X[:,1], bins=(binx,biny))
+#fig = plt.figure('Hist')
+#ax = fig.add_subplot(10,2,1)  
+#plt.step(np.arange(binx), np.sum(H, axis=1))
+#ax = fig.add_subplot(10,2,2)  
+#plt.step(np.arange(biny), np.sum(H, axis=0))
+##ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
   
     
 plt.show()
-
-registration = cpd.affine_registration
-Y0 = runReg(wormPos[0],wormPos[1],wormPos[1], dim3, registration, tolerance=1e-3, maxIterations=150)
-    
-    
-registration = cpd.deformable_registration
-
-
-Y0 = runReg(wormPos[0],Y0,Y0, dim3, registration, tolerance=1e-5, maxIterations=150)
-
-print X.shape
-# to atlas
-registration = cpd.affine_registration
-Y0 = runReg(X,wormPos[1],wormPos[1], dim3, registration, tolerance=1e-3, maxIterations=150)
+#
+#registration = cpd.rigid_registration
+#Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-3, maxIterations=150)
+#    
+#    
+#registration = cpd.deformable_registration
+#
+#
+#Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-5, maxIterations=150)
+#
+#print X.shape
+## to atlas
+#rescale atlas
+Y = wormPos[0]
+X *= np.ptp(Y)/np.ptp(X)
+X = X - np.mean(X, axis=0)
+registration = cpd.rigid_registration
+Y0 = runReg(X,Y,Y, dim3, registration, tolerance=1e-3, maxIterations=150)
     
     
 registration = cpd.deformable_registration

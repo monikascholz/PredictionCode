@@ -11,34 +11,21 @@ import dimReduction as dr
     
 ###############################################    
 # 
+#    run parameters
+#
+###############################################
+typ = 'AML70' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
+first = True # if true, create new HDF5 file
+###############################################    
+# 
 #    load data into dictionary
 #
-##############################################  
-#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
-#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
-#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML70'
-
-# GCamp6s; lite-1
-if typ =='AML70': 
-    folder = "AML70_moving/{}_MS/"
-    dataLog = "AML70_moving/AML70_datasets.txt"
-    outLoc = "AML70_moving/Analysis/"
-# GCamp6s 
-if typ =='AML32': 
-    folder = "AML32_moving/{}_MS/"
-    dataLog = "AML32_moving/AML32_datasets.txt"
-    outLoc = "AML32_moving/Analysis/"
-##### GFP
-elif typ =='AML18': 
-    folder = "AML18_moving/{}_MS/"
-    dataLog = "AML18_moving/AML18_datasets.txt"
-    outLoc = "AML18_moving/Analysis/"
-# immobile GCamp6
-
-elif typ =='AML32imm': 
-    folder = "AML32_immobilized/{}_MS/"
-    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
+##############################################
+folder = '{}_{}/'.format(typ, condition)
+dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
+outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
 dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
@@ -48,11 +35,11 @@ dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size
             }
 
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 4)
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = None)
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = keyListAll
+    keyList = [key]#keyListAll[i:i+1]
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -66,8 +53,11 @@ for key in keyListAll:
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
             'useRank': 0, # use the rank transformed version of neural data for all analyses
-            'useDeconv': 0, # use the rank transformed version of neural data for all analyses
-          }
+            'useDeconv': 0, # use the deconvolved transformed version of neural data for all analyses
+            'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
+            'useClust':False,# use clusters in the fitting procedure.
+            'useDeriv':True,# use neural activity derivative for PCA
+         }
     
     behaviors = ['AngleVelocity','Eigenworm3']#, 'Eigenworm2']
     #behaviors = ['Eigenworm3']
@@ -77,17 +67,18 @@ for key in keyListAll:
     # check which calculations to perform
     #
     ##############################################
-    createIndicesTest = 1#True 
-    overview = 0#False
+    createIndicesTest = 0#True 
+    overview = 1#False
+    predNeur = 0
     bta = 0
     svm = 0
-    pca = 0#False
-    hierclust = False
+    pca = 1#False
+    hierclust = True
     linreg = False
     lasso = 0
-    elasticnet = 1#True
-    positionweights = 1#True
-    resultsPredictionOverview = 1
+    elasticnet = 0#True
+    positionweights = 0#True
+    resultsPredictionOverview = 0
     ###############################################    
     # 
     # create training and test set indices
@@ -108,13 +99,33 @@ for key in keyListAll:
     ##############################################
     if overview:
         #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
-        mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
-        mp.plotVelocityTurns(dataSets, keyList)
+        #mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
+        #mp.plotVelocityTurns(dataSets, keyList)
         mp.plotDataOverview(dataSets, keyList)
         #mp.plotNeurons3D(dataSets, keyList, threed = False)  
         #mp.plotExampleCenterlines(dataSets, keyList, folder)
         plt.show() 
         
+    ###############################################    
+    # 
+    # predict neural dynamics from behavior
+    #
+    ##############################################
+    if predNeur:
+        for kindex, key in enumerate(keyList):
+            print 'predicting neural dynamics from behavior'
+            resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
+        mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'RevPred')
+        plt.show()
+    ###############################################    
+    # 
+    # use agglomerative clustering to connect similar neurons
+    #
+    ##############################################
+    if hierclust:
+        for kindex, key in enumerate(keyList):
+            print 'running clustering'
+            resultDict[key]['clust'] = dr.runHierarchicalClustering(dataSets[key], pars)
     ###############################################    
     # 
     # use behavior triggered averaging to create non-othogonal axes
@@ -123,7 +134,6 @@ for key in keyListAll:
     if bta:
         for kindex, key in enumerate(keyList):
             print 'running BTA'
-            
             resultDict[key]['BTA'] =dr.runBehaviorTriggeredAverage(dataSets[key], pars)
         mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'BTA')
         plt.show()
@@ -163,53 +173,27 @@ for key in keyListAll:
     if pca:
         print 'running PCA'
         for kindex, key in enumerate(keyList):
-            if typ=='AML32imm':
-                print 'running normal pca'
-                resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-            else:
-                resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
-        
+            resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+
         # overview of data ordered by PCA
         mp.plotDataOverview2(dataSets, keyList, resultDict)
         # overview of PCA results and weights
         mp.plotPCAresults(dataSets, resultDict, keyList, pars)
         plt.show()
-        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
-        plt.show()
-        if typ!='AML32imm':
-            # show correlates of PCA
-            mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
-            #  plot 3D trajectory of PCA
-            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
-            plt.show()
-            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
-            plt.show()
-            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
-            plt.show()
-            mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'turns')
-            plt.show()
-        #%%
-        ###############################################    
-        # 
-        # overlay neuron projections with relevant neurons
-        #
-        ##############################################
-        # TODO change to make weights larger or stth.
         
-            
-        #mp.plotWeightLocations(dataSets, resultDict, keyList, fitmethod='PCA')
-        #plt.show()
-        #%%
-    ###############################################    
-    # 
-    # run PCA and store results
-    #
-    ##############################################
-    if hierclust:
-        print 'run hierarchical clustering'
-        print 'to implement'
-    
-    
+       
+        # show correlates of PCA
+        mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
+        #  plot 3D trajectory of PCA
+        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
+        plt.show()
+#        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
+#        plt.show()
+#        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
+#        plt.show()
+#        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'turns')
+#        plt.show()
+
     #%%
     ###############################################    
     # 

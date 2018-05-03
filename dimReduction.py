@@ -20,6 +20,7 @@ from sklearn import svm
 import dataHandler as dh
 from scipy.interpolate import interp1d
 from scipy.optimize import newton 
+from sklearn.cluster import bicluster
 # 
 import makePlots as mp
 
@@ -186,22 +187,30 @@ def createTrainingTestIndices(data, pars, label):
 #
 ##############################################
 
-def runPCANormal(data, pars):
+def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     """run PCA on neural data and return nicely organized dictionary."""
     nComp = pars['nCompPCA']
     pca = PCA(n_components = nComp)
+    if deriv:
+        Neuro = data['Neurons']['derivActivity']
     if pars['useRank']:
         Neuro = data['Neurons']['rankActivity']
     else:
         Neuro = data['Neurons']['Activity']
+    if testset is not None:
+        Neuro = Neuro[:,testset]
     #Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
     pcs = pca.fit_transform(Neuro)
     comp = pca.components_
+    if deriv:
+        print comp.shape
+        comp = np.cumsum(pca.components_, axis=0)
+        print comp.shape
     #comp = np.cumsum(pca.components_, axis=1)
     # order neurons by weight in first component
     #indices = np.arange(len(Neuro))
     
-    indices = np.argsort(pcs.T)[0]
+    indices = np.argsort(pcs.T)[whichPC]
     #print indices.shape
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
@@ -273,7 +282,39 @@ def timewarp(data):
 
 def runHierarchicalClustering(data, pars):
     """cluster neural data."""
+    if pars['useRank']:
+            X = data['Neurons']['rankActivity'].T
+    else:
+        X = data['Neurons']['Activity'] # transpose to conform to nsamples*nfeatures
+    ward = AgglomerativeClustering(n_clusters=pars['nCluster'], affinity='euclidean')
+    ward.fit(X)
+    indices = np.argsort(ward.labels_)    
+    #
+    clustres = {}
+    clustres['nCluster'] = pars['nCluster']
+    clustres['labels'] = ward.labels_
+    # average neurons with similar activity
+    clustAct = np.zeros((pars['nCluster'], X.shape[1]))
+    clustIndices = {}
+    labels = np.unique(ward.labels_)
+    for label in labels:
+        neuronID = np.where(ward.labels_==label)
+        clustAct[label] = np.mean(X[neuronID], axis=0)
+        clustIndices[label] = neuronID[0]
     
+    # mean activity in a cluster
+    clustres['Activity'] = clustAct
+
+    # maps cluster indices back to neurons in that cluster
+    clustres['originalIndices'] = clustAct
+    
+    plt.subplot(211)
+    plt.imshow(X[indices], aspect = 'auto', vmin=-0.1, vmax=2)
+    plt.subplot(212)
+    plt.imshow(clustres['Activity'] , aspect = 'auto', vmin=-0.1, vmax=2)
+
+    plt.show()
+    return clustres
 ###############################################    
 # 
 # predict discrete behaviors
@@ -315,44 +356,6 @@ def discreteBehaviorPrediction(data, pars, splits):
     pcares['neuronWeights'] =  pcs.T
     pcares['neuronOrderPCA'] =  indices
     pcares['pcaComponents'] =  comp
-#    X_train = X[trainingsInd]
-#    y_train = Y[trainingsInd]
-#    X_test = X[testInd]
-#    y_test = Y[testInd]
-#    # Set the parameters by cross-validation
-#    tuned_parameters = [ {'kernel': ['linear'], 'C': [1, 5,10,100]}]
-#    
-#    scores = ['f1_weighted', 'f1_macro']
-#    
-#    for score in scores:
-#        print("# Tuning hyper-parameters for %s" % score)
-#        print()
-#    
-#        clf = GridSearchCV(svm.SVC(class_weight='balanced'), tuned_parameters, cv=5,
-#                           scoring='%s' % score)
-#        clf.fit(X_train, y_train)
-#    
-#        print("Best parameters set found on development set:")
-#        
-#        print(clf.best_params_)
-#        
-#        print("Grid scores on development set:")
-#       
-#        means = clf.cv_results_['mean_test_score']
-#        stds = clf.cv_results_['std_test_score']
-#        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
-#            print("%0.3f (+/-%0.03f) for %r"
-#                  % (mean, std * 2, params))
-#        print()
-#    
-#        print("Detailed classification report:")
-#        print()
-#        print("The model is trained on the full development set.")
-#        print("The scores are computed on the full evaluation set.")
-#        print()
-#        y_true, y_pred = y_test, clf.predict(X_test)
-#        print(classification_report(y_true, y_pred))
-#        print()
     T = testInd
     ax1 = plt.subplot(211)
     mp.plotEthogram(ax1, T, Y[testInd], alpha = 0.5, yValMax=1, yValMin=0, legend=0)
@@ -369,12 +372,14 @@ def runBehaviorTriggeredAverage(data, pars):
     # modify data to be like scikit likes it
     if pars['useRank']:
             Y = data['Neurons']['rankActivity'].T
+    if pars['useClust']:
+        clustres = runHierarchicalClustering(data, pars)
+        Y = clustres['Activity'].T
     else:
         Y = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
     # use ethogram for behavior
     X = data['Behavior']['Ethogram']
     
-        
     orderFwd = np.argsort(np.std(Y, axis=0))
     pcs = np.zeros((4, Y.shape[1]))
     for index, bi in enumerate([1,-1, 2, 0]):
@@ -438,16 +443,12 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
     for label in behaviors:
         Y = data['Behavior'][label]
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
-        
-        #Y = Y.reshape((-1,1))
-        #scale = np.nanmean(Y)
-        #Y-=scale
-        # regularize behavior
-        #Y = preprocessing.scale(Y)
-        #scaler = StandardScaler(with_std=False)
-        #Y = scaler.fit_transform(Y)
+    
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
+        if pars['useClust']:
+            clustres = runHierarchicalClustering(data, pars)
+            X = clustres['Activity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
 
@@ -457,14 +458,15 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         # unbalanced sets
         #fold = KFold(cv, shuffle=False) 
         # balanced sets
-        if label =='Eigenworm3':
-            a = np.logspace(-3,2,100)
-        else:
-            a = np.logspace(-5,-1,1000)
-        if label =='Eigenworm3':
-            fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        else:
-            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+#        if label =='Eigenworm3':
+#            a = np.logspace(-3,2,100)
+#        else:
+#            a = np.logspace(-2,1,1000)
+#        if label =='Eigenworm3':
+#            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+#        else:
+#            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        fold = 10
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
          max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
@@ -538,13 +540,16 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
+        elif pars['useClust']:
+            clustres = runHierarchicalClustering(data, pars)
+            X = clustres['Activity'].T
         elif pars['useDeconv']:
             X = data['Neurons']['deconvolvedActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # fit elasticNet and validate
-        cv = 5
+        cv = 15
         if label =='Eigenworm3':
             l1_ratio = [0.95]
             #l1_ratio = [0.95]
@@ -555,7 +560,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
             fold = cv
-            a = np.logspace(-3,0,200)
+            a = np.logspace(-5,-2,200)
         
         #cv = 15
         #a = np.logspace(-3,-1,100)
@@ -563,7 +568,6 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-10, alphas=a)
         reg.fit(X[trainingsInd], Y[trainingsInd])
 
-        reg.fit(X[trainingsInd], Y[trainingsInd])
         scorepred = reg.score(X[testInd], Y[testInd])
         score = reg.score(X[trainingsInd], Y[trainingsInd])
         
@@ -636,6 +640,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         # individual predictive scores
         indScore = []
         sumScore = []
+        mse = []
         if fitmethod == 'ElasticNet':
             print 'Elastic Net params:', results[fitmethod][label]['alpha'], results[fitmethod][label]['l1_ratio']
             print 'Elastic Net R2:', results[fitmethod][label]['scorepredicted'], results[fitmethod][label]['score']
@@ -652,10 +657,12 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                 xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
+                mse.append(np.sum((reg.predict(xTmp[testInd])-Y[testInd])**2))
                 
                 xTmp = np.reshape(X[:,wInd], (-1,1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 indScore.append(reg.score(xTmp[testInd], Y[testInd]))
+                
 #                plt.scatter(xTmp[testInd], Y[testInd], s=0.5)
 #                plt.plot(xTmp[testInd], reg.predict(xTmp[testInd]))
 #                plt.show()
@@ -677,6 +684,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         linData[label] = {}
         linData[label]['cumulativeScore'] = sumScore
         linData[label]['individualScore'] = indScore
+        linData[label]['MSE'] = mse
     return linData
     
 ###############################################    
@@ -689,19 +697,23 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
     # modify data to be like scikit likes it
     if pars['useRank']:
         X = data['Neurons']['rankActivity'].T
+    elif pars['useClust']:
+        clustres = runHierarchicalClustering(data, pars)
+        X = clustres['Activity']
     else:
         X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
     # get weights
     pcs = np.vstack([results[fitmethod][label]['weights'] for label in behaviors])
-    print pcs.shape
     indices = np.argsort(pcs[0])
     
     comp = np.zeros((len(behaviors), len(X)))
-    # show temporal components
+    # show temporal components created by fits
     for wi, weights in enumerate(pcs):
-        print weights.shape
         comp[wi] = np.dot(X, weights)
-    # calculate redicted neural dynamics  TODO
+    # recreate neural data from weights
+    neurPred = np.zeros(X.shape)
+    
+    # calculate predicted neural dynamics  TODO
     score = np.ones(len(behaviors))
     #score = explained_variance_score()
     
@@ -712,3 +724,124 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
     pcares['neuronOrderPCA'] =  indices
     pcares['pcaComponents'] =  comp
     return pcares
+
+
+###############################################    
+# 
+# predict neural dynamics from behavior
+#
+##############################################
+def predictNeuralDynamicsfromBehavior(data,  pars):
+    """use linear model to predict the neural data from behavior and estimate what worm is thinking about."""
+    # create dimensionality-reduced behavior - pca with 10 eigenworms
+    cl = data['CL']
+    eigenworms = dh.loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=4, new=True)
+    pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, eigenworms)
+    behavior = pcsNew.T
+    # nevermind, use the behaviors we use for lasso instead
+    behavior = np.vstack([data['Behavior']['AngleVelocity'], behavior.T]).T
+    # scale behavior to same 
+    behavior = preprocessing.scale(behavior)
+    blabels = np.array(['Wave velocity', 'Eigenworm 3', 'Eigenworm 2', 'Eigenworm 1', 'Eigenworm 4'])
+
+    #pcsNew are new eigenworms directly from the centerlines. 
+    # also reduce dimensionality of the neural dynamics.
+    nComp = 10#pars['nCompPCA']
+    pca = PCA(n_components = nComp)
+    Neuro = data['Neurons']['Activity'].T
+    pcs = pca.fit_transform(Neuro)
+    comp = pca.components_.T
+    #now we use a linear model to train and test our predictions
+    #here we will simply use a 50/50 split for now
+    half = int((len(Neuro))/2.)
+    tmp = np.arange(2*half)
+    test = tmp[int(half/2.):int(3*half/2.)]
+    train = np.setdiff1d(tmp, test)
+    
+    #train = np.arange(half)
+    #test = np.arange(half,2*half)
+    # lets build a linear model
+    lin = linear_model.LinearRegression(normalize=False)
+    lin.fit(behavior[train], pcs[train])
+    
+    # some fit diagnostics
+#    for i in range(nComp):
+    print 'Train R2: ', lin.score(behavior[train],pcs[train])
+    print 'Test R2: ', lin.score(behavior[test],pcs[test])
+    # recreate the PCA components of the neural map from these predictions
+    predN = lin.predict(behavior)
+    print predN.shape, 'predicted neurons in pca space', behavior.shape
+    indices = np.argsort(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))[::-1]
+    # weightorder
+    weightorder = np.arange(lin.coef_.shape[1])[np.argsort(np.abs(lin.coef_[indices[0]]))][::-1]
+    # reverse the PCA
+    newHM = pca.inverse_transform(predN).T
+    plt.figure('PredictedNeuralActivity', figsize=(2.28*4,2.28*6))
+    plt.subplot(321)
+    #show original heatmap
+    mp.plotHeatmap(data['Neurons']['Time'], data['Neurons']['Activity'])
+    # show reduced dimensionality heatmap
+    mp.plotHeatmap(data['Neurons']['Time'][test], pca.inverse_transform(pcs).T[:,test])
+    plt.subplot(322)
+    mp.plotHeatmap(data['Neurons']['Time'][test], newHM[:,test], vmin=np.min(newHM)*1.1, vmax=np.max(newHM)*0.9)
+    plt.subplot(324)
+    for ind, i in enumerate(indices[:4]):
+        x = data['Neurons']['Time'][test]
+        line1, = plt.plot(x, pcs[test,i]+ind*12, color='C0', label='Neural PCs')
+        line2, = plt.plot(x, predN[test,i]+ind*12, color='C3', label= 'Predicted')
+        plt.text(x[-1]*0.9, 1.2*np.max(predN[test,i]+ind*10), '$R^2={:.2f}$'.format(explained_variance_score(pcs[test,i], predN[test,i])))
+    plt.legend([line1, line2], ['Neural PCs', 'Predicted from Behavior'], loc=2)
+    ylabels = ['PC {}'.format(index+1) for index in indices[:4]]
+    plt.yticks(np.arange(0,4*12, 12), ylabels)
+    plt.xlabel('Time(s)')
+    plt.subplot(323)
+    for ind, i in enumerate(weightorder):
+        plt.plot(data['Neurons']['Time'], behavior[:,i]+ind*4, color='k', label = blabels[i], alpha=0.35+0.1*ind)
+        plt.xlabel('Time(s)')
+        
+    locs, labels = plt.yticks()
+    plt.yticks(np.arange(0,len(weightorder)*4,4), blabels[weightorder])
+    plt.legend()
+    plt.subplot(325)
+    # plot the weights for each PC
+    orderedWeights = lin.coef_[:,weightorder]
+    for li,line in enumerate(orderedWeights):
+        plt.plot(np.abs(line), label = ('weights for PC{}'.format(li+1)), color='C5', alpha=0.25+0.05*li, lw=1)
+    plt.ylabel('Weights')
+    #plt.xlabel('behaviors')
+    plt.plot(np.mean(np.abs(orderedWeights), axis=0), color='C5', alpha=1, lw=2, marker = 'o')
+    plt.xticks(np.arange(len(weightorder)), blabels[weightorder], rotation=30)
+    plt.subplot(326)
+    # variance explained with each PC prediction
+    expScore = []
+    for i in range(len(weightorder)):
+        tmpBeh = behavior[:,weightorder]
+        tmpBeh[:,i+1:] = 0
+        predictedNeurons = lin.predict(tmpBeh)
+        tmpHM = pca.inverse_transform(predictedNeurons).T
+        expScore.append(explained_variance_score(data['Neurons']['Activity'], tmpHM))
+    plt.plot(expScore, color='C7', alpha=1, lw=2, marker = 'o')
+    plt.xticks(np.arange(len(weightorder)), blabels[weightorder], rotation=30)
+    plt.tight_layout()
+    plt.show()
+    # order the map by the components that is most explained by behavior
+    #ci = np.argmax(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
+    indices = np.argsort(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
+    print len(indices), predN.shape
+    #print lin.coef_.shape
+    # calculate how good the heatmap is -- explained variance of the fit first
+    #print explained_variance_score(pcs[test],predN[test],multioutput ='raw_values')
+    #print explained_variance_score(pcs[train],predN[train],multioutput ='raw_values')
+    print explained_variance_score(data['Neurons']['Activity'], newHM)
+    print explained_variance_score(pca.inverse_transform(pcs).T[:,test], newHM[:,test])
+    print explained_variance_score(pca.inverse_transform(pcs).T, newHM)
+    
+    
+    #return pcares
+    
+    
+    
+    
+    
+    
+    

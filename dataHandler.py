@@ -85,7 +85,7 @@ def makeEthogram(anglevelocity, pc3):
 
 def loadPoints(folder,  straight = True):
     """get tracked points from Pointfile."""
-    points = np.squeeze(scipy.io.loadmat(folder+'pointStatsNew.mat')['pointStatsNew'])
+    points = np.squeeze(scipy.io.loadmat(os.path.join(folder,'pointStatsNew.mat'))['pointStatsNew'])
     
     if straight:
         return [p[1] for p in points]
@@ -95,8 +95,7 @@ def loadPoints(folder,  straight = True):
 def loadEigenBasis(filename, nComp=3, new = True):
     """load the specific worm basis set."""
     if new:
-        eigenworms = np.loadtxt('Eigenworms.dat')[:nComp]
-        print eigenworms.shape
+        eigenworms = np.loadtxt(filename)[:nComp]
     else:
         eigenworms = scipy.io.loadmat(filename)['eigbasis'][:nComp]
     # ncomponents controls how many we use
@@ -167,21 +166,18 @@ def calculateCLfromEW(pcsNew, eigenworms, meanAngle, lengths, refPoint):
 
 def loadCenterlines(folder, full = False, wormcentered = False):
     """get centerlines from centerline.mat file"""
-    
     #cl = scipy.io.loadmat(folder+'centerline.mat')['centerline']
-    cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['centerline'], 2,0)
-    if wormcentered:
-        cl = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['wormcentered'], 1,0)
-        # eigenprojections
-    #ep = np.rollaxis(scipy.io.loadmat(folder+'centerline.mat')['eigenProj'],1,0)
+    tmp =scipy.io.loadmat(os.path.join(folder,'centerline.mat'))
     
-        # get all recorded centerlines during high-res movie
-        #clIndices = np.arange(int(np.min(clIndices), int(np.max(clIndices))))
-      
-    # get relevnt indices
-    tmp = scipy.io.loadmat(folder+'heatDataMS.mat')
+    cl = np.rollaxis(scipy.io.loadmat(os.path.join(folder,'centerline.mat'))['centerline'], 2,0)
+    if wormcentered:
+        cl = np.rollaxis(scipy.io.loadmat(os.path.join(folder,'centerline.mat'))['wormcentered'], 1,0)
+
+    tmp = scipy.io.loadmat(os.path.join(folder,'heatDataMS.mat'))
+    
     clTime = np.squeeze(tmp['clTime']) # 50Hz centerline times
     volTime =  np.squeeze(tmp['hasPointsTime'])# 6 vol/sec neuron times
+    
     clIndices = np.rint(np.interp(volTime, clTime, np.arange(len(clTime))))  
     if not full:
         # reduce to volume time
@@ -256,8 +252,11 @@ def preprocessNeuralData(R, G, dataPars):
 
 def loadData(folder, dataPars, ew=1):
     """load matlab data."""
-    data = scipy.io.loadmat(folder+'heatDataMS.mat')
-
+    try:
+        data = scipy.io.loadmat(os.path.join(folder,'heatDataMS.mat'))
+    except IOError:
+        print 'IOERROR'
+        data = scipy.io.loadmat(os.path.join(folder,'heatData.mat'))
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
 #    # get eigenworm file
@@ -267,7 +266,7 @@ def loadData(folder, dataPars, ew=1):
         # get prefactors from eigenworm projection
         #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
         print 'creating eigenworm projections'
-        eigenworms = loadEigenBasis(filename = 'eigenWorms.mat', nComp=3, new=True)
+        eigenworms = loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=3, new=True)
         _, pcsErr, pcs = estimateEigenwormError(folder, eigenworms)
         print 'Done loading eigenworms '
     else:
@@ -296,6 +295,10 @@ def loadData(folder, dataPars, ew=1):
     R = np.array(data['rPhotoCorr'])
     G = np.array(data['gPhotoCorr'])
     Y = preprocessNeuralData(R, G, dataPars)
+    try:
+        dY = np.array(data['Ratio2D']).T
+    except KeyError:
+        dY = np.zeros(Y.shape)
     order = np.array(data['cgIdx']).T[0]-1
     # store relevant indices
     nonNan = np.arange(0, Y.shape[1])
@@ -315,6 +318,7 @@ def loadData(folder, dataPars, ew=1):
     
     Y = Y[order]
     YD = deconvolveCalcium(Y) 
+    dY = dY[order]
     if 0:
         #### show what pipeline does
         titles= ['Bleaching corrected', 'Gaussian filter $\sigma=5$', 'Rolling mean (30 s) ', 'Z score']
@@ -356,6 +360,7 @@ def loadData(folder, dataPars, ew=1):
     dataDict['Neurons']['Time'] =  np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
     dataDict['Neurons']['Activity'] = Y[:,nonNan]
     dataDict['Neurons']['rankActivity'] = rankTransform(Y)[:,nonNan]
+    dataDict['Neurons']['derivActivity'] = dY[:,nonNan]
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
     return dataDict
@@ -371,7 +376,7 @@ def loadMultipleDatasets(dataLog, pathTemplate, dataPars, nDatasets = None):
     """
     datasets={}
     for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:nDatasets]):
-        folder = pathTemplate.format(line[0])
+        folder = ''.join([pathTemplate, line[0], '_MS'])
         datasets[line[0]] = loadData(folder, dataPars)
     return datasets
 
@@ -402,17 +407,21 @@ def rolling_window(a, window):
 
 def saveDictToHDF(filePath, d):
     f = h5py.File(filePath,'w')
-    for fnKey in d.keys():
-        for amKey in d[fnKey].keys():
-            for attKey in d[fnKey][amKey].keys():
-                if type(d[fnKey][amKey][attKey]) is not dict:
-                    dataPath = '/%s/%s/%s'%(fnKey,amKey,attKey)
-                    f.create_dataset(dataPath,data=d[fnKey][amKey][attKey])
-                else:
-                    for bKey in d[fnKey][amKey][attKey].keys():
-                        
-                        dataPath = '/%s/%s/%s/%s'%(fnKey,amKey,attKey,bKey)
-                        f.create_dataset(dataPath,data=d[fnKey][amKey][attKey][bKey])
+    for fnKey in d.keys(): #this level is datasets ie., Brainscanner0000000
+        for amKey in d[fnKey].keys():# this level is analysis type ie., PCA
+            if type(d[fnKey][amKey]) is not dict:
+                 dataPath = '/%s/%s'%(fnKey,amKey)
+                 f.create_dataset(dataPath,data=d[fnKey][amKey])
+            else:
+                for attKey in d[fnKey][amKey].keys(): # This level is entry ie. PCAweights
+                    if type(d[fnKey][amKey][attKey]) is not dict:
+                        dataPath = '/%s/%s/%s'%(fnKey,amKey,attKey)
+                        f.create_dataset(dataPath,data=d[fnKey][amKey][attKey])
+                    else:
+                        for bKey in d[fnKey][amKey][attKey].keys():
+                            
+                            dataPath = '/%s/%s/%s/%s'%(fnKey,amKey,attKey,bKey)
+                            f.create_dataset(dataPath,data=d[fnKey][amKey][attKey][bKey])
     f.close()
     return
 
@@ -422,14 +431,17 @@ def loadDictFromHDF(filePath):
     for fnKey in f.keys():
         d[fnKey] = {}
         for amKey in f[fnKey].keys():
-            d[fnKey][amKey] = {}
-            for attKey in f[fnKey][amKey].keys():
-                if isinstance(f[fnKey][amKey][attKey], h5py.Dataset):
-                    d[fnKey][amKey][attKey] = f[fnKey][amKey][attKey][...]
-                else:
-                    d[fnKey][amKey][attKey] = {}
-                    for bKey in f[fnKey][amKey][attKey].keys():
-                        d[fnKey][amKey][attKey][bKey] = f[fnKey][amKey][attKey][bKey][...]
+            if isinstance(f[fnKey][amKey], h5py.Dataset):
+                d[fnKey][amKey] = f[fnKey][amKey][...]
+            else:
+                d[fnKey][amKey] = {}
+                for attKey in f[fnKey][amKey].keys():
+                    if isinstance(f[fnKey][amKey][attKey], h5py.Dataset):
+                        d[fnKey][amKey][attKey] = f[fnKey][amKey][attKey][...]
+                    else:
+                        d[fnKey][amKey][attKey] = {}
+                        for bKey in f[fnKey][amKey][attKey].keys():
+                            d[fnKey][amKey][attKey][bKey] = f[fnKey][amKey][attKey][bKey][...]
                         
     f.close()
     return d

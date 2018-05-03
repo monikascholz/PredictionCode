@@ -8,36 +8,28 @@ import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
 
-    
+        
+###############################################    
+# 
+#    run parameters
+#
+###############################################
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
+first = True # if true, create new HDF5 file
 ###############################################    
 # 
 #    load data into dictionary
 #
-##############################################  
-#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
-#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
-#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML32'
-if typ =='AML32': 
-    folder = "AML32_moving/{}_MS/"
-    dataLog = "AML32_moving/AML32_datasets.txt"
-    outLoc = "AML32_moving/Analysis/Results.hdf5"
-##### GFP
-elif typ =='AML18': 
-    folder = "AML18_moving/{}_MS/"
-    dataLog = "AML18_moving/AML18_datasets.txt"
-    outLoc = "AML18_moving/Analysis/Results.hdf5"
-# output is stored here
-
-elif typ =='AML32imm': 
-    folder = "AML32_immobilized/{}_MS/"
-    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
-    outLoc = "AML32_immobilized/Analysis/Results.hdf5"
+##############################################
+folder = '{}_{}/'.format(typ, condition)
+dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
+outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-# data parameters
-dataPars = {'medianWindow':11, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':11, # sgauss window for angle velocity derivative. must be odd
+dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':5, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5,  # gauss window for red and green channel
             
@@ -46,7 +38,7 @@ dataPars = {'medianWindow':11, # smooth eigenworms with gauss filter of that siz
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
 
-# results dictionary 
+## results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
     resultDict[key] = {}
@@ -59,11 +51,12 @@ pars ={'nCompPCA':10, # no of PCA components
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
-        'useDeconv':False # use deconvolved calcium signal
-      }
+        'useDeconv': 0, # use the deconvolved transformed version of neural data for all analyses
+        'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
+        'useClust':False,# use clusters in the fitting procedure.
+         }
 
-behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2', 'CMSVelocity']
-#behaviors = ['AngleVelocity']
+behaviors = ['AngleVelocity', 'Eigenworm3']
 
 ###############################################    
 # 
@@ -71,10 +64,14 @@ behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2', 'CMSVelocity']
 #
 ##############################################
 createIndicesTest = 1#True 
-svm = 1
+svm = 0
+predNeur = 0
+hierclust = 0
+bta = 0
 pca = 1#False
-lasso = 1
-elasticnet = 1#True
+kato_pca = 0#False
+lasso = 0
+elasticnet = 0#True
 ###############################################    
 # 
 # create training and test set indices
@@ -109,12 +106,51 @@ if svm:
 if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
-        if typ=='AML32imm':
-            resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-        else:
-            resultDict[key]['PCA'] = dr.runPCATimeWarp(dataSets[key], pars)
-
-
+        resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
+        
+###############################################    
+# 
+# run Kato PCA
+#
+##############################################
+#%%
+if kato_pca:
+    print 'running Kato et. al PCA'
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
+        
+#%%
+###############################################    
+# 
+# predict neural dynamics from behavior
+#
+##############################################
+if predNeur:
+    for kindex, key in enumerate(keyList):
+        print 'predicting neural dynamics from behavior'
+        resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
+    mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'RevPred')
+    plt.show()
+#%%
+###############################################    
+# 
+# use agglomerative clustering to connect similar neurons
+#
+##############################################
+if hierclust:
+    for kindex, key in enumerate(keyList):
+        print 'running clustering'
+        resultDict[key]['clust'] = dr.runHierarchicalClustering(dataSets[key], pars)
+#%%
+###############################################    
+# 
+# use behavior triggered averaging to create non-othogonal axes
+#
+##############################################
+if bta:
+    for kindex, key in enumerate(keyList):
+        print 'running BTA'
+        resultDict[key]['BTA'] =dr.runBehaviorTriggeredAverage(dataSets[key], pars)
 #%%
 ###############################################    
 # 
@@ -164,3 +200,4 @@ if elasticnet:
 #
 ##############################################
 dh.saveDictToHDF(outLoc, resultDict)
+dh.saveDictToHDF(outLocData, dataSets)
