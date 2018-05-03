@@ -465,8 +465,8 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #        if label =='Eigenworm3':
 #            fold = balancedFolds(Y[trainingsInd], nSets=cv)
 #        else:
-#            fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        fold = 10
+        fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        #fold = 10
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
          max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
         reg.fit(X[trainingsInd], Y[trainingsInd])
@@ -801,7 +801,7 @@ def predictNeuralDynamicsfromBehavior(data,  pars):
         
     locs, labels = plt.yticks()
     plt.yticks(np.arange(0,len(weightorder)*4,4), blabels[weightorder])
-    plt.legend()
+    #plt.legend()
     plt.subplot(325)
     # plot the weights for each PC
     orderedWeights = lin.coef_[:,weightorder]

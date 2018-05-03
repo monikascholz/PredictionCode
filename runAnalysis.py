@@ -14,7 +14,7 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
+typ = 'AML70' # possible values AML32, AML18, AML70
 condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
@@ -44,7 +44,7 @@ for kindex, key in enumerate(keyList):
     resultDict[key] = {}
 # analysis parameters
 
-pars ={'nCompPCA':10, # no of PCA components
+pars ={'nCompPCA':20, # no of PCA components
         'PCAtimewarp':True, #timewarp so behaviors are equally represented
         'trainingCut': 0.7, # what fraction of data to use for training 
         'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
@@ -64,14 +64,22 @@ behaviors = ['AngleVelocity', 'Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-svm = 0
-predNeur = 0
+
 hierclust = 0
 bta = 0
 pca = 1#False
-kato_pca = 0#False
+kato_pca = 1#False
+
+predNeur = 0
+svm = 0
 lasso = 0
-elasticnet = 0#True
+elasticnet = 0
+# this requires moving animals
+if condition == 'moving':
+    predNeur = 0
+    svm = 1
+    lasso = 1
+    elasticnet = 1#True
 ###############################################    
 # 
 # create training and test set indices
@@ -129,7 +137,6 @@ if predNeur:
     for kindex, key in enumerate(keyList):
         print 'predicting neural dynamics from behavior'
         resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
-    mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'RevPred')
     plt.show()
 #%%
 ###############################################    

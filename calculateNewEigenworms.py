@@ -13,8 +13,8 @@ import makePlots as mp
 
 # datasets for eigenworm calculation. More than are used for LASSO since 
 #it includes animals that had bad neural tracking but ok cl
-dataLog = "AML32_moving/AML32_moving_datasets.txt"
-pathTemplate = "AML32_moving/"
+dataLog = "AML70_moving/AML70_moving_datasets.txt"
+pathTemplate = "AML70_moving/"
 
 # load centerline data and concatenate
 allCenterlines = []

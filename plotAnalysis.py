@@ -9,79 +9,96 @@ import makePlots as mp
 import dimReduction as dr
 
     
+
+###############################################    
+# 
+#   datset params
+#
+###############################################
+typ = 'AML70' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
 ###############################################    
 # 
 #    load data into dictionary
 #
-##############################################  
-#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
-#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
-#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-folder = "AML32_moving/{}_MS/"
-dataLog = "AML32_moving/AML32_datasets.txt"
-##### GFP
-#folder = "AML18_moving/{}_MS/"
-#dataLog = "AML18_moving/AML18_datasets.txt"
-# output is stored here
-outLoc = "AML32_moving/Analysis/Results.hdf5"
-##### GFP
-folderCtrl = "AML18_moving/{}_MS/"
-dataLogCtrl = "AML18_moving/AML18_datasets.txt"
-outLoc2 = "AML18_moving/Analysis/Results.hdf5"
-# immobilized GCamp
-folderimm = "AML32_immobilized/{}_MS/"
-dataLogimm = "AML32_immobilized/AML32_immobilized_datasets.txt"
-outLoc3 = "AML32_immobilized/Analysis/Results.hdf5"
+##############################################
+data = {}
+for typ in ['AML32', 'AML70']:
+    for condition in ['moving', 'immobilized']:
+        folder = '{}_{}/'.format(typ, condition)
+        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        
+        
+        # load multiple datasets
+        dataSets = dh.loadDictFromHDF(outLocData)
+        keyList = np.sort(dataSets.keys())
+        results = dh.loadDictFromHDF(outLoc) 
+        # store in dictionary by typ and condition
+        key = '{}_{}'.format(typ, condition)
+        data[key] = {}
+        data[key]['dsets'] = keyList
+        data[key]['input'] = dataSets
+        data[key]['analysis'] = results
+        
 
-# data parameters
-dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
-            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
-            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5 # gauss window for red and green channel
-            }
-
-# normal data
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
-keyList = np.sort(dataSets.keys())
-resultDict = dh.loadDictFromHDF(outLoc) 
-# gfp data
-resultDictCtrl = dh.loadDictFromHDF(outLoc2)
-dataSetsCtrl = dh.loadMultipleDatasets(dataLogCtrl, pathTemplate=folderCtrl, dataPars = dataPars)
-keyListCtrl = np.sort(dataSetsCtrl.keys())
-# immobilized data
-resultDictimm = dh.loadDictFromHDF(outLoc3)
-dataSetsimm = dh.loadMultipleDatasets(dataLogimm, pathTemplate=folderimm, dataPars = dataPars)
-keyListimm = np.sort(dataSetsimm.keys())
 # analysis parameters
+behaviors = ['AngleVelocity', 'Eigenworm3']
 
-pars ={'nCompPCA':10, # no of PCA components
-        'PCAtimewarp':True, #timewarp so behaviors are equally represented
-        'trainingCut': 0.6, # what fraction of data to use for training 
-        'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
-        'linReg': 'simple', # ordinary or ransac least squares
-        'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
-        'useRank': 0, # use the rank transformed version of neural data for all analyses
-      }
-
-behaviors = ['AngleVelocity', 'Eigenworm3']#, 'Eigenworm2']
-#behaviors = ['AngleVelocity']
-#behaviors = ['Eigenworm3']
+colors = {'moving': '#204a87ff',
+            'immobilized': '#cc0000ff'}
 
 ###############################################    
 # 
-# check which calculations to perform
+# plot PCA dimensionality of moving versus immobile
 #
 ##############################################
-createIndicesTest = True 
-overview = 0#False
-svm = 0
-pca = 0#False
-hierclust = False
-linreg = False
-lasso = 1
-elasticnet = 0#True
-positionweights = 1#True
-resultsPredictionOverview = 1
+fig = plt.figure('Compare Dimensionality')
+ax4 = plt.subplot(111)
+for typ in ['AML70']:
+    for condition in ['moving', 'immobilized']:
+        key = '{}_{}'.format(typ, condition)
+        dset = data[key]['analysis']
+        #
+        tmpdata = []
+        for idn in dset.keys():
+            results=  dset[idn]['PCA'] 
+            nComp = dset[idn]['PCA'] ['nComp']
+            rescale = 1.0*data[key]['input'][idn]['Neurons']['Activity'].shape[0]
+            #rescale = 1
+            ax4.plot(np.arange(1,nComp+1)/rescale,np.cumsum(results['expVariance'])*100, '-',alpha = 0.75,color = colors[condition], lw=1)
+            tmpdata.append(np.cumsum(results['expVariance'])*100)
+        ax4.plot(np.arange(1,nComp+1),np.cumsum(results['expVariance'])*100 ,'o-',color = colors[condition], lw=1, label = '{} {}'.format(typ, condition))
+        ax4.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = colors[condition])
+    ax4.set_ylabel('Explained variance (%)')
+    ax4.set_yticks([0,25,50,75,100])
+    ax4.set_xlabel('Number of components')
+    plt.legend()
+    fig.add_subplot(ax4)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ###############################################    
 # 

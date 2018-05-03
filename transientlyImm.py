@@ -14,13 +14,21 @@ import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
 
-key = 'BrainScanner20180327_152059_MS/'
+# multicolor
+key = 'BrainScanner20180427_120545_MS'
+
+# transiently immobilized
+
+#key = 'BrainScanner20180329_152141_MS'
+# moving
+#key = 'BrainScanner20180327_152059_MS/'
 folder ='AML70_chip/{}'.format(key)
+folder ='OtherDatasets/{}'.format(key)
 
 print folder
 # data parameters
 dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':10, # sgauss window for angle velocity derivative. must be odd
+            'gaussWindow':5, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5  # gauss window for red and green channel
             }
@@ -50,8 +58,8 @@ for kindex, key in enumerate(keyList):
 
 behaviors = ['AngleVelocity','Eigenworm3']
 createIndicesTest = 1#True 
-overview = 0#False
-pca = 0#False
+overview = 1#False
+pca = 1#False
 hierclust = False
 linreg = False
 lasso = 1

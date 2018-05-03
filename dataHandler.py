@@ -292,8 +292,8 @@ def loadData(folder, dataPars, ew=1):
         etho[ethomask] = 0
     
     #load neural data
-    R = np.array(data['rPhotoCorr'])
-    G = np.array(data['gPhotoCorr'])
+    R = np.array(data['rPhotoCorr'])[:,:len(np.array(data['hasPointsTime']))]
+    G = np.array(data['gPhotoCorr'])[:,:len(np.array(data['hasPointsTime']))]
     Y = preprocessNeuralData(R, G, dataPars)
     try:
         dY = np.array(data['Ratio2D']).T
@@ -302,7 +302,7 @@ def loadData(folder, dataPars, ew=1):
     order = np.array(data['cgIdx']).T[0]-1
     # store relevant indices
     nonNan = np.arange(0, Y.shape[1])
-    nonNan  = np.where(np.any(np.isfinite(data['rPhotoCorr']),axis=0))[0]
+    nonNan  = np.where(np.any(np.isfinite(R),axis=0))[0]
     
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.

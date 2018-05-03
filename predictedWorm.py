@@ -27,7 +27,7 @@ def recrWorm(av, turns, thetaTrue, r, show = 1):
     """recalculate eigenworm prefactor from angular velocity and turns."""
     thetaCum = np.cumsum(av)
     # reset theta every minute to real value   
-    dt = np.arange(0, len(thetaCum), 180)
+    dt = np.arange(0, len(thetaCum), 60)
     for tt in dt:    
         thetaCum[tt:] -= -thetaTrue[tt]+thetaCum[tt]
 #    thetaCum -= thetaCum[50]-thetaTrue[50] 
@@ -46,6 +46,7 @@ def recrWorm(av, turns, thetaTrue, r, show = 1):
         plt.subplot(221)
         #plt.plot(thetaCum, label = 'reconstructed')
         #plt.plot(thetaTrue, label = 'real')
+        
         plt.scatter(thetaCum,thetaTrue, label = 'reconstructed')
         #plt.plot(thetaTrue, label = 'real')
         plt.ylabel('Accumulated phase angle')
@@ -87,7 +88,7 @@ def main():
             }
     folder = "AML32_moving/"
     dataLog = "AML32_moving/AML32_moving_datasets.txt"
-    outLoc = "AML32_moving/Analysis/Results.hdf5"
+    outLoc = "Analysis/AML32_moving_results.hdf5"
     
     #=============================================================================#
     #                           # load eigenworms
@@ -146,24 +147,30 @@ def main():
     if show:
         
         # animate centerlines
-        fig = plt.figure('wiggly centerlines')
-        ax0 = fig.add_subplot(311)
-        plt.plot(avTrue, label = 'True', color=mp.colorBeh['AngleVelocity'])
-        plt.plot(avP, label = 'Predicted', color=mp.colorPred['AngleVelocity'])
+        fig = plt.figure('prediction')
+        frames = np.arange(1750,2550)
+        #frames = np.arange(1750,1760)
+        f, (ax0, ax1, ax) = plt.subplots(2,1)
+        ax0.plot(avTrue[frames], label = 'True', color=mp.colorBeh['AngleVelocity'])
+        ax0.plot(avP[frames], label = 'Predicted', color=mp.colorPred['AngleVelocity'])
         plt.xlabel('Frames')
         plt.ylabel('Wave velocity')
         plt.legend()
-        plt.subplot(312)
-        plt.plot(pc3, color=mp.colorBeh['Eigenworm3'])
-        plt.plot(tP, color=mp.colorPred['Eigenworm3'])
+        
+        ax1.plot(pc3[frames], color=mp.colorBeh['Eigenworm3'], label = 'True')
+        ax1.plot(tP[frames], color=mp.colorPred['Eigenworm3'], label = 'Predicted')
         plt.xlabel('Frames')
-        plt.ylabel('Wave velocity')
-        ax = fig.add_subplot(313, adjustable='box', aspect=0.66)
+        plt.ylabel('Turns')
+        plt.show()
+        fig = plt.figure('wiggly centerlines')
+        ax = fig.add_subplot(111, adjustable='box', aspect=0.66)
 
         ax.set_ylim(-400, 400)
         ax.set_xlim(-400, 800)
+        plt.tight_layout()
         
-        mp.make_animation3(fig, ax, data1= clPred, data2=clApprox +(500,0) , frames = results['Training']['AngleVelocity']['Test'], save=True)
+        #frames = results['Training']['AngleVelocity']['Test']
+        mp.make_animation3(fig, ax, data1= clPred, data2=clApprox +(500,0) , frames = frames, save=True)
         #mp.make_animation2(fig, ax, data1= clApprox +(500,0), data2=clApprox +(500,0) , frames = np.arange(120, 1000), color=mp.UCred[0])
         plt.show()
         
@@ -182,13 +189,15 @@ def main():
         plt.show()       
         #example centerlines
         i=99
-        plt.plot(clApprox[i,:,0],clApprox[i,:,1]+300*i, '0.5', label = 'Approximated centerline by 4 Eigenworms')
-        plt.plot(cl[i,:,0],cl[i,:,1]+300*i, 'r', label = 'Real Centerline')
-        plt.plot(clPred[i,:,0],clPred[i,:,1]+300*i, 'b', label = 'Predicted Centerline')
-        for i in range(100, 200, 5):
-            plt.plot(clApprox[i,:,0],clApprox[i,:,1]+300*i, '0.5')
-            plt.plot(cl[i,:,0],cl[i,:,1]+300*i, 'r')
-            plt.plot(clPred[i,:,0],clPred[i,:,1]+300*i, 'b')
+        plt.figure()
+        plt.subplot(111, aspect = 'equal')
+        plt.plot(clApprox[i,:,0]+30*i,clApprox[i,:,1], '0.5', label = 'Approximated centerline by 4 Eigenworms')
+        plt.plot(cl[i,:,0]+30*i,cl[i,:,1], 'r', label = 'Real Centerline')
+        plt.plot(clPred[i,:,0]+30*i,clPred[i,:,1], 'b', label = 'Predicted Centerline')
+        for i in range(100, 200, 10):
+            plt.plot(clApprox[i,:,0]+30*i,clApprox[i,:,1], '0.5')
+            plt.plot(cl[i,:,0]+30*i,cl[i,:,1], 'r')
+            plt.plot(clPred[i,:,0]+30*i,clPred[i,:,1], 'b')
         plt.legend()
         plt.tight_layout()
         plt.show()

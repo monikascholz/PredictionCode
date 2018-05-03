@@ -176,7 +176,10 @@ def createWorm(x, y):
         
 def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
     """use pythons built-in animation tools to make a centerline animation."""
-    
+    if save:
+        writer = animation.FFMpegWriter()
+        #writer = Writer(fps=6, metadata=dict(artist='Me'), bitrate=1800)
+
         
     def init():
         x1,y1 = data1[0].T
@@ -217,9 +220,9 @@ def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
         return patch1
         
     anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
-                               frames=frames, interval=166, blit=True)
+                               frames=frames, interval=166, blit=True, repeat=False)
     if save:
-        anim.save('im.mp4')
+        anim.save('im2.mp4', writer=writer)
     plt.show()
     
 
@@ -472,7 +475,31 @@ def plotVelocityTurns(dataSets, keyList):
     
     plt.tight_layout()
     plt.show()  
+
+###############################################    
+# 
+# plot neural data as line plots
+#
+############################################## 
+def neuralActivity(dataSets, keyList):
+    nWorms = len(keyList)
+    fig = plt.figure('Lines',(10, nWorms*3.4))
+    gs = gridspec.GridSpec(nWorms, 1)
     
+    for dindex, key in enumerate(keyList):
+        print 'Plotting lines ', key
+        
+        data = dataSets[key]
+        time = data['Neurons']['Time']
+        ax = plt.subplot(gs[dindex])
+        currPos = 0
+        for line in data['Neurons']['Activity']:
+            plt.plot(time, line+currPos, 'k-', lw=1)
+            currPos += np.max(line)*1.1
+        plt.ylabel('Neural Activity')
+        plt.xlabel('Time (s)')
+    gs.tight_layout(fig)
+    plt.show()
 ###############################################    
 # 
 # full figures

@@ -39,7 +39,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyListAll = np.sort(dataSets.keys())
 print keyListAll
 for key in keyListAll: 
-    keyList = [key]#keyListAll[i:i+1]
+    keyList = keyListAll#[key]#keyListAll[i:i+1]
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -67,16 +67,16 @@ for key in keyListAll:
     # check which calculations to perform
     #
     ##############################################
-    createIndicesTest = 0#True 
+    createIndicesTest = 1#True 
     overview = 1#False
-    predNeur = 0
+    predNeur = 1
     bta = 0
     svm = 0
-    pca = 1#False
-    hierclust = True
+    pca = 0#False
+    hierclust = False
     linreg = False
-    lasso = 0
-    elasticnet = 0#True
+    lasso = 1
+    elasticnet = 1#True
     positionweights = 0#True
     resultsPredictionOverview = 0
     ###############################################    
@@ -98,6 +98,7 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
+        mp.neuralActivity(dataSets, keyList)
         #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
         #mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
         #mp.plotVelocityTurns(dataSets, keyList)
@@ -115,7 +116,7 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print 'predicting neural dynamics from behavior'
             resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
-        mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'RevPred')
+       
         plt.show()
     ###############################################    
     # 
