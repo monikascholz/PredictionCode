@@ -10,10 +10,10 @@ scikit_learn==0.19.1
 
 ## key pieces
 
-dataHandler: Reads in wholebrain data.
-dimReduction: contains actual analysis functions
-dataQualityCheck: run diverse set of analysis methods, such as PCA, linear Regression or SVM. Here, output is plotted, and the program is more verbose.
-runAnalysis: basically the same as dataQualityCheck, but runs quietly and saves results in a hdf5 file.
+* dataHandler: Reads in wholebrain data.
+* dimReduction: contains actual analysis functions
+* dataQualityCheck: run diverse set of analysis methods, such as PCA, linear Regression or SVM. Here, output is plotted, and the program is more verbose.
+* runAnalysis: basically the same as dataQualityCheck, but runs quietly and saves results in a hdf5 file.
 
 ## how to use it
 dataFolder is the Brainscanner folder with your dataset
