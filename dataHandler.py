@@ -259,10 +259,11 @@ def loadData(folder, dataPars, ew=1):
         data = scipy.io.loadmat(os.path.join(folder,'heatData.mat'))
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
+    cl, _ = loadCenterlines(folder)
 #    # get eigenworm file
     if ew:
         # deal with eigenworms -- get them directly from centerlines
-        cl, _ = loadCenterlines(folder)
+        
         # get prefactors from eigenworm projection
         #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
         print 'creating eigenworm projections'
@@ -270,9 +271,10 @@ def loadData(folder, dataPars, ew=1):
         _, pcsErr, pcs = estimateEigenwormError(folder, eigenworms)
         print 'Done loading eigenworms '
     else:
-        cl = None
+        
         # reorder for rotation
         pcs = np.vstack([pc3[:,0],pc12[:,1], pc12[:,0]])
+        pcsErr = np.zeros(pcs.shape)
         # Rotate Eigenworms
         if dataPars['rotate']:
             # load rotation matrix
@@ -282,7 +284,7 @@ def loadData(folder, dataPars, ew=1):
     # do Eigenworm transformations and calculate velocity etc.
 #    # median filter the Eigenworms
     pc1, pc2, pc3, velo, theta = transformEigenworms(pcs, dataPars)
-    print 'mean velocity', np.mean(velo)
+    #print 'mean velocity', np.mean(velo)
     # ethogram redone
     etho = makeEthogram(velo, pc3)
     etho = ethoOrig
@@ -303,11 +305,17 @@ def loadData(folder, dataPars, ew=1):
     # store relevant indices
     nonNan = np.arange(0, Y.shape[1])
     nonNan  = np.where(np.any(np.isfinite(R),axis=0))[0]
+    #lets interpolate small gaps but throw out larger gaps.
+    tmpNans = rolling_window(np.sum(R,axis=0), window= dataPars['interpolateNans'])
+    nonNan  = np.where(np.isfinite(np.nanmean(tmpNans, axis=1)))[0]
     
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
     # redo time axis in seconds for nan issues
     T = np.arange(Y[:,nonNan].shape[1])/6.
+    # 
+    time = np.squeeze(data['hasPointsTime'])
+    time -= time[0]
     
     # unpack neuron position (only one frame, randomly chosen)
     try:
@@ -317,7 +325,9 @@ def loadData(folder, dataPars, ew=1):
         print 'No neuron positions:', folder
     
     Y = Y[order]
-    YD = deconvolveCalcium(Y) 
+    #deconvolved data
+    YD = deconvolveCalcium(Y)
+    #regularized derivative
     dY = dY[order]
     if 0:
         #### show what pipeline does
@@ -357,7 +367,8 @@ def loadData(folder, dataPars, ew=1):
                 'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
-    dataDict['Neurons']['Time'] =  np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
+    dataDict['Neurons']['Indices'] =  T#np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
+    dataDict['Neurons']['Time'] =  time # actual time
     dataDict['Neurons']['Activity'] = Y[:,nonNan]
     dataDict['Neurons']['rankActivity'] = rankTransform(Y)[:,nonNan]
     dataDict['Neurons']['derivActivity'] = dY[:,nonNan]

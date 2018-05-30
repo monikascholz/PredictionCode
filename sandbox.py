@@ -19,12 +19,7 @@ from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 from sklearn.linear_model import LassoCV, LassoLarsCV, LassoLarsIC
 #import pyemma.coordinates as coor
-
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import pycpd as cpd
-
-# try to do error estimates of dat
-
 # standard modules
 import numpy as np
 import matplotlib.pylab as plt
@@ -33,6 +28,7 @@ import h5py
 import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
+from sklearn.decomposition import PCA
 
 from pycpd import deformable_registration, rigid_registration
 
@@ -86,231 +82,265 @@ def runReg(X,Y,Y0, dim3, registration, **kwargs):
     
     plt.show()
     # return deformed Y
-    return reg.TY
-# use 3d neuron atlas positions?
-dim3 = False
+    return reg
 
-if dim3:
-    neuronAtlasFile = 'NeuronPositions.mat'
-    neuronAtlas = scipy.io.loadmat(neuronAtlasFile)
-    # load matlab neuron positions from atlas
-    Xref = np.hstack([neuronAtlas['x'], neuronAtlas['y'],neuronAtlas['z']])
-    relevantIds = (Xref[:,1]<-2.0)#*(Xref[:,1]<-3.0)
-    Xref = Xref[relevantIds]
-    print len(Xref)
-    #Xref = Xref[Xref[:,0]<2.7]
-    ax = plt.subplot(111, projection='3d')
-    ax.scatter(Xref[:,0],  Xref[:,1], Xref[:,2], color='red')
-    plt.show()
-    
-
-
-# load 2d new location file
-else:
-    neuron2D = 'utility/celegans277positionsKaiser.csv'
-    neuronAtlas2Dlabels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
-    neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
-    
-    
-    relevantIds = (neuronAtlas2D[:,0]>-0.0)#*(Xref[:,0]<0.1)
-    X = neuronAtlas2D[relevantIds]
-    X[:,0] = -X[:,0]
-    
+def loadAtlas(dim3=False):
+    # use 3d neuron atlas positions?
+    if dim3:
+        neuronAtlasFile = 'utility/NeuronPositions.mat'
+        neuronAtlas = scipy.io.loadmat(neuronAtlasFile)
+        # load matlab neuron positions from atlas
+        Xref = np.hstack([neuronAtlas['x'], neuronAtlas['y'],neuronAtlas['z']])
+        
+        relevantIds = (Xref[:,1]<-2.5)#*(Xref[:,1]<-3.0)
+        Xref = Xref[relevantIds]
+        
+        labels = np.array([str(idn[0][:3]) for idn in neuronAtlas['ID'][relevantIds, 0]])
+        #Xref = Xref[Xref[:,0]<2.7]
+    # load 2d new location file
+    else:
+        neuron2D = 'utility/celegans277positionsKaiser.csv'
+        labels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
+        neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
+        relevantIds = (neuronAtlas2D[:,0]>-0.0)#*(Xref[:,0]<0.1)
+        Xref = neuronAtlas2D[relevantIds]
+        Xref[:,0] = -Xref[:,0]
+        labels = labels[relevantIds]
+    return Xref, labels
+###############################################    
+# 
+#    run parameters
+#
+###############################################
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
+first = True # if true, create new HDF5 file
 ###############################################    
 # 
 #    load data into dictionary
 #
-##############################################  
-#folder = "SelectDatasets/BrainScanner20170610_105634_linkcopy/"
-#folder = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/{}_linkcopy/"
-#dataLog = "/home/monika/Dropbox/Work/BehaviorPrediction/PredictionCode/SelectDatasets/description.txt"
-typ='AML70imm'
-
-# GCamp6s; lite-1
-if typ =='AML70': 
-    folder = "AML70_moving/{}_MS/"
-    dataLog = "AML70_moving/AML70_datasets.txt"
-    outLoc = "AML70_moving/Analysis/"
-# GCamp6s 
-if typ =='AML32': 
-    folder = "AML32_moving/{}_MS/"
-    dataLog = "AML32_moving/AML32_datasets.txt"
-    outLoc = "AML32_moving/Analysis/"
-##### GFP
-elif typ =='AML18': 
-    folder = "AML18_moving/{}_MS/"
-    dataLog = "AML18_moving/AML18_datasets.txt"
-    outLoc = "AML18_moving/Analysis/"
-# output is stored here
-
-
-elif typ =='AML32imm': 
-    folder = "AML32_immobilized/{}_MS/"
-    dataLog = "AML32_immobilized/AML32_immobilized_datasets.txt"
-
-# immobile GCamp6 -lite-1
-elif typ =='AML70imm': 
-    folder = "AML70_immobilized/{}_MS/"
-    dataLog = "AML70_immobilized/AML70imm_datasets.txt"
+##############################################
+folder = '{}_{}/'.format(typ, condition)
+dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
+outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 # data parameters
-dataPars = {'medianWindow':3, # smooth eigenworms with gauss filter of that size, must be odd
-            'savGolayWindow':5, # savitzky-golay window for angle velocity derivative. must be odd
-            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5 # gauss window for red and green channel
+dataPars = {'medianWindow':1, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':15, # sgauss window for angle velocity derivative. must be odd
+            'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
+            'windowGCamp': 5,  # gauss window for red and green channel
+            'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
             }
 
+dataSets = dh.loadDictFromHDF(outLocData)
+keys = dataSets.keys()
+results = dh.loadDictFromHDF(outLoc) 
+dim3 = True
+Xref, labels = loadAtlas(dim3=dim3)
 
-#dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 2)
-#keyList = np.sort(dataSets.keys())
-#pos = []
-#for kindex, key in enumerate(keyList):
-#    pos.append(dataSets[key]['Neurons']['Positions'].T)
-    # deformable
-    #neurPosdef = neurPos + 05*(0.5-np.random.random_sample(neurPos.shape))
-    #reg = cpd.deformable_registration(neurPos, neurPosdef)
+Xref -= np.mean(Xref, axis=0)
+Xref /=np.max(Xref, axis=0)
+Y = dataSets[keys[1]]['Neurons']['Positions'].T
 
-binx, biny = 20,20
-
-wormPos = []
-# for now hard code ventral
-ventral = [-1,1,1]
-for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:1]):
-    folderName = folder.format(line[0])
-
-    pts = np.array(dh.loadPoints(folderName, straight = True))
-    nNeur = [len(pt) for pt in pts]
-    Y0 = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
-    pts = np.array(dh.loadPoints(folderName, straight = False))    
-    #YS = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
-    print 'before', Y0.shape
-    Y0 = Y0[np.isfinite(Y0[:,0])]
-    print 'after',Y0.shape
-    fig = plt.figure('Atlas and points')
-    ax = fig.add_subplot(2,1,lindex+2)
-    # invert y-axis if ventral side up
-    Y0[:,1] = Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
-    Y0[:,0] -= 200# Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
-    # make 2D
-    Y0 = Y0[:,:2]
-    ax.scatter(Y0[:,0],  Y0[:,1], color='green', alpha=0.5, s =5)
-   
-
+Y -= np.mean(Y, axis=0)
+Y /=np.max(Y, axis=0)
+if not dim3:
+    Y = Y[:,:2]
     
-    #ax.scatter(YS[:,0],  YS[:,1], color='k', alpha=0.5, s=1)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    
-    
-     # plot marginals
-#    H, xedge, yedge = np.histogram2d(Y0[:,0],  Y0[:,1], bins=(binx,biny))
-#    fig = plt.figure('Hist')
-#    ax = fig.add_subplot(10,2,2*lindex+3)    
-#    plt.step(np.arange(binx), np.sum(H, axis=1))
-#    ax = fig.add_subplot(10,2,2*lindex+4)    
-#    plt.step(np.arange(biny), np.sum(H, axis=0))
-    #ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
-    wormPos.append(Y0)
-    
-fig = plt.figure('Atlas and points')
-ax = fig.add_subplot(211)
+pca = PCA(n_components = 2)
+Xref = pca.fit_transform(Xref)    
+Y = pca.fit_transform(Y)
+dim3 = False
 
-ax.scatter(X[:,0],  X[:,1], color='red', s=5)
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-
-#H, xedge, yedge = np.histogram2d(X[:,0],  X[:,1], bins=(binx,biny))
-#fig = plt.figure('Hist')
-#ax = fig.add_subplot(10,2,1)  
-#plt.step(np.arange(binx), np.sum(H, axis=1))
-#ax = fig.add_subplot(10,2,2)  
-#plt.step(np.arange(biny), np.sum(H, axis=0))
-##ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
-  
-    
+print Xref.shape, Y.shape
+registration = cpd.rigid_registration
+reg = runReg(Xref,Y,Y, dim3, registration, tolerance=1, maxIterations=150)
+registration = cpd.deformable_registration
+reg = runReg(Xref,reg.TY,reg.TY, dim3, registration, tolerance=1e-6, maxIterations=50)
+order = np.argsort(np.argmax(reg.P, axis = 1))
+print order.shape
+plt.subplot(211)
+plt.imshow(reg.P[order], aspect='auto')
+ax1=plt.subplot(212)
+#ax1.scatter(Xref[:,0],  Xref[:,1], color='red')
+ax1.scatter(reg.TY[:,0],  reg.TY[:,1], color='blue')
+for loc, idn in  zip(Xref,labels):
+    ax1.text(loc[0], loc[1], idn, verticalalignment='center', horizontalalignment='center')
 plt.show()
+
+results = dh.loadDictFromHDF(outLoc)
+idents = []
+control = []
+shuffled_labels = labels.copy()
+np.random.shuffle(shuffled_labels)
+for weights in [results[keys[1]]['LASSO']['AngleVelocity'], results[keys[1]]['LASSO']['Eigenworm3']]:
+    print weights['scorepredicted']    
+    for windex, w in enumerate(weights['weights']):
+        if w !=0:
+            print w, labels[np.argsort(reg.P[:,windex])][-3:]
+            idents.append(labels[np.argsort(reg.P[:,windex])][-3:])
+            control.append(shuffled_labels[np.argsort(reg.P[:,windex])][-3:])
+            
+            
+av_neurons = ['ASI', 'AIY','AIB', 'RIM', 'SMB', 'RMD', 'SMD']
+turn_neurons = ['RIV', 'SMD']
+motionneurons = ['ASI', 'AIY','AIB', 'RIM', 'SMB', 'RMD', 'SMD', 'RIV']
+counter = [0, 0]
+for neuron in np.concatenate(idents):
+    if neuron in motionneurons:
+        counter[0] += 1
+
+for neuron in np.concatenate(control):
+    if neuron in motionneurons:
+        counter[1] += 1
+    
+print 'Fraction motion neurons in exp:', counter[0]/1.0/len(np.concatenate(idents))
+print 'Fraction motion neurons in control:', counter[1]/1.0/len(np.concatenate(control))
+   
+ 
+ 
+#binx, biny = 20,20
 #
+#wormPos = []
+## for now hard code ventral
+#ventral = [-1,1,1]
+#for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[:1]):
+#    folderName = folder.format(line[0])
+#
+#    pts = np.array(dh.loadPoints(folderName, straight = True))
+#    nNeur = [len(pt) for pt in pts]
+#    Y0 = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
+#    pts = np.array(dh.loadPoints(folderName, straight = False))    
+#    #YS = np.array(pts[np.max(nNeur)])# + 10*np.ones(X.shape)+5*(0.5-np.random.random_sample(X.shape))#10*np.ones(X.shape)#
+#    print 'before', Y0.shape
+#    Y0 = Y0[np.isfinite(Y0[:,0])]
+#    print 'after',Y0.shape
+#    fig = plt.figure('Atlas and points')
+#    ax = fig.add_subplot(2,1,lindex+2)
+#    # invert y-axis if ventral side up
+#    Y0[:,1] = Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
+#    Y0[:,0] -= 200# Y0[:,1]*ventral[lindex]-(-1+ventral[lindex])*50
+#    # make 2D
+#    Y0 = Y0[:,:2]
+#    ax.scatter(Y0[:,0],  Y0[:,1], color='green', alpha=0.5, s =5)
+#   
+#
+#    
+#    #ax.scatter(YS[:,0],  YS[:,1], color='k', alpha=0.5, s=1)
+#    ax.set_xlabel('X')
+#    ax.set_ylabel('Y')
+#    
+#    
+#     # plot marginals
+##    H, xedge, yedge = np.histogram2d(Y0[:,0],  Y0[:,1], bins=(binx,biny))
+##    fig = plt.figure('Hist')
+##    ax = fig.add_subplot(10,2,2*lindex+3)    
+##    plt.step(np.arange(binx), np.sum(H, axis=1))
+##    ax = fig.add_subplot(10,2,2*lindex+4)    
+##    plt.step(np.arange(biny), np.sum(H, axis=0))
+#    #ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
+#    wormPos.append(Y0)
+#    
+#fig = plt.figure('Atlas and points')
+#ax = fig.add_subplot(211)
+#
+#ax.scatter(X[:,0],  X[:,1], color='red', s=5)
+#ax.set_xlabel('X')
+#ax.set_ylabel('Y')
+#
+##H, xedge, yedge = np.histogram2d(X[:,0],  X[:,1], bins=(binx,biny))
+##fig = plt.figure('Hist')
+##ax = fig.add_subplot(10,2,1)  
+##plt.step(np.arange(binx), np.sum(H, axis=1))
+##ax = fig.add_subplot(10,2,2)  
+##plt.step(np.arange(biny), np.sum(H, axis=0))
+###ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,1])))
+#  
+#    
+#plt.show()
+##
+##registration = cpd.rigid_registration
+##Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-3, maxIterations=150)
+##    
+##    
+##registration = cpd.deformable_registration
+##
+##
+##Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-5, maxIterations=150)
+##
+##print X.shape
+### to atlas
+##rescale atlas
+#Y = wormPos[0]
+#X *= np.ptp(Y)/np.ptp(X)
+#X = X - np.mean(X, axis=0)
 #registration = cpd.rigid_registration
-#Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-3, maxIterations=150)
+#Y0 = runReg(X,Y,Y, dim3, registration, tolerance=1e-3, maxIterations=150)
 #    
 #    
 #registration = cpd.deformable_registration
+#Y0 = runReg(X,Y0,Y0, dim3, registration, tolerance=1e-5, maxIterations=150)
+#    
+#    
+#    
+#    #
+#for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[1:2]):
+#    folder = folder.format(line[0])
 #
-#
-#Y0 = runReg(wormPos[0],X,X, dim3, registration, tolerance=1e-5, maxIterations=150)
-#
-#print X.shape
-## to atlas
-#rescale atlas
-Y = wormPos[0]
-X *= np.ptp(Y)/np.ptp(X)
-X = X - np.mean(X, axis=0)
-registration = cpd.rigid_registration
-Y0 = runReg(X,Y,Y, dim3, registration, tolerance=1e-3, maxIterations=150)
-    
-    
-registration = cpd.deformable_registration
-Y0 = runReg(X,Y0,Y0, dim3, registration, tolerance=1e-5, maxIterations=150)
-    
-    
-    
-    #
-for lindex, line in enumerate(np.loadtxt(dataLog, dtype=str, ndmin = 2)[1:2]):
-    folder = folder.format(line[0])
-
-    pts = np.array(dh.loadPoints(folder,straight = True))
-    print len(pts)
-    print pts.shape
-    
-    
-    
-    #rigid
-    nNeur = [len(pt) for pt in pts]
-    Y0 = np.array(pts[np.max(nNeur)])
-    fig = plt.figure('Atlas and points')
-    ax = fig.add_subplot(211)
-    
-    ax.scatter(Y0[:,0],  Y0[:,1], color='green')
-    
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
-    
-    ax = fig.add_subplot(212)
-    
-    ax.scatter(X[:,0],  X[:,1], color='red')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
-    plt.show()
-    if not dim3:
-        Y0 = Y0[:,:2]
-        # flip x axis
-        Y0[:,1] = -Y0[:,1]
-        Y0[:,0] = -Y0[:,0]
-    print Y0.shape
-    
-    # subsample X
-    #X = X[np.random.randint(0,len(Xref), (len(Xref)-50))]
-    #SHIFT TO CENTER
-    Y0 = Y0-np.mean(Y0, axis=0)
-    Y0 += np.mean(X, axis=0)
-    #adjust range
-    Y0 /= np.ptp(Y0, axis=0)
-    Y0 *= np.ptp(X, axis=0)
-    
-    #Y0[:,0] = pos[1][:,1]
-    
-    #Y0[:,1] = np.max(Y0[:,1])-Y0[:,1]
-    Y = np.copy(Y0)
-    registration = cpd.rigid_registration
-    Y0 = runReg(X,Y,Y0, dim3, registration, tolerance=1e-3, maxIterations=100)
-    
-    
-    Y = np.copy(Y0)
-    registration = cpd.deformable_registration
-    runReg(X,Y,Y0, dim3, registration, tolerance=1e-18)
-    
-    
+#    pts = np.array(dh.loadPoints(folder,straight = True))
+#    print len(pts)
+#    print pts.shape
+#    
+#    
+#    
+#    #rigid
+#    nNeur = [len(pt) for pt in pts]
+#    Y0 = np.array(pts[np.max(nNeur)])
+#    fig = plt.figure('Atlas and points')
+#    ax = fig.add_subplot(211)
+#    
+#    ax.scatter(Y0[:,0],  Y0[:,1], color='green')
+#    
+#    ax.set_xlabel('X')
+#    ax.set_ylabel('Y')
+#    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
+#    
+#    ax = fig.add_subplot(212)
+#    
+#    ax.scatter(X[:,0],  X[:,1], color='red')
+#    ax.set_xlabel('X')
+#    ax.set_ylabel('Y')
+#    ax.set_aspect(aspect=(np.ptp(Y0[:,0])/np.ptp(Y0[:,0])))
+#    plt.show()
+#    if not dim3:
+#        Y0 = Y0[:,:2]
+#        # flip x axis
+#        Y0[:,1] = -Y0[:,1]
+#        Y0[:,0] = -Y0[:,0]
+#    print Y0.shape
+#    
+#    # subsample X
+#    #X = X[np.random.randint(0,len(Xref), (len(Xref)-50))]
+#    #SHIFT TO CENTER
+#    Y0 = Y0-np.mean(Y0, axis=0)
+#    Y0 += np.mean(X, axis=0)
+#    #adjust range
+#    Y0 /= np.ptp(Y0, axis=0)
+#    Y0 *= np.ptp(X, axis=0)
+#    
+#    #Y0[:,0] = pos[1][:,1]
+#    
+#    #Y0[:,1] = np.max(Y0[:,1])-Y0[:,1]
+#    Y = np.copy(Y0)
+#    registration = cpd.rigid_registration
+#    Y0 = runReg(X,Y,Y0, dim3, registration, tolerance=1e-3, maxIterations=100)
+#    
+#    
+#    Y = np.copy(Y0)
+#    registration = cpd.deformable_registration
+#    runReg(X,Y,Y0, dim3, registration, tolerance=1e-18)
+#    
+#    
 
 #threed = 1
 #

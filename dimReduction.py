@@ -21,6 +21,7 @@ import dataHandler as dh
 from scipy.interpolate import interp1d
 from scipy.optimize import newton 
 from sklearn.cluster import bicluster
+from scipy.signal import welch, lombscargle
 # 
 import makePlots as mp
 
@@ -137,9 +138,9 @@ def createTrainingTestIndices(data, pars, label):
 #            testIndices = np.arange(np.max([0,loc-cutoff]), loc+cutoff)
 #        else:
         # this makes a centered box
-        #testIndices = tmpIndices[cutoff:-cutoff]
+        testIndices = tmpIndices[cutoff:-cutoff]
         # this makes a box that starts in the center
-        testIndices = tmpIndices[int(timeLen/2.):int(timeLen/2.)+testTime]
+        #testIndices = tmpIndices[int(timeLen/2.):int(timeLen/2.)+testTime]
         trainingsIndices = np.setdiff1d(tmpIndices, testIndices)[::pars['trainingSample']]
     elif pars['trainingType'] == 'LR':
         # crop out a testset first -- find an area that contains at least one turn
@@ -203,13 +204,7 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     pcs = pca.fit_transform(Neuro)
     comp = pca.components_
     if deriv:
-        print comp.shape
         comp = np.cumsum(pca.components_, axis=0)
-        print comp.shape
-    #comp = np.cumsum(pca.components_, axis=1)
-    # order neurons by weight in first component
-    #indices = np.arange(len(Neuro))
-    
     indices = np.argsort(pcs.T)[whichPC]
     #print indices.shape
     pcares = {}
@@ -218,7 +213,8 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     pcares['neuronWeights'] =  pcs
     pcares['neuronOrderPCA'] =  indices
     pcares['pcaComponents'] =  comp
-    
+    if testset is not None:
+        pcares['testSet'] = testset
     return pcares
     
 def runPCATimeWarp(data, pars):
@@ -273,7 +269,48 @@ def timewarp(data):
             
     neurData = np.concatenate(neurArr, axis=1)
     return neurData
+
+###############################################    
+# 
+# estimate signal/ periodogram
+#
+##############################################
+def behaviorCorrelations(data, behaviors, subset = None):
+    """simple r2 scores of behavior and neural activity."""
+    Y = data['Neurons']['Activity']
+    nNeur = Y.shape[0]
+    print nNeur
+    results = {}
     
+    for bindex, beh in enumerate(behaviors):
+        r2s = []
+        x = data['Behavior'][beh]
+        if subset is not None:
+            Y = Y[:,subset]
+            x = x[subset]
+        x = (x-np.mean(x))/np.std(x)
+        for n in range(nNeur):
+            r2s.append(np.corrcoef(x, Y[n])[0,1]**2)
+        results[beh] = np.array(r2s)
+    return results
+###############################################    
+# 
+# estimate signal/ periodogram
+#
+##############################################
+def runPeriodogram(data, pars, testset = None):
+    """run a welch periodogram to estimate the PSD of neural activity."""
+    
+    Neuro = data['Neurons']['Activity']
+    time = data['Neurons']['Time']
+    if testset is not None:
+        Neuro = Neuro[:,testset]
+        time = time[testset]
+    f = pars['periodogramFreqs']
+    p = lombscargle(time, Neuro, f)
+    
+    plt.imshow(p, aspect = 'auto')
+    plt.show()
 ###############################################    
 # 
 # hierarchical clustering
@@ -334,9 +371,7 @@ def discreteBehaviorPrediction(data, pars, splits):
     trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     # create a linear SVC
     lin_clf = svm.LinearSVC(penalty='l1',dual=False, class_weight='balanced', C=10)
-    
     lin_clf.fit(X[trainingsInd], Y[trainingsInd]) 
-    
     Ypred = lin_clf.predict(X[testInd])
     
     print classification_report(Y[testInd], Ypred)
@@ -402,8 +437,99 @@ def runBehaviorTriggeredAverage(data, pars):
     pcares['neuronOrderPCA'] =  orderFwd
     pcares['pcaComponents'] =  comp
     return pcares
+
+###############################################    
+# 
+# Linear Model
+#
+##############################################    
+
+def runLinearModel(data, results, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = None):
+    """run a linear model to fit behavior and neural activity with a linear model."""
+    linData = {}
+    for label in behaviors:
+        Y = data['Behavior'][label]
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     
-    
+        if pars['useRank']:
+            X = data['Neurons']['rankActivity'].T
+        if pars['useClust']:
+            clustres = runHierarchicalClustering(data, pars)
+            X = clustres['Activity'].T
+        else:
+            X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        if subset is not None:
+            # only a few neurons
+            if len(subset[label])<1:
+                print 'no weights found.proceeding with all neurons'
+            else:
+                X = X[:,subset[label]]
+#        cv = 10
+#        reg = linear_model.LinearRegression()
+#        # setting alpha to zero makes this a linear model without regularization
+        reg = linear_model.Lasso(alpha = results[fitmethod][label]['alpha'])
+        reg.fit(X[trainingsInd], Y[trainingsInd])
+#        alphas = reg.alphas_
+#        ymean = np.mean(reg.mse_path_, axis =1)
+#        yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
+#        alphaNew = alphas[np.argmin(ymean)]
+#        # calculate standard deviation rule
+#        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
+#        reg = linear_model.Lasso(alpha=alphaNew)
+#        reg.fit(X[trainingsInd], Y[trainingsInd])
+        
+        if plot:
+            plt.subplot(221)
+            plt.title('Trainingsset')
+            plt.plot(Y[trainingsInd], 'r')
+            plt.plot(reg.predict(X[trainingsInd]), 'k', alpha=0.7)
+            plt.subplot(222)
+            plt.title('Testset')
+            plt.plot(Y[testInd], 'r')
+            plt.plot(reg.predict(X[testInd]), 'k', alpha=0.7)
+            ax1 = plt.subplot(223)
+            plt.title('Non-zero weighths: {}'.format(len(reg.coef_[reg.coef_!=0])))
+            ax1.scatter(Y[testInd], reg.predict(X[testInd]), alpha=0.7, s=0.2)
+#            hist, bins = np.histogram(reg.coef_, bins = 30, density = True)
+#            ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post', color='r')
+#            ax1.set_xlabel(r'weights')
+#            ax1.set_ylabel('PDF(weights)')
+            plt.subplot(224)
+#            
+#            #plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.3)
+#            plt.plot(alphas, ymean, 'k')
+#            plt.errorbar(alphas, ymean, yerr=yerr, capsize=1)
+#            plt.axvline(alphas[np.argmin(ymean)],label='minimal error')
+#            plt.axvline(alphaNew,label='stdev rule')
+#            plt.xscale('log')
+#            #plt.fill_between(reg.alphas_,y1=ymean-yerr, y2= ymean+yerr, alpha=0.5)
+#            #plt.errorbar(,color= 'k')
+            plt.tight_layout()            
+            plt.show()
+        weights = reg.coef_
+        # score model
+        if len(weights)>0:
+            scorepred = reg.score(X[testInd], Y[testInd])#, sample_weight=np.power(Y[testInd], 2))
+            score = reg.score(X[trainingsInd], Y[trainingsInd])
+        else:
+            scorepred = np.nan
+            score = reg.score(X[trainingsInd], Y[trainingsInd])
+        linData[label] = {}
+        linData[label]['weights'] =  weights
+        linData[label]['fullweights'] =  weights
+        if subset[label] is not None and len(subset[label])>0:
+            fullweights = np.zeros(data['Neurons']['Activity'].shape[0])
+            fullweights[subset[label]] = weights
+            linData[label]['fullweights'] =  fullweights
+        linData[label]['intercepts'] = reg.intercept_
+#        linData[label]['alpha'] = alphaNew#reg.alpha_
+        linData[label]['score'] = score
+        linData[label]['scorepredicted'] = scorepred
+        linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
+        linData[label]['output'] = reg.predict(X) # full output training and test
+        print 'r2', scorepred
+    return linData
+
 ###############################################    
 # 
 # LASSO
@@ -437,39 +563,57 @@ def balancedFolds(y, nSets=5,  splitMethod = 'unique'):
         folds.append([splits[i], np.concatenate(splits[np.arange(len(splits))!=i] )])
     return folds
     
-def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
+def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
     """run LASSO to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
-        Y = data['Behavior'][label]
+        Y = np.reshape(data['Behavior'][label],(-1, 1))
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
-        if pars['useClust']:
+        elif pars['useClust']:
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
-
+        # implement time lagging -- forward and reverse
+        
+        if lag is not None:
+            # move neural activity by lag (lag has units of volume)
+            # positive lag = behavior trails after neural activity, uses values from the past
+            # negative lag = behavior precedes neural activity
+            X = np.roll(X, shift = lag, axis = 0)
+        # prep data by scalig
+        # fit scale model
+        scale = False
+        if scale:
+            scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
+            scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
+            #scale data
+            Xtrain, Xtest = scalerX.transform(X[trainingsInd]), scalerX.transform(X[testInd])
+            Ytrain, Ytest = scalerY.transform(Y[trainingsInd]), scalerY.transform(Y[testInd])
+        Xtrain, Xtest = X[trainingsInd],X[testInd]
+        Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit lasso and validate
         #a = np.logspace(-2,2,100)
         cv = 10
         # unbalanced sets
-        #fold = KFold(cv, shuffle=False) 
-        # balanced sets
+        fold = KFold(cv, shuffle=True) 
+#        # balanced sets
 #        if label =='Eigenworm3':
-#            a = np.logspace(-3,2,100)
+#            a = np.logspace(-3,-1,100)
 #        else:
-#            a = np.logspace(-2,1,1000)
+#            a = np.logspace(-3,0,100)
 #        if label =='Eigenworm3':
 #            fold = balancedFolds(Y[trainingsInd], nSets=cv)
-#        else:
-        fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        #fold = 10
+##        else:
+#        fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        fold = 10
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
-         max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
-        reg.fit(X[trainingsInd], Y[trainingsInd])
+         max_iter=5000, tol=0.0001)#, alphas=a)#, eps=1e-2)#, normalize=False)
+        
+        reg.fit(Xtrain, Ytrain)
         alphas = reg.alphas_
         ymean = np.mean(reg.mse_path_, axis =1)
         yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
@@ -482,15 +626,15 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         if plot:
             plt.subplot(221)
             plt.title('Trainingsset')
-            plt.plot(Y[trainingsInd], 'r')
-            plt.plot(reg.predict(X[trainingsInd]), 'k', alpha=0.7)
+            plt.plot(Ytrain, 'r')
+            plt.plot(reg.predict(Xtrain), 'k', alpha=0.7)
             plt.subplot(222)
             plt.title('Testset')
             plt.plot(Y[testInd], 'r')
-            plt.plot(reg.predict(X[testInd]), 'k', alpha=0.7)
+            plt.plot(reg.predict(Xtest), 'k', alpha=0.7)
             ax1 = plt.subplot(223)
             plt.title('Non-zero weighths: {}'.format(len(reg.coef_[reg.coef_!=0])))
-            ax1.scatter(Y[testInd], reg.predict(X[testInd]), alpha=0.7, s=0.2)
+            ax1.scatter(Ytest, reg.predict(Xtest), alpha=0.7, s=0.2)
 #            hist, bins = np.histogram(reg.coef_, bins = 30, density = True)
 #            ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post', color='r')
 #            ax1.set_xlabel(r'weights')
@@ -510,11 +654,12 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         weights = reg.coef_
         # score model
         if len(weights)>0:
-            scorepred = reg.score(X[testInd], Y[testInd])#, sample_weight=np.power(Y[testInd], 2))
-            score = reg.score(X[trainingsInd], Y[trainingsInd])
+            # normalize testset with scaler values
+            scorepred = reg.score(Xtest, Ytest)#, sample_weight=np.power(Y[testInd], 2))
+            score = reg.score(Xtrain, Ytrain)
         else:
             scorepred = np.nan
-            score = reg.score(X[trainingsInd], Y[trainingsInd])
+            score = reg.score(Xtrain, Ytrain)
         linData[label] = {}
         linData[label]['weights'] =  weights
         linData[label]['intercepts'] = reg.intercept_
@@ -532,7 +677,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #
 ##############################################    
 
-def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3']):
+def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
     """run EN to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
@@ -548,24 +693,32 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
+        # implement time lagging -- forward and reverse
+        if lag is not None:
+            # move neural activity by lag (lag has units of volume)
+            # positive lag = behavior lags after neural activity, uses values from the past
+            X = np.roll(X, shift = lag, axis = 0)
+            
         # fit elasticNet and validate
-        cv = 15
+        cv = 10
         if label =='Eigenworm3':
             l1_ratio = [0.95]
             #l1_ratio = [0.95]
             #fold =10
-            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+            #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
             fold = cv
-            a = np.logspace(-5,-2,200)
+            #fold = balancedFolds(Y[trainingsInd], nSets=cv)
+            a = np.logspace(-4,-2,200)
         
         #cv = 15
         #a = np.logspace(-3,-1,100)
         #fold = 5
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-10, alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5, alphas=a)
+        #        
         reg.fit(X[trainingsInd], Y[trainingsInd])
 
         scorepred = reg.score(X[testInd], Y[testInd])
@@ -619,6 +772,124 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
 
 ###############################################    
 # 
+# run LASSO with multiple time lags and collate data
+#
+##############################################
+    
+def timelagRegression(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], flag = 'LASSO', lags = np.arange(-18,19, 3)):
+    """runs LASSO in the same train/test split for multiple time lags and computes the standard erro, parameters etc."""
+    # store results
+    res = []
+    for lag in lags:
+        if flag =='LASSO':
+            results = runLasso(data, pars, splits, plot = False, behaviors = behaviors, lag = lag)
+        else:
+            results = runElasticNet(data, pars, splits, plot = False, behaviors = behaviors, lag = lag)
+        res.append(results)
+    # pull out the results
+    pcares = {}
+    for rindex, results in enumerate(res):
+        for lindex, label in enumerate(behaviors):
+            if rindex == 0:
+                pcares[label] = {}
+                pcares[label]['lags'] = lags
+            for key in results[label].keys():
+                if rindex==0:
+                    pcares[label][key] = []
+                pcares[label][key].append(results[label][key])
+                
+    
+    plt.figure()
+    plt.subplot(221)
+    for label in behaviors:
+        plt.plot(pcares[label]['lags'], pcares[label]['scorepredicted'], label=label)
+    plt.subplot(222)
+    for label in behaviors:
+        plt.plot(pcares[label]['lags'], pcares[label]['noNeurons'], label=label)
+    plt.subplot(223)
+    plt.imshow(np.array(pcares[behaviors[0]]['weights']), label=label, aspect='auto')
+    plt.subplot(224)
+    plt.imshow(np.array(pcares[behaviors[1]]['weights']), label=label, aspect='auto')
+    plt.show()
+    return pcares
+    
+###############################################    
+# 
+# run LASSO/EN with multiple train-test splits to obtain unbiased estimate of test error
+# also check how robust model fitting is 
+#
+##############################################
+    
+def NestedRegression(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], flag = 'LASSO'):
+    """runs LASSO in the same train/test split for multiple time lags and computes the standard erro, parameters etc."""
+    # store results
+    res = []
+    # since this is a time series, make sure test is after all training data
+    timeLen = data['Neurons']['Activity'].shape[1]
+    dur = pars['testVolumes'] # 2 min of data for test sets
+    # make successive train-test splits with increasing time ('day-forward chaining')
+    maxSplits = int((timeLen-dur)/dur)
+
+    splitOuterLoop = [(np.arange(0, (i+1)*dur), np.arange((i+1)*dur, (i+2)*dur)) for i in range(maxSplits)]
+    for repeats in splitOuterLoop:
+        plt.plot(repeats[0])
+        plt.plot(repeats[1])
+        plt.show()
+    splits = {}    
+    
+    for repeats in splitOuterLoop:
+        for label in behaviors:
+            splits[label] = {}
+            splits[label]['Train'] , splits[label]['Test'] = repeats
+        
+        if flag =='LASSO':
+            results = runLasso(data, pars, splits, plot = True, behaviors = behaviors, lag = None)
+        else:
+            results = runElasticNet(data, pars, splits, plot = False, behaviors = behaviors, lag = None)
+        res.append(results)
+    # pull out the results
+    pcares = {}
+    for rindex, results in enumerate(res):
+        for lindex, label in enumerate(behaviors):
+            if rindex == 0:
+                pcares[label] = {}
+                
+            for key in results[label].keys():
+                if rindex==0:
+                    pcares[label][key] = []
+                pcares[label][key].append(results[label][key])
+                
+    plt.figure()
+    plt.subplot(221)
+    for label in behaviors:
+        plt.plot( pcares[label]['scorepredicted'], label=label)
+    plt.subplot(222)
+    for label in behaviors:
+        plt.plot( pcares[label]['noNeurons'], label=label)
+    plt.subplot(223)
+    plt.imshow(np.array(pcares[behaviors[0]]['weights']), label=label, aspect='auto')
+    plt.subplot(224)
+    plt.imshow(np.array(pcares[behaviors[1]]['weights']), label=label, aspect='auto')
+    plt.show()
+    return pcares
+    
+###############################################    
+# 
+# calculate non-linearity from linear model output
+#
+##############################################
+def fitNonlinearity(data, results, splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3']):
+    """fit a nonlinearity to a dataset that was fit with a linear model first."""
+    for label in behaviors:
+        # linear model output
+        X = results[fitmethod][label]['output']
+        # true values
+        Y =  data['Behavior'][label]
+        # 
+        plt.hexbin(X,Y)
+        plt.show()
+###############################################    
+# 
 # Show how prediction improves with more neurons
 #
 ##############################################  
@@ -641,10 +912,10 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         indScore = []
         sumScore = []
         mse = []
-        if fitmethod == 'ElasticNet':
-            print 'Elastic Net params:', results[fitmethod][label]['alpha'], results[fitmethod][label]['l1_ratio']
-            print 'Elastic Net R2:', results[fitmethod][label]['scorepredicted'], results[fitmethod][label]['score']
-        # TODO: check why individual fits not as stable
+        print "___________________________"
+        print fitmethod, 'params:', results[fitmethod][label]['alpha']
+        print fitmethod, 'R2:', results[fitmethod][label]['scorepredicted'], results[fitmethod][label]['score']
+
         for count, wInd in enumerate(weightsInd):
             if np.abs(weights[wInd]) >0:
                 # fit one neuron
@@ -663,24 +934,6 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 indScore.append(reg.score(xTmp[testInd], Y[testInd]))
                 
-#                plt.scatter(xTmp[testInd], Y[testInd], s=0.5)
-#                plt.plot(xTmp[testInd], reg.predict(xTmp[testInd]))
-#                plt.show()
-                # fit up to n neurons
-                #reg = linear_model.Lasso(alpha = results[fitmethod][label]['alpha'])
-                
-#                plt.subplot(311)
-#                plt.plot(Y[trainingsInd])
-#                plt.plot(reg.predict(xTmp[trainingsInd]))
-#                
-#                plt.subplot(312)
-#                plt.plot(Y[testInd])
-#                plt.plot(reg.predict(xTmp[testInd]), lw=0.5)
-#                
-#                plt.subplot(313)
-#                plt.scatter(reg.predict(xTmp[testInd]),Y[testInd], s=0.2)
-                
-            plt.show()
         linData[label] = {}
         linData[label]['cumulativeScore'] = sumScore
         linData[label]['individualScore'] = indScore
@@ -731,8 +984,10 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
 # predict neural dynamics from behavior
 #
 ##############################################
-def predictNeuralDynamicsfromBehavior(data,  pars):
+def predictNeuralDynamicsfromBehavior(data,  splits, pars):
     """use linear model to predict the neural data from behavior and estimate what worm is thinking about."""
+    label = 'AngleVelocity'
+    train, test = splits[label]['Train'], splits[label]['Test']
     # create dimensionality-reduced behavior - pca with 10 eigenworms
     cl = data['CL']
     eigenworms = dh.loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=4, new=True)
@@ -750,7 +1005,7 @@ def predictNeuralDynamicsfromBehavior(data,  pars):
     pca = PCA(n_components = nComp)
     Neuro = data['Neurons']['Activity'].T
     pcs = pca.fit_transform(Neuro)
-    comp = pca.components_.T
+    #comp = pca.components_.T
     #now we use a linear model to train and test our predictions
     #here we will simply use a 50/50 split for now
     half = int((len(Neuro))/2.)
@@ -771,77 +1026,43 @@ def predictNeuralDynamicsfromBehavior(data,  pars):
     # recreate the PCA components of the neural map from these predictions
     predN = lin.predict(behavior)
     print predN.shape, 'predicted neurons in pca space', behavior.shape
+    
     indices = np.argsort(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))[::-1]
+    r2 = [explained_variance_score(pcs[test,i], predN[test,i]) for i in indices]    
     # weightorder
     weightorder = np.arange(lin.coef_.shape[1])[np.argsort(np.abs(lin.coef_[indices[0]]))][::-1]
     # reverse the PCA
     newHM = pca.inverse_transform(predN).T
-    plt.figure('PredictedNeuralActivity', figsize=(2.28*4,2.28*6))
-    plt.subplot(321)
-    #show original heatmap
-    mp.plotHeatmap(data['Neurons']['Time'], data['Neurons']['Activity'])
-    # show reduced dimensionality heatmap
-    mp.plotHeatmap(data['Neurons']['Time'][test], pca.inverse_transform(pcs).T[:,test])
-    plt.subplot(322)
-    mp.plotHeatmap(data['Neurons']['Time'][test], newHM[:,test], vmin=np.min(newHM)*1.1, vmax=np.max(newHM)*0.9)
-    plt.subplot(324)
-    for ind, i in enumerate(indices[:4]):
-        x = data['Neurons']['Time'][test]
-        line1, = plt.plot(x, pcs[test,i]+ind*12, color='C0', label='Neural PCs')
-        line2, = plt.plot(x, predN[test,i]+ind*12, color='C3', label= 'Predicted')
-        plt.text(x[-1]*0.9, 1.2*np.max(predN[test,i]+ind*10), '$R^2={:.2f}$'.format(explained_variance_score(pcs[test,i], predN[test,i])))
-    plt.legend([line1, line2], ['Neural PCs', 'Predicted from Behavior'], loc=2)
-    ylabels = ['PC {}'.format(index+1) for index in indices[:4]]
-    plt.yticks(np.arange(0,4*12, 12), ylabels)
-    plt.xlabel('Time(s)')
-    plt.subplot(323)
-    for ind, i in enumerate(weightorder):
-        plt.plot(data['Neurons']['Time'], behavior[:,i]+ind*4, color='k', label = blabels[i], alpha=0.35+0.1*ind)
-        plt.xlabel('Time(s)')
-        
-    locs, labels = plt.yticks()
-    plt.yticks(np.arange(0,len(weightorder)*4,4), blabels[weightorder])
-    #plt.legend()
-    plt.subplot(325)
-    # plot the weights for each PC
-    orderedWeights = lin.coef_[:,weightorder]
-    for li,line in enumerate(orderedWeights):
-        plt.plot(np.abs(line), label = ('weights for PC{}'.format(li+1)), color='C5', alpha=0.25+0.05*li, lw=1)
-    plt.ylabel('Weights')
-    #plt.xlabel('behaviors')
-    plt.plot(np.mean(np.abs(orderedWeights), axis=0), color='C5', alpha=1, lw=2, marker = 'o')
-    plt.xticks(np.arange(len(weightorder)), blabels[weightorder], rotation=30)
-    plt.subplot(326)
+    # order the weights for each behavior
+    #orderedWeights = lin.coef_[:,weightorder]
     # variance explained with each PC prediction
     expScore = []
     for i in range(len(weightorder)):
         tmpBeh = behavior[:,weightorder]
         tmpBeh[:,i+1:] = 0
         predictedNeurons = lin.predict(tmpBeh)
-        tmpHM = pca.inverse_transform(predictedNeurons).T
-        expScore.append(explained_variance_score(data['Neurons']['Activity'], tmpHM))
-    plt.plot(expScore, color='C7', alpha=1, lw=2, marker = 'o')
-    plt.xticks(np.arange(len(weightorder)), blabels[weightorder], rotation=30)
-    plt.tight_layout()
-    plt.show()
-    # order the map by the components that is most explained by behavior
-    #ci = np.argmax(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
-    indices = np.argsort(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
-    print len(indices), predN.shape
-    #print lin.coef_.shape
-    # calculate how good the heatmap is -- explained variance of the fit first
-    #print explained_variance_score(pcs[test],predN[test],multioutput ='raw_values')
-    #print explained_variance_score(pcs[train],predN[train],multioutput ='raw_values')
-    print explained_variance_score(data['Neurons']['Activity'], newHM)
-    print explained_variance_score(pca.inverse_transform(pcs).T[:,test], newHM[:,test])
-    print explained_variance_score(pca.inverse_transform(pcs).T, newHM)
-    
-    
-    #return pcares
-    
-    
-    
-    
-    
-    
-    
+        tmpHM = pca.inverse_transform(predictedNeurons)
+        # compare to full neural data
+        #expScore.append(explained_variance_score(data['Neurons']['Activity'][test], tmpHM[test]))
+        # compare to nComp recornstructed data
+        expScore.append(explained_variance_score(pca.inverse_transform(pcs).T[test], tmpHM[test]))
+    # store results
+    pcares = {}
+    pcares['nComp'] =  nComp
+    pcares['lowDimNeuro'] = pca.inverse_transform(pcs).T# smaller dimension neural data
+    pcares['behavior'] = behavior # stacked behavioral vectors
+    pcares['expVariance'] =  expScore
+    pcares['behaviorWeights'] =  lin.coef_# actual fitted weights for each behavior
+    pcares['behaviorOrder'] =  weightorder # indices of behaviors if ordered by fit weight
+    pcares['predictedNeuralPCS'] =  predN
+    pcares['NeuralPCS'] =  pcs
+    pcares['behaviorLabels'] = blabels    
+    pcares['predictedNeuralDynamics'] = newHM
+    pcares['PCA_indices'] = indices
+    pcares['R2_test'] = r2# r2 for predicting neural PCS testset only()
+
+    return pcares
+
+
+
+        

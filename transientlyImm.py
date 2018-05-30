@@ -86,8 +86,8 @@ if createIndicesTest:
 ##############################################
 if overview:
     #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
-    mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
-    mp.plotVelocityTurns(dataSets, keyList)
+    #mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
+    #mp.plotVelocityTurns(dataSets, keyList)
     mp.plotDataOverview(dataSets, keyList)
     #mp.plotNeurons3D(dataSets, keyList, threed = False)  
     #mp.plotExampleCenterlines(dataSets, keyList, folder)

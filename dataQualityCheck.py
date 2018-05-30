@@ -15,7 +15,7 @@ import dimReduction as dr
 #
 ###############################################
 typ = 'AML70' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+condition = 'chip' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -28,18 +28,19 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':10, # sgauss window for angle velocity derivative. must be odd
-            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5  # gauss window for red and green channel
+dataPars = {'medianWindow':1, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':15, # sgauss window for angle velocity derivative. must be odd
+            'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
+            'windowGCamp': 5,  # gauss window for red and green channel
+            'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = None)
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = 1)
 keyListAll = np.sort(dataSets.keys())
-print keyListAll
-for key in keyListAll: 
-    keyList = keyListAll#[key]#keyListAll[i:i+1]
+for keyList in keyListAll: 
+    keyList = keyListAll[-2:-1]#[key]#keyListAll[i:i+1]
+    print keyList
     # results dictionary 
     resultDict = {}
     for kindex, key in enumerate(keyList):
@@ -47,16 +48,19 @@ for key in keyListAll:
     # analysis parameters
     
     pars ={'nCompPCA':10, # no of PCA components
-            'PCAtimewarp':True, #timewarp so behaviors are equally represented
-            'trainingCut': 0.7, # what fraction of data to use for training 
-            'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
+            'PCAtimewarp':False, #timewarp so behaviors are equally represented
+            'trainingCut': 0.8, # what fraction of data to use for training 
+            'trainingType': 'simple', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
             'linReg': 'simple', # ordinary or ransac least squares
             'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
             'useRank': 0, # use the rank transformed version of neural data for all analyses
             'useDeconv': 0, # use the deconvolved transformed version of neural data for all analyses
             'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
             'useClust':False,# use clusters in the fitting procedure.
-            'useDeriv':True,# use neural activity derivative for PCA
+            'useDeriv':False,# use neural activity derivative for PCA
+            'testVolumes' : 6*60*1, # 2 min of data for test sets in nested validation
+            'periodogramFreqs': np.logspace(0.1, 10, 25) # frequencies for periodogram estimation
+            
          }
     
     behaviors = ['AngleVelocity','Eigenworm3']#, 'Eigenworm2']
@@ -68,15 +72,18 @@ for key in keyListAll:
     #
     ##############################################
     createIndicesTest = 1#True 
-    overview = 1#False
-    predNeur = 1
+    overview = 0#False
+    predNeur = 0
     bta = 0
     svm = 0
     pca = 0#False
     hierclust = False
     linreg = False
+    periodogram = 1
+    nestedvalidation = 0
     lasso = 1
-    elasticnet = 1#True
+    elasticnet = 0#True
+    lagregression = 0
     positionweights = 0#True
     resultsPredictionOverview = 0
     ###############################################    
@@ -98,11 +105,17 @@ for key in keyListAll:
     #
     ##############################################
     if overview:
+            # line plots of neuronal activity, pretty
         mp.neuralActivity(dataSets, keyList)
-        #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
+            # cimple scatter of behavior versus neurons
+        mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
+            # heatmaps of neuronal activity ordered by behavior
         #mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
+            # sanity check - CMS velocity, wave velocity and turn variables with ethogram
         #mp.plotVelocityTurns(dataSets, keyList)
+            # plot neural data, ethogram, behavior and location for each dataset
         mp.plotDataOverview(dataSets, keyList)
+            # neuron locations
         #mp.plotNeurons3D(dataSets, keyList, threed = False)  
         #mp.plotExampleCenterlines(dataSets, keyList, folder)
         plt.show() 
@@ -115,9 +128,10 @@ for key in keyListAll:
     if predNeur:
         for kindex, key in enumerate(keyList):
             print 'predicting neural dynamics from behavior'
-            resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
-       
-        plt.show()
+            splits = resultDict[key]['Training']
+            resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], splits, pars)
+            mp.plotNeuronPredictedFromBehavior(resultDict[key], dataSets[key])
+            plt.show()
     ###############################################    
     # 
     # use agglomerative clustering to connect similar neurons
@@ -127,6 +141,17 @@ for key in keyListAll:
         for kindex, key in enumerate(keyList):
             print 'running clustering'
             resultDict[key]['clust'] = dr.runHierarchicalClustering(dataSets[key], pars)
+            
+    ###############################################    
+    # 
+    # calculate the periodogram of the neural signals
+    #
+    ##############################################
+    if periodogram:
+        print 'running periodogram(s)'
+        for kindex, key in enumerate(keyList):
+            
+            dr.runPeriodogram(dataSets[key], pars, testset = None)       
     ###############################################    
     # 
     # use behavior triggered averaging to create non-othogonal axes
@@ -208,7 +233,7 @@ for key in keyListAll:
         
         mp.plotLinearPredictionSingleNeurons(dataSets, resultDict, keyList)
         plt.show()
-        
+    
     #%%
     ###############################################    
     # 
@@ -225,22 +250,26 @@ for key in keyListAll:
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key],splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
             for tmpKey in tmpDict.keys():
                 resultDict[key]['LASSO'][tmpKey].update(tmpDict[tmpKey])
-            
-            tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
-            for tmpKey in tmpDict.keys():
-                resultDict[key]['LASSO'][tmpKey]=tmpDict[tmpKey]
+#            # reorganize to get similar structure as PCA
+#            tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
+#            for tmpKey in tmpDict.keys():
+#                resultDict[key]['LASSO'][tmpKey]=tmpDict[tmpKey]
+#            
+#            # do converse calculation -- give it only the neurons non-zero in previous case
+#            subset = {}
+#            subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
+#            subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
+#            resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
+#            # find non-linearity
+#            dr.fitNonlinearity(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'])
         
         mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
         plt.show()
-        # overview of LASSO results and weights
-        #mp.plotPCAresults(dataSets, resultDict, keyList, pars,  flag = 'LASSO')
-        #plt.show()
-        #  plot 3D trajectory of SVM
-        #mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag = 'LASSO')
+        # predict opposites
+        
         plt.show()
         
-        
-        
+    
     #%%
     ###############################################    
     # 
@@ -256,10 +285,40 @@ for key in keyListAll:
             tmpDict = dr.scoreModelProgression(dataSets[key], resultDict[key], splits,pars, fitmethod = 'ElasticNet', behaviors = behaviors, )
             for tmpKey in tmpDict.keys():
                 resultDict[key]['ElasticNet'][tmpKey].update(tmpDict[tmpKey])
-        mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
+                
+            # do converse calculation -- give it only the neurons non-zero in previous case
+            subset = {}
+            subset['AngleVelocity'] = np.where(resultDict[key]['ElasticNet']['Eigenworm3']['weights']>0)[0]
+            subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
+            resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
+            
+            mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
         plt.show()
     
-    
+     #%%
+    ###############################################    
+    # 
+    # lag-time fits of neural activity
+    #
+    ##############################################
+    if lagregression:
+        for kindex, key in enumerate(keyList):
+            print 'Running lag calculation',  key
+            splits = resultDict[key]['Training']
+            resultDict[key]['LagLASSO'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3))
+    #%%
+    ###############################################    
+    # 
+    #day-forward crossvalidation for test error estimates
+    #
+    ##############################################
+    if nestedvalidation:
+        for kindex, key in enumerate(keyList):
+            print 'Running nested validation',  key
+            splits = resultDict[key]['Training']
+            resultDict[key]['nestedLASSO'] = dr.NestedRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], flag = 'LASSO')    
+
+
     #%%
     ###############################################    
     # 

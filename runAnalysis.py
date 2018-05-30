@@ -15,7 +15,7 @@ import dimReduction as dr
 #
 ###############################################
 typ = 'AML70' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+condition = 'chip' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -32,7 +32,7 @@ dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size
             'gaussWindow':5, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5,  # gauss window for red and green channel
-            
+            'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
@@ -69,13 +69,14 @@ hierclust = 0
 bta = 0
 pca = 1#False
 kato_pca = 1#False
+half_pca = 1
 
 predNeur = 0
 svm = 0
 lasso = 0
 elasticnet = 0
 # this requires moving animals
-if condition == 'moving':
+if condition != 'immobilized':
     predNeur = 0
     svm = 1
     lasso = 1
@@ -96,12 +97,26 @@ if createIndicesTest:
 
 ###############################################    
 # 
+# correlation neurons and behavior
+#
+##############################################
+if svm:
+    print 'running Correlation.'
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['Correlation'] = dr.behaviorCorrelations(dataSets[key], behaviors)
+    # first four minute correlation
+    half1 = np.arange(0,1440)
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['CorrelationHalf'] = dr.behaviorCorrelations(dataSets[key], behaviors, subset = half1)
+
+###############################################    
+# 
 # run svm to predict discrete behaviors
 #
 ##############################################
 if svm:
     for kindex, key in enumerate(keyList):
-        print 'running SVM'
+        print 'running SVM.'
         splits = resultDict[key]['Training']
         resultDict[key]['SVM'] = dr.discreteBehaviorPrediction(dataSets[key], pars, splits )
 
@@ -125,8 +140,24 @@ if pca:
 if kato_pca:
     print 'running Kato et. al PCA'
     for kindex, key in enumerate(keyList):
-        resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
+        resultDict[key]['katoPCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
         
+###############################################    
+# 
+# run split first-second half PCA
+#
+##############################################
+#%%
+if half_pca:
+    print 'half-split PCA'
+    for kindex, key in enumerate(keyList):
+        # run PCA on each half
+        # first four min
+        half1 = np.arange(0,1440)
+        # after 4:30 min
+        half2 = np.arange(1620,dataSets[key]['Neurons']['Activity'].shape[1])
+        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = half1)
+        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = half2)
 #%%
 ###############################################    
 # 

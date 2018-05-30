@@ -18,8 +18,9 @@ from sklearn.decomposition import PCA
 from sklearn import linear_model
 from scipy.signal import medfilt
 from scipy.ndimage.filters import gaussian_filter1d
-from sklearn.metrics import explained_variance_score
+from sklearn.metrics import explained_variance_score, r2_score
 from scipy.ndimage.filters import gaussian_filter
+from sklearn.preprocessing import StandardScaler
 #custom
 import dataHandler as dh
 # change axes
@@ -84,6 +85,7 @@ labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
 ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb('#C21807'), UCgray[1], mpl.colors.to_rgb('#4AA02C'), mpl.colors.to_rgb('#0F52BA')], name='etho', N=None)
 ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
+
 
 # rename behaviors for plots
 names = {'AngleVelocity': 'Wave velocity',
@@ -256,7 +258,8 @@ def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
     lw = 1
     x = x[::cg]
     y = y[::cg]
-    z = z[::cg]
+    if threedim:
+        z = z[::cg]
     t = t[::cg]
     if threedim:
         points = np.array([x,y,z]).transpose().reshape(-1,1,3)
@@ -284,8 +287,9 @@ def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
 def circle_scatter(axes, x_array, y_array, radius=0.5, **kwargs):
     """make scatter plot with axis unit radius.(behaves nice when zooming in)"""
     for x, y in zip(x_array, y_array):
-        circle = plt.Circle((x,y), radius=radius, **kwargs)
-        axes.add_patch(circle)
+        if np.isfinite(x):
+            circle = plt.Circle((x,y), radius=radius, **kwargs)
+            axes.add_patch(circle)
     return True
 
 def plotHeatmap(T, Y, ax = None, vmin=-2, vmax=2):
@@ -316,12 +320,14 @@ def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
 #        if len((etho==key))==0:
 #            
 #            continue
-        plt.fill_between(T, y1=np.ones(len(T))*yValMin, y2=np.ones(len(T))*yValMax, where=where, \
+        ax.fill_between(T, y1=np.ones(len(T))*yValMin, y2=np.ones(len(T))*yValMax, where=where, \
         interpolate=False, color=colDict[key], label=labelDict[key], alpha = alpha)
-    plt.xlim([min(T), max(T)])
-    plt.ylim([yValMin, yValMax])
-    plt.xlabel('Time (s)')
-    plt.yticks([])
+    ax.set_xlim([min(T), max(T)])
+    ax.set_ylim([yValMin, yValMax])
+    ax.set_xlabel('Time (s)')
+    ax.set_yticks([])
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
     if legend:
         plt.legend(ncol=2)
     
@@ -426,23 +432,51 @@ def plotBehaviorNeuronCorrs(dataSets, keyList, behaviors):
         Y = dataSets[key]['Neurons']['Activity']
         nNeur = len(Y)
         nRows = int(np.sqrt(nNeur))+1
-        
+        r2s = []
+        scaler = StandardScaler()
         for bindex, beh in enumerate(behaviors):
             inner_grid = gridspec.GridSpecFromSubplotSpec(nRows,nRows,\
             subplot_spec=gs[bindex], hspace=0.05, wspace=0.05)
             x = dataSets[key]['Behavior'][beh]
+            x = (x-np.mean(x))/np.std(x)
+            
             for n in range(nNeur):
                 ax = plt.subplot(inner_grid[int(n/nRows), n%nRows])
-                ax.scatter(x,Y[n], color=colorBeh[beh], s=0.25, alpha=0.1, label=explained_variance_score(x, Y[n]))
+                r2 = np.corrcoef(x, Y[n])[0,1]**2
+                r2s.append(r2)
+                ax.scatter(x,Y[n], color=colorBeh[beh], s=0.25, alpha=0.1, label="{:.2f}".format(r2))
                 
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)
                 ax.legend()
+        r2scores = np.reshape(np.array(r2s), (-1, 2))
         gs.tight_layout(fig)
+        plt.figure()
+        plt.subplot(231)
+        plt.plot(r2scores[:,0], colorPred['AngleVelocity'], label = names['AngleVelocity'])
+        plt.plot(r2scores[:,1], colorPred['Eigenworm3'], label = names['Eigenworm3'])
+        plt.xlabel('Neurons')
+        plt.ylabel(r'R^2 score')
+        plt.subplot(232)
+        plt.xlabel('R^2 scores')
+        plt.ylabel(r'Distribution of R^2 scores')
+        plt.hist(r2scores[:,0], bins = 10,color = colorPred['AngleVelocity'])
+        plt.subplot(233)
+        plt.xlabel('R^2 scores')
+        plt.ylabel(r'Distribution of R^2 scores')
+        plt.hist(r2scores[:,1], bins = 10,color = colorPred['Eigenworm3'])
+        
+        plt.subplot(234)
+        plt.plot(dataSets[key]['Behavior']['AngleVelocity']+5, ':', color = colorBeh['AngleVelocity'])
+        plt.plot(Y[np.argsort(r2scores[:,0])[-10:]].T, color = colorPred['AngleVelocity'], alpha=0.8)
+        plt.subplot(235)
+        plt.plot(dataSets[key]['Behavior']['Eigenworm3']+10, ':' ,color = colorBeh['Eigenworm3'])
+        plt.plot(Y[np.argsort(r2scores[:,1])[-10:]].T, color = colorPred['Eigenworm3'], alpha=0.8)
+        plt.show()
             #ax.fill_between(range(len(m)), m-s, m+s, alpha=0.5)
 ###############################################    
 # 
-# velocity versus angle veocity
+# velocity versus angle veocity10
 #
 ##############################################       
 def plotVelocityTurns(dataSets, keyList):
@@ -1279,3 +1313,64 @@ def averageResultsPCA( resultSetsAll, keyListsAll,labels,colors,fitmethod = "PCA
         
         
     gs.tight_layout(fig)
+    
+def plotNeuronPredictedFromBehavior(results, data):
+    label = 'AngleVelocity'
+    splits = results['Training']
+    train, test = splits[label]['Train'], splits[label]['Test']
+    res = results['RevPred']
+    newHM = res['predictedNeuralDynamics']
+    orderedWeights = res['behaviorWeights'][:,res['behaviorOrder']]
+    # plot stuff
+    plt.figure('PredictedNeuralActivity', figsize=(2.28*4,2.28*6))
+    plt.subplot(321)
+    #show original heatmap
+    plotHeatmap(data['Neurons']['Time'], data['Neurons']['Activity'])
+    # show reduced dimensionality heatmap
+    plotHeatmap(data['Neurons']['Time'][test], res['lowDimNeuro'][:,test])
+    plt.subplot(322)
+    plotHeatmap(data['Neurons']['Time'][test], newHM[:,test], vmin=np.min(newHM)*1.1, vmax=np.max(newHM)*0.9)
+    plt.subplot(324)
+    for ind, i in enumerate(res['PCA_indices'][:4]):
+        x = data['Neurons']['Time'][test]
+        line1, = plt.plot(x, res['NeuralPCS'][test,i]+ind*12, color='C0', label='Neural PCs')
+        line2, = plt.plot(x, res['predictedNeuralPCS'][test,i]+ind*12, color='C3', label= 'Predicted')
+        plt.text(x[-1]*0.9, 1.2*np.max(res['predictedNeuralPCS'][test,i]+ind*10), '$R^2={:.2f}$'.format(res['R2_test'][ind]))
+    plt.legend([line1, line2], ['Neural PCs', 'Predicted from Behavior'], loc=2)
+    ylabels = ['PC {}'.format(index+1) for index in res['PCA_indices'][:4]]
+    plt.yticks(np.arange(0,4*12, 12), ylabels)
+    plt.xlabel('Time(s)')
+    plt.subplot(323)
+    for ind, i in enumerate(res['behaviorOrder']):
+        plt.plot(data['Neurons']['Time'], res['behavior'][:,i]+ind*4, color='k', label = res['behaviorLabels'][i], alpha=0.35+0.1*ind)
+        plt.xlabel('Time(s)')
+        
+    locs, labels = plt.yticks()
+    plt.yticks(np.arange(0,len(res['behaviorOrder'])*4,4), res['behaviorLabels'][res['behaviorOrder']])
+    #plt.legend()
+    plt.subplot(325)
+    # plot the weights for each PC
+    
+    for li,line in enumerate(orderedWeights):
+        plt.plot(np.abs(line), label = ('weights for PC{}'.format(li+1)), color='C5', alpha=0.25+0.05*li, lw=1)
+    plt.ylabel('Weights')
+    #plt.xlabel('behaviors')
+    plt.plot(np.mean(np.abs(orderedWeights), axis=0), color='C5', alpha=1, lw=2, marker = 'o')
+    plt.xticks(np.arange(len(res['behaviorOrder'])), res['behaviorLabels'][res['behaviorOrder']], rotation=30)
+    plt.subplot(326)
+    
+    plt.plot(res['expVariance'], color='C7', alpha=1, lw=2, marker = 'o')
+    plt.xticks(np.arange(len(res['behaviorOrder'])),res['behaviorLabels'][res['behaviorOrder']], rotation=30)
+    plt.tight_layout()
+    plt.show()
+    # order the map by the components that is most explained by behavior
+    #ci = np.argmax(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
+    #indices = np.argsort(explained_variance_score(pcs[test],predN[test],multioutput ='raw_values'))
+    #print len(indices), predN.shape
+    #print lin.coef_.shape
+    # calculate how good the heatmap is -- explained variance of the fit first
+    #print explained_variance_score(pcs[test],predN[test],multioutput ='raw_values')
+    #print explained_variance_score(pcs[train],predN[train],multioutput ='raw_values')
+    #print explained_variance_score(data['Neurons']['Activity'], newHM)
+    #print explained_variance_score(pca.inverse_transform(pcs).T[:,test], newHM[:,test])
+    #print explained_variance_score(pca.inverse_transform(pcs).T, newHM)

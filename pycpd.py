@@ -1,5 +1,7 @@
 import numpy as np
 
+import numpy as np
+
 class rigid_registration(object):
   def __init__(self, X, Y, R=None, t=None, s=None, sigma2=None, maxIterations=100, tolerance=0.001, w=0):
     if X.shape[1] != Y.shape[1]:
@@ -77,11 +79,12 @@ class rigid_registration(object):
     xPx      = np.dot(np.transpose(self.Pt1), np.sum(np.multiply(self.XX, self.XX), axis =1))
     self.q   = (xPx - 2 * self.s * trAR + self.s * self.s * self.YPY) / (2 * self.sigma2) + self.D * self.Np/2 * np.log(self.sigma2)
     self.err = np.abs(self.q - qprev)
-
+    
     self.sigma2 = (xPx - self.s * trAR) / (self.Np * self.D)
-
+    
     if self.sigma2 <= 0:
       self.sigma2 = self.tolerance / 10
+      self.err= 0
 
   def initialize(self):
     self.TY = self.s * np.dot(self.Y, np.transpose(self.R)) + np.repeat(self.t, self.M, axis=0)
