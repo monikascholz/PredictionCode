@@ -9,7 +9,7 @@ import os
 import numpy as np
 import matplotlib.pylab as plt
 import scipy.interpolate
-from scipy.signal import medfilt, deconvolve
+#from scipy.signal import medfilt, deconvolve
 from skimage.transform import resize
 from sklearn import preprocessing
 import makePlots as mp
@@ -248,10 +248,14 @@ def preprocessNeuralData(R, G, dataPars):
         YN = YR
     # zscore values 
     Y =  preprocessing.scale(YN.T).T
-    return Y
+    # percentile scale
+    R0 = np.percentile(YN, [20])
+    dR = (YN-R0)/R0
+    return Y, dR
 
 def loadData(folder, dataPars, ew=1):
     """load matlab data."""
+    print 'Loading ', folder
     try:
         data = scipy.io.loadmat(os.path.join(folder,'heatDataMS.mat'))
     except IOError:
@@ -287,7 +291,7 @@ def loadData(folder, dataPars, ew=1):
     #print 'mean velocity', np.mean(velo)
     # ethogram redone
     etho = makeEthogram(velo, pc3)
-    etho = ethoOrig
+    etho = np.squeeze(ethoOrig)
     # mask nans in ethogram
     ethomask = np.isnan(etho)
     if np.any(ethomask):
@@ -296,18 +300,23 @@ def loadData(folder, dataPars, ew=1):
     #load neural data
     R = np.array(data['rPhotoCorr'])[:,:len(np.array(data['hasPointsTime']))]
     G = np.array(data['gPhotoCorr'])[:,:len(np.array(data['hasPointsTime']))]
-    Y = preprocessNeuralData(R, G, dataPars)
+    #
+    Ratio = np.array(data['Ratio2'])[:,:len(np.array(data['hasPointsTime']))]
+    Y, dR = preprocessNeuralData(R, G, dataPars)
     try:
         dY = np.array(data['Ratio2D']).T
     except KeyError:
         dY = np.zeros(Y.shape)
     order = np.array(data['cgIdx']).T[0]-1
-    # store relevant indices
-    nonNan = np.arange(0, Y.shape[1])
-    nonNan  = np.where(np.any(np.isfinite(R),axis=0))[0]
+    
     #lets interpolate small gaps but throw out larger gaps.
-    tmpNans = rolling_window(np.sum(R,axis=0), window= dataPars['interpolateNans'])
-    nonNan  = np.where(np.isfinite(np.nanmean(tmpNans, axis=1)))[0]
+    # make a map with all nans smoothed out if larger than some window    
+    nanmask =[np.repeat(np.nanmean(chunky_window(line, window= dataPars['interpolateNans']), axis=1), dataPars['interpolateNans']) for line in Ratio]
+    Rfull = dR
+    Rfull[np.isnan(nanmask)[:,:Y.shape[1]]] =np.nan
+   
+    # store relevant indices -- crop out the long gaps of nans
+    nonNan  = np.where(np.all(np.isfinite(nanmask),axis=0))[0]
     
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
@@ -315,7 +324,7 @@ def loadData(folder, dataPars, ew=1):
     T = np.arange(Y[:,nonNan].shape[1])/6.
     # 
     time = np.squeeze(data['hasPointsTime'])
-    time -= time[0]
+    time -= time[nonNan[0]]
     
     # unpack neuron position (only one frame, randomly chosen)
     try:
@@ -325,35 +334,11 @@ def loadData(folder, dataPars, ew=1):
         print 'No neuron positions:', folder
     
     Y = Y[order]
+    dR = dR[order]
     #deconvolved data
     YD = deconvolveCalcium(Y)
     #regularized derivative
     dY = dY[order]
-    if 0:
-        #### show what pipeline does
-        titles= ['Bleaching corrected', 'Gaussian filter $\sigma=5$', 'Rolling mean (30 s) ', 'Z score']
-        for i, hm in enumerate([G[order]/R[order],YR, YN, Y]):
-            ax=plt.subplot(2,2,i+1)
-            low, high = np.percentile(hm, [2.28, 97.72])#[ 15.87, 84.13])
-            ax.set_title(titles[i])
-            cax1 = ax.imshow( hm, aspect='auto', interpolation='none', origin='lower',extent=[0,T[-1],len(Y),0],vmax=high, vmin=low)
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel("Neuron")
-        plt.tight_layout()
-        plt.show()
-        
-        for i, hm in enumerate([G[order]/R[order],YR, YN, Y]):
-            ax=plt.subplot(2,2,i+1)
-            f, ps = calcFFT(hm, time_step=1/6.)
-            ax.set_title(titles[i])
-            m, s = np.mean(ps, axis=0), np.std(ps, axis=0)
-            ax.plot(f, m, 'r')
-            #ax.fill_between(f, m-s, m+s, alpha=0.2, color='r')
-            ax.set_yscale('log',nonposy='clip')
-            ax.set_xlabel('Frequency (Hz)')
-            ax.set_ylabel("Power spectrum")
-        plt.tight_layout()
-        plt.show()
     # create a dictionary structure of these data
     dataDict = {}
     # store centerlines subsampled to volumes
@@ -368,12 +353,15 @@ def loadData(folder, dataPars, ew=1):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
     dataDict['Neurons']['Indices'] =  T#np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
-    dataDict['Neurons']['Time'] =  time # actual time
+    dataDict['Neurons']['Time'] =  time[nonNan] # actual time
+    dataDict['Neurons']['TimeFull'] =  time # actual time
+    dataDict['Neurons']['ActivityFull'] =  Rfull[order] # full activity
     dataDict['Neurons']['Activity'] = Y[:,nonNan]
-    dataDict['Neurons']['rankActivity'] = rankTransform(Y)[:,nonNan]
+    dataDict['Neurons']['RawActivity'] = dR[:,nonNan]
     dataDict['Neurons']['derivActivity'] = dY[:,nonNan]
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
+    dataDict['Neurons']['ordering'] = order
     return dataDict
     
     
@@ -415,7 +403,10 @@ def rolling_window(a, window):
     
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
     
-
+def chunky_window(a, window):
+    xp =  np.r_[a, np.nan + np.zeros((-len(a) % window,))]
+    return xp.reshape(-1, window)
+    
 def saveDictToHDF(filePath, d):
     f = h5py.File(filePath,'w')
     for fnKey in d.keys(): #this level is datasets ie., Brainscanner0000000

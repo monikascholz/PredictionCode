@@ -14,8 +14,8 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML70' # possible values AML32, AML18, AML70
-condition = 'chip' # Moving, immobilized, chip
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -54,6 +54,7 @@ pars ={'nCompPCA':20, # no of PCA components
         'useDeconv': 0, # use the deconvolved transformed version of neural data for all analyses
         'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
         'useClust':False,# use clusters in the fitting procedure.
+        'periods': np.arange(0, 300) # relevant periods in seconds for timescale estimate
          }
 
 behaviors = ['AngleVelocity', 'Eigenworm3']
@@ -64,13 +65,14 @@ behaviors = ['AngleVelocity', 'Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-
+periodogram = 1
+half_period = 1
 hierclust = 0
 bta = 0
 pca = 1#False
 kato_pca = 1#False
 half_pca = 1
-
+corr = 1
 predNeur = 0
 svm = 0
 lasso = 0
@@ -97,10 +99,31 @@ if createIndicesTest:
 
 ###############################################    
 # 
+# calculate the periodogram of the neural signals
+#
+##############################################
+if periodogram:
+    print 'running periodogram(s)'
+    for kindex, key in enumerate(keyList):
+        resultDict[key]['Period'] = dr.runPeriodogram(dataSets[key], pars, testset = None)
+# for half the sample each
+if half_period:
+    print 'running periodogram(s)'
+    for kindex, key in enumerate(keyList):
+        # first four min
+        half1 = np.arange(0,1440)
+        # after 4:30 min
+        half2 = np.arange(1620,dataSets[key]['Neurons']['Activity'].shape[1])
+        resultDict[key]['Period1Half'] = dr.runPeriodogram(dataSets[key], pars, testset = half1)
+        resultDict[key]['Period2Half'] = dr.runPeriodogram(dataSets[key], pars, testset = half2)
+
+
+###############################################    
+# 
 # correlation neurons and behavior
 #
 ##############################################
-if svm:
+if corr:
     print 'running Correlation.'
     for kindex, key in enumerate(keyList):
         resultDict[key]['Correlation'] = dr.behaviorCorrelations(dataSets[key], behaviors)

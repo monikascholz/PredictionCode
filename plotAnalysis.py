@@ -76,27 +76,7 @@ for typ in ['AML70']:
     ax4.set_xlabel('Number of components')
     plt.legend()
     fig.add_subplot(ax4)
-plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+plt
 
 
 

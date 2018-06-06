@@ -12,7 +12,7 @@ from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import explained_variance_score, accuracy_score, precision_recall_fscore_support
 from sklearn import preprocessing
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split, KFold, TimeSeriesSplit
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report, f1_score
@@ -21,7 +21,7 @@ import dataHandler as dh
 from scipy.interpolate import interp1d
 from scipy.optimize import newton 
 from sklearn.cluster import bicluster
-from scipy.signal import welch, lombscargle
+from scipy.signal import welch, lombscargle, fftconvolve
 # 
 import makePlots as mp
 
@@ -303,14 +303,40 @@ def runPeriodogram(data, pars, testset = None):
     
     Neuro = data['Neurons']['Activity']
     time = data['Neurons']['Time']
+    B = np.array(data['Behavior']['Ethogram'], dtype=float)
+    B -=np.mean(B)
+    B/= np.std(B)
     if testset is not None:
         Neuro = Neuro[:,testset]
         time = time[testset]
-    f = pars['periodogramFreqs']
-    p = lombscargle(time, Neuro, f)
+        B = B[testset]
     
-    plt.imshow(p, aspect = 'auto')
+    autocorr = np.array([fftconvolve(y, y[::-1], mode='full') for y in Neuro])
+    periods = np.arange(-len(y), len(y)-1)/6.
+    # behavior
+    autocorrB = np.array(fftconvolve(B, B[::-1], mode='full'))
+    # get only relevant subset
+    Indices = np.rint(np.interp(pars['periods'], periods, np.arange(len(periods)))).astype(int)
+    print Indices
+#    p = np.array([np.sqrt(lombscargle(time, neuron, f)*4/len(time)) for neuron in Neuro ])
+#    p2 = np.sqrt(lombscargle(time, np.array(data['Behavior']['Ethogram'], dtype=float), f)*4/len(time))
+#    plt.subplot(211)
+#    plt.plot((f/2/np.pi),np.mean(p, axis=0), 'b', alpha=0.5)
+#    plt.plot((f/2/np.pi),p2, 'r', alpha=0.5)
+#    plt.subplot(212)
+#    plt.plot((f/2/np.pi),np.cumsum(np.mean(p, axis=0)), 'b', alpha=0.5)
+#    plt.plot((f/2/np.pi),np.cumsum(p2), 'r', alpha=0.5)
+#    plt.show()
+    plt.plot(periods[Indices],np.mean(autocorr, axis = 0)[Indices])
+    plt.plot(periods[Indices],autocorrB[Indices])
+#    n = np.reshape(Neuro, (-1))
+#    plt.plot(n)
     plt.show()
+    results = {}
+    results['BehaviorACorr'] = autocorrB[Indices]
+    results['NeuronACorr'] = autocorr[:,Indices]
+    results['Periods'] = periods[Indices]
+    return results
 ###############################################    
 # 
 # hierarchical clustering
@@ -567,7 +593,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
     """run LASSO to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
-        Y = np.reshape(data['Behavior'][label],(-1, 1))
+        Y = np.reshape(np.copy(data['Behavior'][label]),(-1, 1))
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     
         if pars['useRank']:
@@ -586,20 +612,20 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             X = np.roll(X, shift = lag, axis = 0)
         # prep data by scalig
         # fit scale model
-        scale = False
+        scale = True
         if scale:
             scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
             scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
             #scale data
-            Xtrain, Xtest = scalerX.transform(X[trainingsInd]), scalerX.transform(X[testInd])
-            Ytrain, Ytest = scalerY.transform(Y[trainingsInd]), scalerY.transform(Y[testInd])
+            X = scalerX.transform(X)
+            Y = scalerY.transform(Y)
         Xtrain, Xtest = X[trainingsInd],X[testInd]
         Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit lasso and validate
         #a = np.logspace(-2,2,100)
         cv = 10
         # unbalanced sets
-        fold = KFold(cv, shuffle=True) 
+#        fold = KFold(cv, shuffle=True) 
 #        # balanced sets
 #        if label =='Eigenworm3':
 #            a = np.logspace(-3,-1,100)
@@ -609,9 +635,10 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #            fold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
 #        fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        fold = 10
+        #fold = 10
+        fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
-         max_iter=5000, tol=0.0001)#, alphas=a)#, eps=1e-2)#, normalize=False)
+         max_iter=5000, tol=0.01)#, alphas=a)#, eps=1e-2)#, normalize=False)
         
         reg.fit(Xtrain, Ytrain)
         alphas = reg.alphas_
@@ -667,7 +694,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
-        linData[label]['output'] = reg.predict(X) # full output training and test
+        linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
         print 'alpha', alphaNew, 'r2', scorepred
     return linData
     
@@ -681,7 +708,8 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
     """run EN to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
-        Y = data['Behavior'][label]
+        Y = np.copy(data['Behavior'][label])
+        Y = np.reshape(Y, (-1,1))
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
@@ -698,7 +726,16 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             # move neural activity by lag (lag has units of volume)
             # positive lag = behavior lags after neural activity, uses values from the past
             X = np.roll(X, shift = lag, axis = 0)
-            
+        # fit scale model
+        scale = True
+        if scale:
+            scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
+            scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
+            #scale data
+            X = scalerX.transform(X)
+            Y = scalerY.transform(Y)
+        Xtrain, Xtest = X[trainingsInd],X[testInd]
+        Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit elasticNet and validate
         cv = 10
         if label =='Eigenworm3':
@@ -717,12 +754,13 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         #cv = 15
         #a = np.logspace(-3,-1,100)
         #fold = 5
+        fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
         reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5, alphas=a)
         #        
-        reg.fit(X[trainingsInd], Y[trainingsInd])
+        reg.fit(Xtrain, Ytrain)
 
-        scorepred = reg.score(X[testInd], Y[testInd])
-        score = reg.score(X[trainingsInd], Y[trainingsInd])
+        scorepred = reg.score(Xtest, Ytest)
+        score = reg.score(Xtrain, Ytrain)
         
         #linData[label] = [reg.coef_, reg.intercept_, reg.alpha_, score, scorepred]
         linData[label] = {}
@@ -733,21 +771,21 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[reg.coef_>0])
-        linData[label]['output'] = reg.predict(X) # full output training and test
+        linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
         if plot:
             print 'alpha', reg.alpha_, 'l1_ratio', reg.l1_ratio_, 'r2', scorepred
             print reg.alphas_.shape, reg.mse_path_.shape
             plt.subplot(221)
             plt.title('Trainingsset')
-            plt.plot(Y[trainingsInd], 'r')
-            plt.plot(reg.predict(X[trainingsInd]), 'k', alpha=0.7)
+            plt.plot(Ytrain, 'r')
+            plt.plot(reg.predict(Xtrain), 'k', alpha=0.7)
             plt.subplot(222)
             plt.title('Testset')
             plt.plot(Y[testInd], 'r')
-            plt.plot(reg.predict(X[testInd]), 'k', alpha=0.7)
+            plt.plot(reg.predict(Xtest), 'k', alpha=0.7)
             ax1 = plt.subplot(223)
             plt.title('Non-zero weighths: {}'.format(len(reg.coef_[reg.coef_!=0])))
-            ax1.scatter(Y[testInd], reg.predict(X[testInd]), alpha=0.7, s=0.2)
+            ax1.scatter(Ytest, reg.predict(Xtest), alpha=0.7, s=0.2)
             #hist, bins = np.histogram(reg.coef_, bins = 30, density = True)
             #ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post', color='r')
             #ax1.set_xlabel(r'weights')

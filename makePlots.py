@@ -94,6 +94,26 @@ names = {'AngleVelocity': 'Wave velocity',
          'Eigenworm1': 'Head swing'
         }
 
+#=============================================================================#
+#                           Histograms 1D and 2D
+#=============================================================================#
+def hist2d(x,y,nBinsX,nBinsY,rngX=None,rngY=None):
+    if rngX == None and rngY == None:
+        h2d, xp, yp = np.histogram2d(y,x,bins=(nBinsY,nBinsX), normed = True)
+    else:
+        h2d, xp, yp = np.histogram2d(y,x,bins=(nBinsY,nBinsX),range=[rngY,rngX], normed = True)
+    extent = [yp[0],yp[-1],xp[0],xp[-1]]
+    return h2d, extent
+    
+def histogram(data, bins, normed=False):
+    """simple numpy hist wrapper."""
+    hist, bins = np.histogram(data, bins, normed=normed)
+    x = bins[:-1]+0.5*(bins[1]-bins[0])
+    return x, hist
+
+#=============================================================================#
+#                           Animating worms
+#=============================================================================#
 def make_animation(fig, ax, data1, data2, frames):
     """use pythons built-in animation tools to make a centerline animation."""
     x1,y1 = data1[0].T
@@ -449,12 +469,13 @@ def plotBehaviorNeuronCorrs(dataSets, keyList, behaviors):
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)
                 ax.legend()
-        r2scores = np.reshape(np.array(r2s), (-1, 2))
+        r2scores = np.reshape(np.array(r2s), (-1, len(behaviors)))
         gs.tight_layout(fig)
         plt.figure()
         plt.subplot(231)
         plt.plot(r2scores[:,0], colorPred['AngleVelocity'], label = names['AngleVelocity'])
-        plt.plot(r2scores[:,1], colorPred['Eigenworm3'], label = names['Eigenworm3'])
+        if len(behaviors) >1:        
+            plt.plot(r2scores[:,1], colorPred['Eigenworm3'], label = names['Eigenworm3'])
         plt.xlabel('Neurons')
         plt.ylabel(r'R^2 score')
         plt.subplot(232)
@@ -464,14 +485,16 @@ def plotBehaviorNeuronCorrs(dataSets, keyList, behaviors):
         plt.subplot(233)
         plt.xlabel('R^2 scores')
         plt.ylabel(r'Distribution of R^2 scores')
-        plt.hist(r2scores[:,1], bins = 10,color = colorPred['Eigenworm3'])
+        if len(behaviors) >1:   
+            plt.hist(r2scores[:,1], bins = 10,color = colorPred['Eigenworm3'])
         
         plt.subplot(234)
         plt.plot(dataSets[key]['Behavior']['AngleVelocity']+5, ':', color = colorBeh['AngleVelocity'])
         plt.plot(Y[np.argsort(r2scores[:,0])[-10:]].T, color = colorPred['AngleVelocity'], alpha=0.8)
         plt.subplot(235)
-        plt.plot(dataSets[key]['Behavior']['Eigenworm3']+10, ':' ,color = colorBeh['Eigenworm3'])
-        plt.plot(Y[np.argsort(r2scores[:,1])[-10:]].T, color = colorPred['Eigenworm3'], alpha=0.8)
+        if len(behaviors) >1:   
+            plt.plot(dataSets[key]['Behavior']['Eigenworm3']+10, ':' ,color = colorBeh['Eigenworm3'])
+            plt.plot(Y[np.argsort(r2scores[:,1])[-10:]].T, color = colorPred['Eigenworm3'], alpha=0.8)
         plt.show()
             #ax.fill_between(range(len(m)), m-s, m+s, alpha=0.5)
 ###############################################    
@@ -1222,12 +1245,12 @@ def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod 
     gs.tight_layout(fig)
     
     
-def mkStyledBoxplot(fig, ax, x_data, y_data, clrs, lbls) : 
+def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls) : 
     
     dx = np.min(np.diff(x_data))
     
     for xd, yd, cl in zip(x_data, y_data, clrs) :
-        print xd, yd, cl
+       
         bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
                         notch=False, patch_artist=True)
         plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
