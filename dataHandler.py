@@ -109,11 +109,10 @@ def estimateEigenwormError(folder, eigenworms, show=False):
     # calculate centerline projections for full movie
     clFull, clIndices = loadCenterlines(folder, full = True)
     print 'done loading'
-    pcsNew, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
+    pcsFull, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
     print 'done projecting'
     # split array by indices into blocks corresponding to volumes
-    pcsSplit = np.split(pcsNew, clIndices, axis=1)
-
+    pcsSplit = np.split(pcsFull, clIndices, axis=1)
     # calculate standard deviation and mean
     pcsM = np.array([np.nanmean(p, axis=1) for p in pcsSplit]).T
     pcsErr = np.array([np.nanstd(p, axis=1) for p in pcsSplit]).T
@@ -123,16 +122,16 @@ def estimateEigenwormError(folder, eigenworms, show=False):
         i=2 # which eigenworm
         plt.figure('Eigenworm error')
         plt.subplot(211)
-        plt.plot(pcsNew[i][clIndices], label='discret eigenworms')
+        plt.plot(pcsFull[i][clIndices], label='discret eigenworms')
         plt.plot(pcsM[i], label='averaged eigenworms', color='r')
         plt.fill_between(range(len(pcsM[i])), pcsM[i]-pcsErr[i], pcsM[i]+pcsErr[i], alpha=0.5, color='r')
         plt.subplot(212)
         m, err = np.sort(pcsM[i]), pcsErr[i][np.argsort(pcsM[i])]
-        plt.plot(np.sort(pcsNew[i][clIndices]), label='discret eigenworms')
+        plt.plot(np.sort(pcsFull[i][clIndices]), label='discret eigenworms')
         plt.plot(m, label='averaged eigenworms', color='r')
         plt.fill_between(range(len(pcsM[i])), m-err, m+err, alpha=0.5, color='r')
         plt.show()
-    return pcsM, pcsErr, pcsNew[:,clIndices.astype(int)]
+    return pcsM, pcsErr, pcsFull[:,clIndices.astype(int)], pcsFull
 
 def calculateEigenwormsFromCL(cl, eigenworms):
     """takes (x,y) pairs from centerlines and returns eigenworm coefficients."""
@@ -194,32 +193,19 @@ def transformEigenworms(pcs, dataPars):
     """interpolate, smooth Eigenworms and calculate associated metrics like velocity."""
     pc3, pc2, pc1 = pcs
     #mask nans in eigenworms by linear interpolation
-    mask1 = np.isnan(pc1)
-    mask2 = np.isnan(pc2)
-    mask3 = np.isnan(pc3)
-    if np.any(mask1):
-        pc1[mask1] = np.interp(np.flatnonzero(mask1), np.flatnonzero(~mask1), pc1[~mask1])
-    if np.any(mask2):
-        pc2[mask2] = np.interp(np.flatnonzero(mask2), np.flatnonzero(~mask2), pc2[~mask2])
-    if np.any(mask3):
-        pc3[mask3] = np.interp(np.flatnonzero(mask3), np.flatnonzero(~mask3), pc3[~mask3])
+    for pcindex, pc in enumerate(pcs):
+        # mask nans by linearly interpolating
+        mask = np.isnan(pc1)
+        if np.any(mask):
+            pc[mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), pc1[~mask])
+        pcs[pcindex] = pc
         
-    theta = np.unwrap(np.arctan2(pc1, pc2))
-    #velo = savitzky_golay(theta, window_size=dataPars['savGolayWindow'], order=3, deriv=1, rate=1)
+    theta = np.unwrap(np.arctan2(pcs[2], pcs[1]))
+    # convolution with gaussian kernel derivative
     velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
-    # median filter the velocity and pca components 
-    if dataPars['medianWindow'] < 3:
-        return pc1, pc2, pc3, velo, theta
-    #velo = scipy.signal.medfilt(velo, dataPars['medianWindow'])
-    
-#    pc1 = scipy.signal.medfilt(pc1, dataPars['medianWindow'])
-#    pc2 = scipy.signal.medfilt(pc2, dataPars['medianWindow'])
-#    pc3 = scipy.signal.medfilt(pc3, dataPars['medianWindow'])
-#    pc1 = gaussian_filter1d(pc1, dataPars['medianWindow'])
-#    pc2 = gaussian_filter1d(pc2, dataPars['medianWindow'])
-    pc3 = gaussian_filter1d(pc3, dataPars['medianWindow'])
-   
-    return pc1, pc2, pc3, velo, theta
+    for pcindex, pc in enumerate(pcs):
+        pcs[pcindex] = gaussian_filter1d(pc, dataPars['medianWindow'])
+    return pcs, velo, theta
 
 
 def preprocessNeuralData(R, G, dataPars):
@@ -263,32 +249,19 @@ def loadData(folder, dataPars, ew=1):
         data = scipy.io.loadmat(os.path.join(folder,'heatData.mat'))
     # unpack behavior variables
     ethoOrig, xPos, yPos, vel, pc12, pc3 = data['behavior'][0][0].T
-    cl, _ = loadCenterlines(folder)
-#    # get eigenworm file
-    if ew:
-        # deal with eigenworms -- get them directly from centerlines
-        
-        # get prefactors from eigenworm projection
-        #pcs, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(cl, eigenworms)
-        print 'creating eigenworm projections'
-        eigenworms = loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=3, new=True)
-        _, pcsErr, pcs = estimateEigenwormError(folder, eigenworms)
-        print 'Done loading eigenworms '
-    else:
-        
-        # reorder for rotation
-        pcs = np.vstack([pc3[:,0],pc12[:,1], pc12[:,0]])
-        pcsErr = np.zeros(pcs.shape)
-        # Rotate Eigenworms
-        if dataPars['rotate']:
-            # load rotation matrix
-            R = np.loadtxt(folder+'../'+'Rotationmatrix.dat')
-            pcs = np.array(np.dot(R, pcs))
-    
-    # do Eigenworm transformations and calculate velocity etc.
-#    # median filter the Eigenworms
-    pc1, pc2, pc3, velo, theta = transformEigenworms(pcs, dataPars)
-    #print 'mean velocity', np.mean(velo)
+    # get centerlines with full temporal resolution of 50Hz
+    clFull, clIndices = loadCenterlines(folder, full=True)
+    # load new eigenworms
+    eigenworms = loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=3, new=True)
+    # get full set of Eigenworms
+    pcsFull, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
+    # do Eigenworm transformations and calculate velocity etc. 
+    pcs, velo, theta = transformEigenworms(pcsFull, dataPars)
+    #downsample to 6 volumes/sec
+    pc3, pc2, pc1 = pcs[:,clIndices]
+    velo = velo[clIndices]
+    theta = theta[clIndices]
+    cl = clFull[clIndices]
     # ethogram redone
     etho = makeEthogram(velo, pc3)
     etho = np.squeeze(ethoOrig)
@@ -312,11 +285,12 @@ def loadData(folder, dataPars, ew=1):
     #lets interpolate small gaps but throw out larger gaps.
     # make a map with all nans smoothed out if larger than some window    
     nanmask =[np.repeat(np.nanmean(chunky_window(line, window= dataPars['interpolateNans']), axis=1), dataPars['interpolateNans']) for line in Ratio]
+    nanmask = np.array(nanmask)[:,:Y.shape[1]]   
     Rfull = dR
-    Rfull[np.isnan(nanmask)[:,:Y.shape[1]]] =np.nan
+    Rfull[np.isnan(nanmask)] =np.nan
    
     # store relevant indices -- crop out the long gaps of nans
-    nonNan  = np.where(np.all(np.isfinite(nanmask),axis=0))[0]
+    nonNan  = np.where(np.any(np.isfinite(nanmask),axis=0))[0]
     
     # create a time axis in seconds
     T = np.arange(Y.shape[1])/6.
@@ -346,9 +320,9 @@ def loadData(folder, dataPars, ew=1):
     dataDict['goodVolumes'] = nonNan
     dataDict['Behavior'] = {}
 
-    tmpData = [vel[:,0], pc1, pc2, pc3, pcsErr[0], pcsErr[1], pcsErr[2],velo, theta, etho, xPos, yPos]
+    tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho, xPos, yPos]
     for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', \
-    'Eigenworm3','Eigenworm1Err', 'Eigenworm2Err', 'Eigenworm3Err',\
+    'Eigenworm3',\
                 'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
     dataDict['Neurons'] = {}
@@ -362,6 +336,7 @@ def loadData(folder, dataPars, ew=1):
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
     dataDict['Neurons']['ordering'] = order
+    print len(nonNan)
     return dataDict
     
     

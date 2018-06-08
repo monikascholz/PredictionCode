@@ -1,5 +1,6 @@
 
 # standard modules
+import matplotlib as mpl
 import numpy as np
 import matplotlib.pylab as plt
 import h5py
@@ -7,8 +8,8 @@ import h5py
 import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
-
-    
+#
+mpl.rcParams['interactive']  = False
 ###############################################    
 # 
 #    run parameters
@@ -28,10 +29,10 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':1, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':15, # sgauss window for angle velocity derivative. must be odd
+dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':50, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5,  # gauss window for red and green channel
+            'windowGCamp': 6,  # gauss window for red and green channel
             'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
             }
 
@@ -48,7 +49,7 @@ for kindex, key in enumerate(keyList):
 
 pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':False, #timewarp so behaviors are equally represented
-        'trainingCut': 0.6, # what fraction of data to use for training 
+        'trainingCut': 0.8, # what fraction of data to use for training 
         'trainingType': 'simple', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
@@ -71,7 +72,7 @@ behaviors = ['AngleVelocity','Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-overview = 0#False
+overview = 1#False
 predNeur = 0
 bta = 0
 svm = 0
@@ -82,8 +83,8 @@ linreg = False
 periodogram = 0
 nestedvalidation = 0
 lasso = 1
-elasticnet = 1#True
-lagregression = 0
+elasticnet = 0#True
+lagregression = 1
 positionweights = 0#True
 resultsPredictionOverview = 0
 ###############################################    
@@ -281,7 +282,7 @@ if lasso:
         subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
         resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
         # find non-linearity
-        dr.fitNonlinearity(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'])
+        #dr.fitNonlinearity(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'])
     
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
     plt.show()
@@ -325,7 +326,8 @@ if lagregression:
     for kindex, key in enumerate(keyList):
         print 'Running lag calculation',  key
         splits = resultDict[key]['Training']
-        resultDict[key]['LagLASSO'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3))
+        #resultDict[key]['LagLASSO'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3))
+        resultDict[key]['LagEN'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3), flag='ElasticNet')
 #%%
 ###############################################    
 # 

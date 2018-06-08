@@ -774,7 +774,7 @@ def plotPCAresults(dataSets, resultSet, keyList, pars, flag = 'PCA',testset=None
 # neuronal signal pca, plot in 3D with behavior labels
 #
 ############################################## 
-def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 3, colorBy=None):
+def plotPCAresults3D(dataSets, resultSet, keyList,pars,  col = 'phase', flag = 'PCA', smooth = 12, colorBy=None):
     """Show neural manifold with behavior label."""
     nWorms = len(keyList)
     print 'colored by ', col

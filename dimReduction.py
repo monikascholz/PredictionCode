@@ -317,7 +317,6 @@ def runPeriodogram(data, pars, testset = None):
     autocorrB = np.array(fftconvolve(B, B[::-1], mode='full'))
     # get only relevant subset
     Indices = np.rint(np.interp(pars['periods'], periods, np.arange(len(periods)))).astype(int)
-    print Indices
 #    p = np.array([np.sqrt(lombscargle(time, neuron, f)*4/len(time)) for neuron in Neuro ])
 #    p2 = np.sqrt(lombscargle(time, np.array(data['Behavior']['Ethogram'], dtype=float), f)*4/len(time))
 #    plt.subplot(211)
@@ -556,6 +555,129 @@ def runLinearModel(data, results, pars, splits, plot = False, behaviors = ['Angl
         print 'r2', scorepred
     return linData
 
+
+###############################################    
+# 
+# LASSO
+#
+##############################################   
+def runLassoLars(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
+    """run LASSO to fit behavior and neural activity with a linear model."""
+    linData = {}
+    for label in behaviors:
+        Y = np.reshape(np.copy(data['Behavior'][label]),(-1, 1))
+        trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
+    
+        if pars['useRank']:
+            X = data['Neurons']['rankActivity'].T
+        elif pars['useClust']:
+            clustres = runHierarchicalClustering(data, pars)
+            X = clustres['Activity'].T
+        else:
+            X = np.copy(data['Neurons']['Activity'].T) # transpose to conform to nsamples*nfeatures
+        # implement time lagging -- forward and reverse
+        
+        if lag is not None:
+            # move neural activity by lag (lag has units of volume)
+            # positive lag = behavior trails after neural activity, uses values from the past
+            # negative lag = behavior precedes neural activity
+            X = np.roll(X, shift = lag, axis = 0)
+        # prep data by scalig
+        # fit scale model
+        scale = True
+        if scale:
+            scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
+            scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
+            #scale data
+            X = scalerX.transform(X)
+            Y = scalerY.transform(Y)
+        Xtrain, Xtest = X[trainingsInd],X[testInd]
+        Ytrain, Ytest = Y[trainingsInd],Y[testInd]
+        # fit lasso and validate
+        #a = np.logspace(-2,2,100)
+        cv = 10
+        # unbalanced sets
+#        fold = KFold(cv, shuffle=True) 
+#        # balanced sets
+        if label =='Eigenworm3':
+            a = np.logspace(-3,-1,100)
+        else:
+            a = np.logspace(-3,0,100)
+        if label =='Eigenworm3':
+            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+##        else:
+#        fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        fold = 5
+        fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
+        reg = linear_model.LassoLarsIC(criterion = 'bic',  verbose=0, \
+         max_iter=5000)#, eps=1e-2)#, normalize=False)
+        
+        reg.fit(Xtrain, Ytrain)
+        alphas= reg.alphas_
+        ymean = reg.criterion_
+        yerr = None
+        alphaNew = reg.alpha_
+        ####for crossval
+        #alphas = reg.cv_alphas_
+        #ymean = np.mean(reg.mse_path_, axis =1)
+        #yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
+        #alphaNew = alphas[np.argmin(ymean)]
+#        # calculate standard deviation rule
+#        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
+#        reg = linear_model.Lasso(alpha=alphaNew)
+#        reg.fit(X[trainingsInd], Y[trainingsInd])
+        
+        if plot:
+            plt.subplot(221)
+            plt.title('Trainingsset')
+            plt.plot(Ytrain, 'r')
+            plt.plot(reg.predict(Xtrain), 'k', alpha=0.7)
+            plt.subplot(222)
+            plt.title('Testset')
+            plt.plot(Y[testInd], 'r')
+            plt.plot(reg.predict(Xtest), 'k', alpha=0.7)
+            ax1 = plt.subplot(223)
+            plt.title('Non-zero weighths: {}'.format(len(reg.coef_[reg.coef_!=0])))
+            ax1.scatter(Ytest, reg.predict(Xtest), alpha=0.7, s=0.2)
+#            hist, bins = np.histogram(reg.coef_, bins = 30, density = True)
+#            ax1.fill_between(bins[:-1],np.zeros(len(hist)), hist, step='post', color='r')
+#            ax1.set_xlabel(r'weights')
+#            ax1.set_ylabel('PDF(weights)')
+            plt.subplot(224)
+            
+            #plt.plot(alphas, reg.mse_path_, 'k', alpha = 0.3)
+            plt.plot(alphas, ymean, 'k')
+            plt.errorbar(alphas, ymean, yerr=yerr, capsize=1)
+            plt.axvline(alphas[np.argmin(ymean)],label='minimal error')
+            #plt.axvline(alphaNew,label='stdev rule')
+            plt.xscale('log')
+            #plt.fill_between(reg.alphas_,y1=ymean-yerr, y2= ymean+yerr, alpha=0.5)
+            #plt.errorbar(,color= 'k')
+            plt.tight_layout()            
+            plt.show(block=True)
+        weights = reg.coef_
+        # score model
+        if len(weights)>0:
+            # normalize testset with scaler values
+            scorepred = reg.score(Xtest, Ytest)#, sample_weight=np.power(Y[testInd], 2))
+            score = reg.score(Xtrain, Ytrain)
+        else:
+            scorepred = np.nan
+            score = reg.score(Xtrain, Ytrain)
+        linData[label] = {}
+        linData[label]['weights'] =  weights
+        linData[label]['intercepts'] = reg.intercept_
+        linData[label]['alpha'] = alphaNew#reg.alpha_
+        linData[label]['score'] = score
+        linData[label]['scorepredicted'] = scorepred
+        linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
+        if scale:
+            linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
+        else:
+            linData[label]['output'] = reg.predict(X)
+        print 'alpha', alphaNew, 'r2', scorepred
+    return linData
+
 ###############################################    
 # 
 # LASSO
@@ -602,7 +724,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
         else:
-            X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+            X = np.copy(data['Neurons']['Activity'].T) # transpose to conform to nsamples*nfeatures
         # implement time lagging -- forward and reverse
         
         if lag is not None:
@@ -612,7 +734,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             X = np.roll(X, shift = lag, axis = 0)
         # prep data by scalig
         # fit scale model
-        scale = True
+        scale = False
         if scale:
             scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
             scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
@@ -627,18 +749,18 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         # unbalanced sets
 #        fold = KFold(cv, shuffle=True) 
 #        # balanced sets
-#        if label =='Eigenworm3':
-#            a = np.logspace(-3,-1,100)
-#        else:
-#            a = np.logspace(-3,0,100)
-#        if label =='Eigenworm3':
-#            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+        if label =='Eigenworm3':
+            a = np.logspace(-3,-1,100)
+        else:
+            a = np.logspace(-3,0,100)
+        if label =='Eigenworm3':
+            fold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
 #        fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        #fold = 10
-        fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
+        fold = 5
+        fold = TimeSeriesSplit(n_splits=15, max_train_size=None)
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
-         max_iter=5000, tol=0.01)#, alphas=a)#, eps=1e-2)#, normalize=False)
+         max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
         
         reg.fit(Xtrain, Ytrain)
         alphas = reg.alphas_
@@ -668,7 +790,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #            ax1.set_ylabel('PDF(weights)')
             plt.subplot(224)
             
-            #plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.3)
+            plt.plot(reg.alphas_, reg.mse_path_, 'k', alpha = 0.3)
             plt.plot(alphas, ymean, 'k')
             plt.errorbar(alphas, ymean, yerr=yerr, capsize=1)
             plt.axvline(alphas[np.argmin(ymean)],label='minimal error')
@@ -677,7 +799,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             #plt.fill_between(reg.alphas_,y1=ymean-yerr, y2= ymean+yerr, alpha=0.5)
             #plt.errorbar(,color= 'k')
             plt.tight_layout()            
-            plt.show()
+            plt.show(block=True)
         weights = reg.coef_
         # score model
         if len(weights)>0:
@@ -694,7 +816,10 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
-        linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
+        if scale:
+            linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
+        else:
+            linData[label]['output'] = reg.predict(X)
         print 'alpha', alphaNew, 'r2', scorepred
     return linData
     
@@ -712,7 +837,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         Y = np.reshape(Y, (-1,1))
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
-            X = data['Neurons']['rankActivity'].T
+            X = np.copy(data['Neurons']['rankActivity'].T)
         elif pars['useClust']:
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
@@ -727,7 +852,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             # positive lag = behavior lags after neural activity, uses values from the past
             X = np.roll(X, shift = lag, axis = 0)
         # fit scale model
-        scale = True
+        scale = False
         if scale:
             scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
             scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
@@ -753,9 +878,9 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         
         #cv = 15
         #a = np.logspace(-3,-1,100)
-        #fold = 5
+       # fold = 5
         fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5, alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -771,7 +896,10 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         linData[label]['noNeurons'] = len(reg.coef_[reg.coef_>0])
-        linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
+        if scale:
+            linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
+        else:
+            linData[label]['output'] = reg.predict(X)
         if plot:
             print 'alpha', reg.alpha_, 'l1_ratio', reg.l1_ratio_, 'r2', scorepred
             print reg.alphas_.shape, reg.mse_path_.shape
@@ -805,7 +933,7 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
                         plt.plot(reg.alphas_, reg.mse_path_[l1index], 'k', alpha = 0.1)
                         plt.plot(reg.alphas_, np.mean(reg.mse_path_[l1index], axis =1))
             plt.tight_layout()
-            plt.show()
+            plt.show(block=True)
     return linData
 
 ###############################################    

@@ -8,7 +8,6 @@ import dataHandler as dh
 import makePlots as mp
 import dimReduction as dr
 
-        
 ###############################################    
 # 
 #    run parameters
