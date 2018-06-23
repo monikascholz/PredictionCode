@@ -19,56 +19,7 @@ import singlePanels as sp
 import makePlots as mp
 import dataHandler as dh
 
-################################################
-#
-# define colors
-#
-################################################
-axescolor = 'k'
-mpl.rcParams["axes.edgecolor"]=axescolor
-mpl.rcParams["axes.spines.right"] = False
-mpl.rcParams["axes.spines.top"] = False
-# text
-mpl.rcParams["text.color"]='k'
-mpl.rcParams["ytick.color"]=axescolor
-mpl.rcParams["xtick.color"]=axescolor
-mpl.rcParams["axes.labelcolor"]='k'
-mpl.rcParams["savefig.format"] ='pdf'
-# change legend properties
-mpl.rcParams["legend.frameon"]=False
-mpl.rcParams["legend.labelspacing"]=0.25
-mpl.rcParams["legend.labelspacing"]=0.25
-#mpl.rcParams['text.usetex'] =True
-mpl.rcParams["axes.labelsize"]=  12
-mpl.rcParams["xtick.labelsize"]=  12
-mpl.rcParams["ytick.labelsize"]=  12
-mpl.rcParams["axes.labelpad"] = 0
-mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
-mpl.rc('text.latex', preamble='\usepackage{sfmath}')
-plt.rcParams['image.cmap'] = 'viridis'
-################################################
-#
-# define colors
-#
-################################################
-# shades of red, dark to light
-R0, R1, R2 = '#651119ff', '#b0202eff', '#d15144ff'
-Rs = [R0, R1, R2]
-# shades of blue
-B0, B1, B2 = '#2e2f48ff', '#2b497aff', '#647a9eff'
-Bs = [B0, B1, B2]
-# shades of viridis
-V0, V1, V2, V3, V4 = '#403f85ff', '#006e90ff', '#03cea4ff', '#c3de24ff', '#f1e524ff'
-Vs = [V0, V1, V2, V3, V4]
-# line plot shades
-L0, L1, L2, L3 = ['#1a5477ff', '#0d8d9bff', '#ce5c00ff', '#f0a202ff']
-Ls = [L0, L1, L2, L3]
-# neutrals
-N0, N1, N2 = '#383936ff', '#8b8b8bff', '#d1d1d1ff'
-Ns = [N0, N1, N2]
-# make a transition cmap
-transientcmap = mpl.colors.ListedColormap([mpl.colors.to_rgb(B1), mpl.colors.to_rgb(R1)], name='transient', N=None)
-
+from stylesheet import *
 ################################################
 #
 # grab all the data we will need
@@ -109,7 +60,7 @@ print 'Done reading data.'
 
 fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(9.5,6.75))
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(3, 4, width_ratios = [1.2,0.5,1, 0.6], height_ratios=[1,1,0.75])
+gs1 = gridspec.GridSpec(3, 4, width_ratios = [1.2,0.5,1, 0.6], height_ratios=[1,1,1])
 gs1.update(left=0.07, right=0.98, wspace=0.45, bottom = 0.1, top=0.97, hspace=0.5)
 
 ################################################
@@ -141,16 +92,16 @@ resultshalf = transientR['PCAHalf1']
 results2half = transientR['PCAHalf2']
 # plot heatmap ordered by PCA
 # colorbar in a nested gridspec because its much better          
-gsHeatmap = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[0,0], width_ratios=[10,1], height_ratios = [1,10], wspace=0.1, hspace=0.2)
+gsHeatmap = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[0,0], width_ratios=[10,1], height_ratios = [1.5,10], wspace=0.1, hspace=0.2)
 axhm = plt.subplot(gsHeatmap[1,0])
 axcb = plt.subplot(gsHeatmap[1,1])
 axetho = plt.subplot(gsHeatmap[0,0])
-mp.plotEthogram(axetho, time, transient['Behavior']['Ethogram'], alpha = 1, yValMax=1, yValMin=0, legend=0)
+plotEthogram(axetho, time, transient['Behavior']['Ethogram'], alpha = 1, yValMax=1, yValMin=0, legend=0)
 axetho.set_xticks([])
 axetho.xaxis.label.set_visible(False)
 #axetho.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
 #           ncol=2, mode="expand", borderaxespad=0.)
-cax1 = mp.plotHeatmap(transient['Neurons']['TimeFull'], transient['Neurons']['ActivityFull'][results['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=2)
+cax1 = plotHeatmap(transient['Neurons']['TimeFull'], transient['Neurons']['RawActivity'][results['neuronOrderPCA']], ax=axhm, vmin=-1, vmax=1.5)
 
 axhm.set_xlabel('Time (s)')
 cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
@@ -179,7 +130,7 @@ for i in range(np.min([len(results['pcaComponents']), 3])):
     # normalize
     y =y -np.min(y)
     y =y/np.max(y)
-    ax3.text(-150, np.max(y)+i*1.1, 'Component {}'.format(i+1), color = Ls[i])
+    ax3.text(-150, np.max(y)+i*1.1, 'PC{}'.format(i+1), color = Ls[i])
     ax3.plot(time, i*1.1+y, label='Component {}'.format(i+1), lw=1, color = Ls[i])
 #ax3.legend()
 #ax4.set_ylabel('PCA components')
@@ -216,6 +167,10 @@ for letter, loc in zip(letters, locations):
 
 # plot manifold for split dataset
 x,y,z = results['pcaComponents'][:3]
+#x = x/np.max(x)
+#y = y/np.max(x)
+#z = z/np.max(x)
+
 # make smoooth
 smooth = 12
 x = gaussian_filter1d(x, smooth)
@@ -224,30 +179,53 @@ z = gaussian_filter1d(z, smooth)
 # color by before and after
 colorBy = np.zeros(len(time))
 colorBy[:6*60*4] = 1 # first four minutes is m9
-mp.multicolor(ax5,x,y,z,colorBy,c= transientcmap, threedim = True, etho = False, cg = 1)
+multicolor(ax5,x,y,z,colorBy,c= transientcmap, threedim = True, etho = False, cg = 1)
 ax5.scatter3D(x[::12], y[::12], z[::12], c=colorBy[::12], cmap=transientcmap, s=10)
 ax5.view_init(elev=40, azim=55)
 ax5.dist = 7.5
 axmin, axmax = -0.04, 0.04
 ticks = [axmin,0, axmax]
-plt.setp(ax5.get_xticklabels(), fontsize=10)
-plt.setp(ax5.get_yticklabels(), fontsize=10)
-plt.setp(ax5.get_zticklabels(), fontsize=10)
+#plt.setp(ax5.get_xticklabels(), fontsize=10)
+#plt.setp(ax5.get_yticklabels(), fontsize=10)
+#plt.setp(ax5.get_zticklabels(), fontsize=10)
 ax5.set_xlim([axmin, axmax])
 ax5.set_ylim([axmin, axmax])
 ax5.set_zlim([axmin, axmax])
-ax5.set_xticks(ticks)
-ax5.set_yticks(ticks)
-ax5.set_zticks(ticks)
+#ax5.set_xticks(ticks)
+#ax5.set_yticks(ticks)
+#ax5.set_zticks(ticks)
 ax5.tick_params(axis='both', which='major', pad=0)
-
-ax5.set_xlabel('\nPC1', fontsize=10)
-ax5.set_ylabel('\nPC2', fontsize=10)
-ax5.set_zlabel('\nPC3', labelpad =3, fontsize=10)
+ax5.axes.xaxis.set_ticklabels([])
+ax5.axes.yaxis.set_ticklabels([])
+ax5.axes.zaxis.set_ticklabels([])
+#ax5.set_xlabel('\nPC1', fontsize=10)
+#ax5.set_ylabel('\nPC2', fontsize=10)
+#ax5.set_zlabel('\nPC3', labelpad =3, fontsize=10)
 # modify where subplot is
 points = ax5.get_position().get_points()
 ax5.set_position(mpl.transforms.Bbox(ax5.get_position()))
+# make scalebar
+axesNames = [ax5.xaxis, ax5.yaxis, ax5.zaxis]
+for tmp, loc in zip(axesNames, [(0,0,0),(1,1,1),(2,2,2)]):
+    tmp._axinfo['juggled']=loc
 
+# make a scale bar in 3d
+scX, scY, scZ = 0.02,0.005,-0.04
+names = ['PC1', 'PC2', 'PC3']
+align = ['right', 'left','center']
+for i in range(3):
+    l = np.zeros(3)
+    l[i] = 0.02
+    ax5.plot([scX, scX +l[0]], [scY, scY+l[1]], [scZ, scZ+l[2]], color='k')
+    l = np.zeros(3)+axmin
+    l[i] = axmax+0.0075
+    ax5.text(l[0], l[1], l[2], names[i], horizontalalignment=align[i],\
+        verticalalignment='center')
+pos = ax5.get_position().get_points()
+pos[:,0] -=0.035
+pos[:,1] -=0.035
+posNew = mpl.transforms.Bbox(pos)
+ax5.set_position(posNew)
 # show projections
 gsProjections = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs1[1,1:3], wspace=1)
 
@@ -255,15 +233,15 @@ axXY = plt.subplot(gsProjections[0,0])
 axXZ = plt.subplot(gsProjections[0,1])
 axZY = plt.subplot(gsProjections[0,2])
 
-mp.multicolor(axXY,x,y,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
+multicolor(axXY,x,y,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
 axXY.set_xlabel('PC1', labelpad=0)
 axXY.set_ylabel('PC2', labelpad=0)
 
-mp.multicolor(axXZ,x,z,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
+multicolor(axXZ,x,z,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
 axXZ.set_xlabel('PC1')
 axXZ.set_ylabel('PC3')
 #
-mp.multicolor(axZY,z,y,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
+multicolor(axZY,z,y,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
 axZY.set_xlabel('PC3')
 axZY.set_ylabel('PC2')
 axZY.set_xticks([-0.05,0, 0.05])
@@ -391,7 +369,7 @@ for typ, colors in zip(['AML32', 'AML18'], [colorsExp, colorCtrl]):
             tmpdata.append(np.mean(dset[idn]['Neurons']['Activity']))
         ydata.append(tmpdata)
 x_data = np.arange(len(ydata))
-mp.mkStyledBoxplot(ax12, x_data, ydata, color, labels)
+mkStyledBoxplot(ax12, x_data, ydata, color, labels)
 
 
 

@@ -29,11 +29,11 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':50, # gauss window for angle velocity derivative. Acts on full (50Hz) data
+dataPars = {'medianWindow':25, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':100, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
-            'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
+            'interpolateNans': 12,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 
@@ -50,7 +50,7 @@ for kindex, key in enumerate(keyList):
 pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':False, #timewarp so behaviors are equally represented
         'trainingCut': 0.8, # what fraction of data to use for training 
-        'trainingType': 'simple', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
+        'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
@@ -72,19 +72,20 @@ behaviors = ['AngleVelocity','Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-overview = 1#False
+overview = 0#False
 predNeur = 0
+predPCA = 1
 bta = 0
 svm = 0
-pca = 0#False
+pca = 1#False
 kato_pca= 0
 hierclust = False
 linreg = False
 periodogram = 0
 nestedvalidation = 0
-lasso = 1
-elasticnet = 0#True
-lagregression = 1
+lasso = 0
+elasticnet = 1#True
+lagregression = 0
 positionweights = 0#True
 resultsPredictionOverview = 0
 ###############################################    
@@ -120,6 +121,18 @@ if overview:
     #mp.plotNeurons3D(dataSets, keyList, threed = False)  
     #mp.plotExampleCenterlines(dataSets, keyList, folder)
     plt.show() 
+    
+###############################################    
+# 
+# predict neural dynamics from behavior
+#
+##############################################
+if predPCA:
+    for kindex, key in enumerate(keyList):
+        print 'predicting neural dynamics from behavior'
+        splits = resultDict[key]['Training']
+        resultDict[key]['PCAPred'] = dr.predictBehaviorFromPCA(dataSets[key], \
+                    splits, pars, behaviors)
     
 ###############################################    
 # 
@@ -276,12 +289,12 @@ if lasso:
 #            for tmpKey in tmpDict.keys():
 #                resultDict[key]['LASSO'][tmpKey]=tmpDict[tmpKey]
 #            
-        # do converse calculation -- give it only the neurons non-zero in previous case
-        subset = {}
-        subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
-        subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
-        resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
-        # find non-linearity
+#        # do converse calculation -- give it only the neurons non-zero in previous case
+#        subset = {}
+#        subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
+#        subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
+#        resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
+#        # find non-linearity
         #dr.fitNonlinearity(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'])
     
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='LASSO', behaviors = behaviors, random = pars['trainingType'])
@@ -313,7 +326,7 @@ if elasticnet:
         subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
         resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
         
-        mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
+    mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
     plt.show()
 
  #%%

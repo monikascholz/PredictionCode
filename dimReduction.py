@@ -6,6 +6,7 @@ dimensionality reduction and linear model.
 """
 import matplotlib.pylab as plt
 import numpy as np
+ 
 from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from sklearn.cluster import AgglomerativeClustering
 from sklearn import linear_model
@@ -25,6 +26,7 @@ from scipy.signal import welch, lombscargle, fftconvolve
 # 
 import makePlots as mp
 
+np.random.seed(13)
 ###############################################    
 # 
 # create trainings and test sets
@@ -272,20 +274,47 @@ def timewarp(data):
 
 ###############################################    
 # 
-# estimate signal/ periodogram
+# correlate neurons and behavior
 #
 ##############################################
 def behaviorCorrelations(data, behaviors, subset = None):
     """simple r2 scores of behavior and neural activity."""
-    Y = data['Neurons']['Activity']
+    Y = np.copy(data['Neurons']['Activity'])
+    print Y.shape
     nNeur = Y.shape[0]
-    print nNeur
     results = {}
     
     for bindex, beh in enumerate(behaviors):
         r2s = []
         x = data['Behavior'][beh]
         if subset is not None:
+            print max(subset), Y.shape
+            Y = Y[:,subset]
+            x = x[subset]
+        x = (x-np.mean(x))/np.std(x)
+        for n in range(nNeur):
+            r2s.append(np.corrcoef(x, Y[n])[0,1]**2)
+        results[beh] = np.array(r2s)
+    return results
+    
+    
+###############################################    
+# 
+# correlate neurons and PCA axes
+#
+##############################################
+def PCACorrelations(data,results, behaviors, flag = 'PCA', subset = None):
+    """simple r2 scores of behavior and neural activity."""
+    Y = results[flag]['pcaComponents'][:3,]
+    
+    nNeur = Y.shape[0]
+    results = {}
+    
+    for bindex, beh in enumerate(behaviors):
+        r2s = []
+        x = data['Behavior'][beh]
+        if subset is not None:
+            print max(subset), Y.shape
             Y = Y[:,subset]
             x = x[subset]
         x = (x-np.mean(x))/np.std(x)
@@ -300,37 +329,27 @@ def behaviorCorrelations(data, behaviors, subset = None):
 ##############################################
 def runPeriodogram(data, pars, testset = None):
     """run a welch periodogram to estimate the PSD of neural activity."""
-    
-    Neuro = data['Neurons']['Activity']
+    Neuro = np.copy(data['Neurons']['Activity'])
     time = data['Neurons']['Time']
     B = np.array(data['Behavior']['Ethogram'], dtype=float)
     B -=np.mean(B)
     B/= np.std(B)
     if testset is not None:
-        Neuro = Neuro[:,testset]
+        Neuro = np.array(Neuro)[:,testset]
         time = time[testset]
         B = B[testset]
-    
-    autocorr = np.array([fftconvolve(y, y[::-1], mode='full') for y in Neuro])
-    periods = np.arange(-len(y), len(y)-1)/6.
+    autocorr = np.array([fftconvolve(y, y[::-1], mode='full')/len(y) for y in Neuro])
+    periods = np.arange(-len(y), len(y)-1)/6. # in seconds
     # behavior
-    autocorrB = np.array(fftconvolve(B, B[::-1], mode='full'))
+    autocorrB = np.array(fftconvolve(B, B[::-1], mode='full')/len(B))
     # get only relevant subset
     Indices = np.rint(np.interp(pars['periods'], periods, np.arange(len(periods)))).astype(int)
-#    p = np.array([np.sqrt(lombscargle(time, neuron, f)*4/len(time)) for neuron in Neuro ])
-#    p2 = np.sqrt(lombscargle(time, np.array(data['Behavior']['Ethogram'], dtype=float), f)*4/len(time))
-#    plt.subplot(211)
-#    plt.plot((f/2/np.pi),np.mean(p, axis=0), 'b', alpha=0.5)
-#    plt.plot((f/2/np.pi),p2, 'r', alpha=0.5)
-#    plt.subplot(212)
-#    plt.plot((f/2/np.pi),np.cumsum(np.mean(p, axis=0)), 'b', alpha=0.5)
-#    plt.plot((f/2/np.pi),np.cumsum(p2), 'r', alpha=0.5)
+#    plt.plot(np.mean(autocorr[:,Indices], axis=0))
 #    plt.show()
-    plt.plot(periods[Indices],np.mean(autocorr, axis = 0)[Indices])
-    plt.plot(periods[Indices],autocorrB[Indices])
-#    n = np.reshape(Neuro, (-1))
-#    plt.plot(n)
-    plt.show()
+#    plt.plot(periods[Indices],np.mean(autocorr, axis = 0)[Indices])
+#    plt.plot(periods[Indices],autocorrB[Indices])
+
+#    plt.show()
     results = {}
     results['BehaviorACorr'] = autocorrB[Indices]
     results['NeuronACorr'] = autocorr[:,Indices]
@@ -745,27 +764,29 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit lasso and validate
         #a = np.logspace(-2,2,100)
-        cv = 10
+        #cv = 10
         # unbalanced sets
 #        fold = KFold(cv, shuffle=True) 
 #        # balanced sets
         if label =='Eigenworm3':
             a = np.logspace(-3,-1,100)
+            nfold = 5
         else:
             a = np.logspace(-3,0,100)
-        if label =='Eigenworm3':
-            fold = balancedFolds(Y[trainingsInd], nSets=cv)
+            nfold =15
+        #if label =='Eigenworm3':
+        #    nfold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
 #        fold = balancedFolds(Y[trainingsInd], nSets=cv)
-        fold = 5
-        fold = TimeSeriesSplit(n_splits=15, max_train_size=None)
+        #fold = 5
+        fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
-         max_iter=5000, tol=0.001)#, eps=1e-2)#, normalize=False)
+         max_iter=10000, tol=0.0001)#, eps=1e-2)#, normalize=False)
         
         reg.fit(Xtrain, Ytrain)
         alphas = reg.alphas_
         ymean = np.mean(reg.mse_path_, axis =1)
-        yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(cv)
+        yerr = np.std(reg.mse_path_, axis =1)/np.sqrt(nfold)
         alphaNew = alphas[np.argmin(ymean)]
 #        # calculate standard deviation rule
 #        alphaNew = stdevRule(x = alphas, y= ymean, std= yerr)
@@ -869,17 +890,18 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
+            nfold = 10
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
             fold = cv
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-4,-2,200)
-        
+            nfold = 15
         #cv = 15
         #a = np.logspace(-3,-1,100)
        # fold = 5
-        fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
+        fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
         reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
@@ -1211,7 +1233,8 @@ def predictNeuralDynamicsfromBehavior(data,  splits, pars):
         # compare to full neural data
         #expScore.append(explained_variance_score(data['Neurons']['Activity'][test], tmpHM[test]))
         # compare to nComp recornstructed data
-        expScore.append(explained_variance_score(pca.inverse_transform(pcs).T[test], tmpHM[test]))
+        print pca.inverse_transform(pcs).shape, tmpHM.shape
+        expScore.append(explained_variance_score(pca.inverse_transform(pcs)[test], tmpHM[test]))
     # store results
     pcares = {}
     pcares['nComp'] =  nComp
@@ -1230,5 +1253,45 @@ def predictNeuralDynamicsfromBehavior(data,  splits, pars):
     return pcares
 
 
-
+###############################################    
+# 
+# predict behavior from 3 PCA axes
+#
+##############################################
+def predictBehaviorFromPCA(data,  splits, pars, behaviors):
+    linData = {}
+    for label in behaviors:
+        train, test = splits[label]['Train'], splits[label]['Test']
+        # create dimensionality-reduced behavior - pca with 10 eigenworms
+        # nevermind, use the behaviors we use for lasso instead
+        behavior = data['Behavior'][label]
+        # scale behavior to same 
+        behavior = preprocessing.scale(behavior)
+       
+        # also reduce dimensionality of the neural dynamics.
+        nComp = 3#pars['nCompPCA']
+        pca = PCA(n_components = nComp)
+        Neuro = data['Neurons']['Activity'].T
+        pcs = pca.fit_transform(Neuro)
+        #now we use a linear model to train and test our predictions
+        # lets build a linear model
+        lin = linear_model.LinearRegression(normalize=False)
+        lin.fit(pcs[train], behavior[train])
         
+        score = lin.score(pcs[train],behavior[train])
+        scorepred = lin.score(pcs[test], behavior[test])
+        print 'PCA prediction results'
+        print 'Train R2: ',score 
+        print 'Test R2: ', scorepred
+        linData[label] = {}
+        linData[label]['weights'] =  lin.coef_
+        linData[label]['intercepts'] = lin.intercept_
+        
+        linData[label]['score'] = score
+        linData[label]['scorepredicted'] = scorepred
+        
+        
+        linData[label]['output'] = lin.predict(pcs)
+    
+    
+    return linData

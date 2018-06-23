@@ -69,6 +69,8 @@ pcs = [pcsOld[1],pcsOld[0], pcsOld[2]]
 pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, newEigenworms)
 pcsNew = pcsNew[[2,1,0]]
 
+
+print np.mean(meanAngle), np.mean(lengths), refPoint[0]
 # calculate base shapes of old and new eigenworms
 for i in range(3):
     pcs = np.zeros(3)

@@ -13,7 +13,7 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
+typ = 'AML175' # possible values AML32, AML18, AML70
 condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
@@ -27,11 +27,11 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':5, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':5, # sgauss window for angle velocity derivative. must be odd
+dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':150, # sgauss window for angle velocity derivative. must be odd
             'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 5,  # gauss window for red and green channel
-            'interpolateNans': 5,#interpolate gaps smaller than this of nan values in calcium data
+            'interpolateNans': 12,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
@@ -44,8 +44,8 @@ for kindex, key in enumerate(keyList):
 # analysis parameters
 
 pars ={'nCompPCA':20, # no of PCA components
-        'PCAtimewarp':True, #timewarp so behaviors are equally represented
-        'trainingCut': 0.7, # what fraction of data to use for training 
+        'PCAtimewarp':False, #timewarp so behaviors are equally represented
+        'trainingCut': 0.6, # what fraction of data to use for training 
         'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
@@ -73,15 +73,19 @@ kato_pca = 1#False
 half_pca = 1
 corr = 1
 predNeur = 0
+predPCA = 0
 svm = 0
 lasso = 0
 elasticnet = 0
 # this requires moving animals
 if condition != 'immobilized':
-    predNeur = 0
+    predNeur = 1
     svm = 1
     lasso = 1
     elasticnet = 1#True
+    predPCA = 1
+
+transient = 0
 ###############################################    
 # 
 # create training and test set indices
@@ -92,8 +96,15 @@ if createIndicesTest:
         resultDict[key] = {'Training':{}}
         for label in behaviors:
             train, test = dr.createTrainingTestIndices(dataSets[key], pars, label=label)
+            if transient:
+               train = np.where(dataSets[key]['Neurons']['Time']<4*60)[0]
+                # after 4:30 min
+               test = np.where(dataSets[key]['Neurons']['Time']>6*60)[0]
+               
             resultDict[key]['Training'][label] = {'Train':train  }
             resultDict[key]['Training'][label]['Test']=test
+            
+
     print "Done generating trainingsets"
 
 ###############################################    
@@ -107,14 +118,11 @@ if periodogram:
         resultDict[key]['Period'] = dr.runPeriodogram(dataSets[key], pars, testset = None)
 # for half the sample each
 if half_period:
-    print 'running periodogram(s)'
+    print 'running half periodogram(s)'
     for kindex, key in enumerate(keyList):
-        # first four min
-        half1 = np.arange(0,1440)
-        # after 4:30 min
-        half2 = np.arange(1620,dataSets[key]['Neurons']['Activity'].shape[1])
-        resultDict[key]['Period1Half'] = dr.runPeriodogram(dataSets[key], pars, testset = half1)
-        resultDict[key]['Period2Half'] = dr.runPeriodogram(dataSets[key], pars, testset = half2)
+        splits = resultDict[key]['Training']
+        resultDict[key]['Period1Half'] = dr.runPeriodogram(dataSets[key], pars, testset = splits[behaviors[0]]['Train'])
+        resultDict[key]['Period2Half'] = dr.runPeriodogram(dataSets[key], pars, testset = splits[behaviors[0]]['Test'])
 
 
 ###############################################    
@@ -126,11 +134,9 @@ if corr:
     print 'running Correlation.'
     for kindex, key in enumerate(keyList):
         resultDict[key]['Correlation'] = dr.behaviorCorrelations(dataSets[key], behaviors)
-    # first four minute correlation
-    half1 = np.arange(0,1440)
-    for kindex, key in enumerate(keyList):
-        resultDict[key]['CorrelationHalf'] = dr.behaviorCorrelations(dataSets[key], behaviors, subset = half1)
-
+        #half1 =  resultDict[key]['Training'][behaviors[0]]['Train']
+        #resultDict[key]['CorrelationHalf'] = dr.behaviorCorrelations(dataSets[key], behaviors, subset = half1)
+        
 ###############################################    
 # 
 # run svm to predict discrete behaviors
@@ -152,7 +158,9 @@ if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
         resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-        
+    
+        #correlate behavior and PCA
+        resultDict[key]['PCACorrelation']=dr.PCACorrelations(dataSets[key],resultDict[key], behaviors, flag = 'PCA', subset = None)
 ###############################################    
 # 
 # run Kato PCA
@@ -163,7 +171,11 @@ if kato_pca:
     print 'running Kato et. al PCA'
     for kindex, key in enumerate(keyList):
         resultDict[key]['katoPCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
-        
+        splits = resultDict[key]['Training']
+        resultDict[key]['katoPCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Train'])
+  
+        resultDict[key]['katoPCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Test'])
+  
 ###############################################    
 # 
 # run split first-second half PCA
@@ -174,12 +186,21 @@ if half_pca:
     print 'half-split PCA'
     for kindex, key in enumerate(keyList):
         # run PCA on each half
-        # first four min
-        half1 = np.arange(0,1440)
-        # after 4:30 min
-        half2 = np.arange(1620,dataSets[key]['Neurons']['Activity'].shape[1])
-        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = half1)
-        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = half2)
+        splits = resultDict[key]['Training']
+        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Train'])
+        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset =splits[behaviors[0]]['Test'])
+#%%
+###############################################    
+# 
+# predict neural dynamics from behavior
+#
+##############################################
+if predPCA:
+    for kindex, key in enumerate(keyList):
+        print 'predicting behavior PCA'
+        splits = resultDict[key]['Training']
+        resultDict[key]['PCAPred'] = dr.predictBehaviorFromPCA(dataSets[key], \
+                    splits, pars, behaviors)
 #%%
 ###############################################    
 # 
@@ -189,7 +210,8 @@ if half_pca:
 if predNeur:
     for kindex, key in enumerate(keyList):
         print 'predicting neural dynamics from behavior'
-        resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], pars)
+        splits = resultDict[key]['Training']
+        resultDict[key]['RevPred'] = dr.predictNeuralDynamicsfromBehavior(dataSets[key], splits, pars)
     plt.show()
 #%%
 ###############################################    
@@ -231,6 +253,13 @@ if lasso:
         tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = behaviors)
         for tmpKey in tmpDict.keys():
             resultDict[key]['LASSO'][tmpKey]=tmpDict[tmpKey]
+            
+        # do converse calculation -- give it only the neurons non-zero in previous case
+        subset = {}
+        subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
+        subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
+        resultDict[key]['ConversePredictionLASSO'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
+        
     
 #%%
 ###############################################    
@@ -251,7 +280,12 @@ if elasticnet:
         tmpDict = dr.reorganizeLinModel(dataSets[key], resultDict[key], splits, pars, fitmethod = 'ElasticNet', behaviors = behaviors)
         for tmpKey in tmpDict.keys():
             resultDict[key]['ElasticNet'][tmpKey]=tmpDict[tmpKey]
-    
+        # do converse calculation -- give it only the neurons non-zero in previous case
+        subset = {}
+        subset['AngleVelocity'] = np.where(resultDict[key]['ElasticNet']['Eigenworm3']['weights']>0)[0]
+        subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
+        resultDict[key]['ConversePredictionEN'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
+        
 
 #%%
 ###############################################    

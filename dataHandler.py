@@ -17,6 +17,56 @@ from scipy.ndimage.filters import gaussian_filter1d
 import h5py
 from scipy.special import erf
 
+def recrWorm(av, turns, thetaTrue, r, show = 0):
+    """recalculate eigenworm prefactor from angular velocity and turns."""
+    thetaCum = np.cumsum(av)
+    # reset theta every minute to real value   
+    dt = np.arange(30, len(thetaCum), 60)
+    for tt in dt:    
+        thetaCum[tt:] -= -thetaTrue[tt]+thetaCum[tt]
+#    thetaCum -= thetaCum[50]-thetaTrue[50] 
+#    thetaCum -= np.mean(thetaCum)- np.mean(thetaTrue)
+    #tt = 0
+    #thetaCum[tt:] -= -thetaTrue[tt]+thetaCum[tt]
+    # recalculate the phase angle from cumulative phase
+    theta = np.mod(thetaCum, 2*np.pi)#-np.pi
+    sign = np.ones(len(theta))
+    sign[np.where(np.abs(theta-np.pi)>np.pi/2.)] = -1
+    # do the same for the true angle
+    thetaD = np.mod(thetaTrue, 2*np.pi)
+    thetaDS = np.where(np.abs(thetaD-np.pi)>np.pi/2., -thetaD, thetaD)
+    if show:
+        plt.figure('Real and reconstructed phase angle')
+        plt.subplot(221)
+        #plt.plot(thetaCum, label = 'reconstructed')
+        #plt.plot(thetaTrue, label = 'real')
+        
+        plt.scatter(thetaCum,thetaTrue, label = 'reconstructed')
+        #plt.plot(thetaTrue, label = 'real')
+        plt.ylabel('Accumulated phase angle')
+        plt.legend()
+        plt.subplot(222)
+        plt.plot(thetaCum-thetaTrue, label = 'residuals')
+        plt.plot(np.cumsum(thetaCum-thetaTrue), label = 'cumulative residuals')
+        plt.ylabel('Phase difference')
+        plt.legend()
+        plt.subplot(223)
+        plt.plot(theta, label = 'reconstructed')
+        plt.plot(thetaD, label ='real')#-np.pi)
+        plt.ylabel('Phase angle (rad)')
+        plt.xlabel('Time (Volumes)')
+        plt.legend()
+        plt.subplot(224)
+        plt.scatter(sign*theta,thetaDS,s=1, alpha=0.1)
+        plt.ylabel('Phase angle (rad)')
+        plt.xlabel('reconstructed Phase angle (rad)')
+        plt.tight_layout()
+        plt.show()
+    # recalculate eigenworms
+    x = -np.sqrt(r)*np.tan(sign*theta)/np.sqrt((np.tan(sign*theta)**2+1))
+    y = -sign*np.sqrt(r-x**2)
+    return x,y, turns
+
 def deconvolveCalcium(Y, show=False):
     """deconvolve with GCamp6s response digitized from Nature volume 499, pages 295–300 (18 July 2013)
         doi:10.1038/nature12354"""
@@ -281,14 +331,29 @@ def loadData(folder, dataPars, ew=1):
     except KeyError:
         dY = np.zeros(Y.shape)
     order = np.array(data['cgIdx']).T[0]-1
+    # read flagged neurons
+    try:
+        badNeurs = np.array(data['flagged_neurons'][0])
+        order = np.delete(order, badNeurs)
+    except KeyError:
+        pass
+    # get rid of predominantly nan neurons
+    #fracNans = np.sum(np.isnan(Ratio), axis=1)/1.0/len(Ratio[0])
     
+    #order = order[np.where(fracNans<0.1)]
     #lets interpolate small gaps but throw out larger gaps.
     # make a map with all nans smoothed out if larger than some window    
     nanmask =[np.repeat(np.nanmean(chunky_window(line, window= dataPars['interpolateNans']), axis=1), dataPars['interpolateNans']) for line in Ratio]
     nanmask = np.array(nanmask)[:,:Y.shape[1]]   
     Rfull = dR
     Rfull[np.isnan(nanmask)] =np.nan
-   
+    
+    Y = Y[order]
+    dR = dR[order]
+    #deconvolved data
+    YD = deconvolveCalcium(Y)
+    #regularized derivative
+    dY = dY[order]
     # store relevant indices -- crop out the long gaps of nans
     nonNan  = np.where(np.any(np.isfinite(nanmask),axis=0))[0]
     
@@ -307,36 +372,34 @@ def loadData(folder, dataPars, ew=1):
         neuroPos = []
         print 'No neuron positions:', folder
     
-    Y = Y[order]
-    dR = dR[order]
-    #deconvolved data
-    YD = deconvolveCalcium(Y)
-    #regularized derivative
-    dY = dY[order]
+    
     # create a dictionary structure of these data
     dataDict = {}
     # store centerlines subsampled to volumes
     dataDict['CL'] = cl[nonNan]
     dataDict['goodVolumes'] = nonNan
     dataDict['Behavior'] = {}
-
+    
     tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho, xPos, yPos]
     for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', \
     'Eigenworm3',\
                 'AngleVelocity','Theta', 'Ethogram', 'X', 'Y']):
         dataDict['Behavior'][key] = tmpData[kindex][nonNan]
+    dataDict['Behavior']['EthogramFull'] = etho
     dataDict['Neurons'] = {}
     dataDict['Neurons']['Indices'] =  T#np.arange(Y[:,nonNan].shape[1])/6.#T[nonNan]
     dataDict['Neurons']['Time'] =  time[nonNan] # actual time
     dataDict['Neurons']['TimeFull'] =  time # actual time
     dataDict['Neurons']['ActivityFull'] =  Rfull[order] # full activity
-    dataDict['Neurons']['Activity'] = Y[:,nonNan]
-    dataDict['Neurons']['RawActivity'] = dR[:,nonNan]
+    dataDict['Neurons']['Activity'] = preprocessing.scale(Y[:,nonNan].T).T # redo because nans
+    dataDict['Neurons']['RawActivity'] = dR#[:,nonNan]
     dataDict['Neurons']['derivActivity'] = dY[:,nonNan]
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
     dataDict['Neurons']['ordering'] = order
-    print len(nonNan)
+    dataDict['Neurons']['valid'] = nonNan
+    dataDict['Neurons']['orientation'] = 1 # dorsal or ventral
+    
     return dataDict
     
     

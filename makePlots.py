@@ -82,7 +82,10 @@ colorPred = {'AngleVelocity':'#6e0a1e', 'Eigenworm3':'#1c2f66', 'Eigenworm2':'#2
 colDict = {-1:'#C21807', 0: UCgray[1], 1:'#4AA02C', 2:'#0F52BA'}
 labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
 # color the ethogram
+# old style - green red blue
 ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb('#C21807'), UCgray[1], mpl.colors.to_rgb('#4AA02C'), mpl.colors.to_rgb('#0F52BA')], name='etho', N=None)
+# new style 
+#ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb(R1), UCgray[1], mpl.colors.to_rgb('#f0a202ff'), mpl.colors.to_rgb(B1)], name='etho', N=None)
 ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 
@@ -1245,29 +1248,29 @@ def averageResultsLinear(resultSets1,resultSets2, keyList1, keyList2, fitmethod 
     gs.tight_layout(fig)
     
     
-def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls) : 
+def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True) : 
     
     dx = np.min(np.diff(x_data))
-    
+    lw = 1.5
     for xd, yd, cl in zip(x_data, y_data, clrs) :
        
         bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
                         notch=False, patch_artist=True)
         plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
              linewidth=1, alpha=0.4)
-        plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=1, alpha=1.0)    
+        plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=lw, alpha=1.0)    
         for cap in bp['caps']:
-            cap.set(color=cl, linewidth=1)       
+            cap.set(color=cl, linewidth=lw)       
         for flier in bp['fliers']:
             flier.set(marker='+', color=cl, alpha=1.0)            
         for median in bp['medians']:
-            median.set(color=cl, linewidth=1) 
+            median.set(color=cl, linewidth=lw) 
         jitter = (np.random.random(len(yd)) - 0.5)*dx / 20 
         dotxd = [xd - 0.25*dx]*len(yd) + jitter
-
-        # make alpha stronger
-        ax.plot(dotxd, yd, linestyle='None', marker='o', color=cl, \
-                markersize=3, alpha=0.5)  
+        if scatter:
+            # make alpha stronger
+            ax.plot(dotxd, yd, linestyle='None', marker='o', color=cl, \
+                    markersize=3, alpha=0.5)  
 #    ymin = min([min(m) for m in y_data])
 #    ymax = max([max(m) for m in y_data])
 #    dy = 10 ** np.floor(np.log10(ymin))
