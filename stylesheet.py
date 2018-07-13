@@ -9,6 +9,8 @@ import matplotlib.pylab as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
+
+from scipy.ndimage.filters import gaussian_filter1d
 ################################################
 #
 # define colors
@@ -67,6 +69,7 @@ ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb(R1), mpl.colors.to_rgb(N
 ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 colDict = {-1:R1, 0: N1, 1:L3, 2:B1}
+labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
 #=============================================================================#
 #                           moving axes
 #=============================================================================#
@@ -195,6 +198,29 @@ def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True) :
     ax.patch.set_facecolor('white') # ('none')
     ax.set_xticklabels(lbls, rotation=30)
 
+
+def plotManifoooold(x,y,z,colorBy, ax):
+    # make smoooth
+    smooth = 12
+    x = gaussian_filter1d(x, smooth)
+    y = gaussian_filter1d(y, smooth)
+    z = gaussian_filter1d(z, smooth)
+    
+    multicolor(ax,x,y,z,colorBy,c= transientcmap, threedim = True, etho = False, cg = 1)
+    ax.scatter3D(x[::12], y[::12], z[::12], c=colorBy[::12], cmap=transientcmap, s=10)
+    #ax.view_init(elev=40, azim=-15)
+    ax.dist = 10
+    axmin, axmax = -5, 5
+    ticks = [axmin,0, axmax]
+    
+#    ax.set_xlim([axmin, axmax])
+#    ax.set_ylim([axmin, axmax])
+#    ax.set_zlim([axmin, axmax])
+#    #
+    ax.tick_params(axis='both', which='major', pad=0)
+    ax.axes.xaxis.set_ticklabels([])
+    ax.axes.yaxis.set_ticklabels([])
+    ax.axes.zaxis.set_ticklabels([])
 #=============================================================================#
 #                           Animating worms
 #=============================================================================#
@@ -213,3 +239,28 @@ def createWorm(x, y):
     a = np.vstack([x,y])+lwidths*e1
     b = np.vstack([x,y])-lwidths*e1
     return np.concatenate([a, b[:,::-1]], axis=1).T
+
+#=============================================================================#
+#                           utility
+#=============================================================================#
+def sortnbin(x, y, nBins, rng):
+    """takes a scatter plot and bins by some number of bins and a range."""
+    
+    # sort x and y
+    y = y[np.argsort(x)]
+    x = np.sort(x)
+    # create bins
+    _, b = np.histogram([],nBins,rng)
+    c = np.digitize(x, b)
+    
+    std = []
+    avg = []
+    n = []
+    for i in range(nBins):
+        _t = y[c == i]
+        std.append(np.std(_t))
+        avg.append(np.mean(_t))
+        n.append(len(_t))
+
+    xPlot = b[:-1] + np.diff(b) *0.5
+    return xPlot, np.array(avg), np.array(std)/np.sqrt(n)

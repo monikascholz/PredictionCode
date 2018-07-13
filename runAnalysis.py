@@ -13,8 +13,8 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML175' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'immobilized' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -99,11 +99,19 @@ if createIndicesTest:
             if transient:
                train = np.where(dataSets[key]['Neurons']['Time']<4*60)[0]
                 # after 4:30 min
-               test = np.where(dataSets[key]['Neurons']['Time']>6*60)[0]
-               
+               test = np.where(dataSets[key]['Neurons']['Time']>7*60)[0]
+               resultDict[key]['Training']['Half'] ={'Train':train}
+               resultDict[key]['Training']['Half']['Test'] = test
+            else:
+                 # add half split
+                midpoint = np.mean(dataSets[key]['Neurons']['Time'])
+                trainhalf = np.where(dataSets[key]['Neurons']['Time']<midpoint)[0]
+                testhalf = np.where(dataSets[key]['Neurons']['Time']>midpoint)[0]
+                resultDict[key]['Training']['Half'] ={'Train':trainhalf}
+                resultDict[key]['Training']['Half']['Test'] = testhalf
             resultDict[key]['Training'][label] = {'Train':train  }
             resultDict[key]['Training'][label]['Test']=test
-            
+           
 
     print "Done generating trainingsets"
 
@@ -123,7 +131,6 @@ if half_period:
         splits = resultDict[key]['Training']
         resultDict[key]['Period1Half'] = dr.runPeriodogram(dataSets[key], pars, testset = splits[behaviors[0]]['Train'])
         resultDict[key]['Period2Half'] = dr.runPeriodogram(dataSets[key], pars, testset = splits[behaviors[0]]['Test'])
-
 
 ###############################################    
 # 
@@ -160,7 +167,7 @@ if pca:
         resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
     
         #correlate behavior and PCA
-        resultDict[key]['PCACorrelation']=dr.PCACorrelations(dataSets[key],resultDict[key], behaviors, flag = 'PCA', subset = None)
+        #resultDict[key]['PCACorrelation']=dr.PCACorrelations(dataSets[key],resultDict[key], behaviors, flag = 'PCA', subset = None)
 ###############################################    
 # 
 # run Kato PCA
@@ -172,9 +179,9 @@ if kato_pca:
     for kindex, key in enumerate(keyList):
         resultDict[key]['katoPCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
         splits = resultDict[key]['Training']
-        resultDict[key]['katoPCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Train'])
+        resultDict[key]['katoPCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'])
   
-        resultDict[key]['katoPCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Test'])
+        resultDict[key]['katoPCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Test'])
   
 ###############################################    
 # 
@@ -187,8 +194,8 @@ if half_pca:
     for kindex, key in enumerate(keyList):
         # run PCA on each half
         splits = resultDict[key]['Training']
-        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits[behaviors[0]]['Train'])
-        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset =splits[behaviors[0]]['Test'])
+        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'])
+        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset =splits['Half']['Test'])
 #%%
 ###############################################    
 # 

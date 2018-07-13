@@ -23,6 +23,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import newton 
 from sklearn.cluster import bicluster
 from scipy.signal import welch, lombscargle, fftconvolve
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 # 
 import makePlots as mp
 
@@ -201,13 +202,21 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     else:
         Neuro = data['Neurons']['Activity']
     if testset is not None:
-        Neuro = Neuro[:,testset]
-    #Neuro = np.array([dh.savitzky_golay(line, window_size=15, order=3, deriv=1) for line in Neuro])
-    pcs = pca.fit_transform(Neuro)
-    comp = pca.components_
+        Y = Neuro[:,testset].T
+    else:
+        Y= Neuro.T
+    # neuron activity is transposed such that result = nsamples*nfeatures.
+    comp = pca.fit_transform(Y).T
+    pcs = pca.components_.T
+    #print comp.shape, pcs.shape, 0/0
     if deriv:
-        comp = np.cumsum(pca.components_, axis=0)
-    indices = np.argsort(pcs.T)[whichPC]
+        comp = np.cumsum(comp, axis=1)
+    print pcs.shape 
+    indices = np.argsort(pcs[:,whichPC])
+    plt.imshow(Neuro[indices], aspect='auto')
+    plt.subplot(212)
+    plt.plot(pcs[:,0][indices])
+    plt.show()
     #print indices.shape
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
@@ -217,6 +226,7 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     pcares['pcaComponents'] =  comp
     if testset is not None:
         pcares['testSet'] = testset
+        pcares['fullData'] = pca.transform(Neuro.T).T
     return pcares
     
 def runPCATimeWarp(data, pars):
@@ -361,40 +371,35 @@ def runPeriodogram(data, pars, testset = None):
 #
 ##############################################    
 
-def runHierarchicalClustering(data, pars):
+def runHierarchicalClustering(data, pars, subset):
     """cluster neural data."""
-    if pars['useRank']:
-            X = data['Neurons']['rankActivity'].T
-    else:
-        X = data['Neurons']['Activity'] # transpose to conform to nsamples*nfeatures
-    ward = AgglomerativeClustering(n_clusters=pars['nCluster'], affinity='euclidean')
-    ward.fit(X)
-    indices = np.argsort(ward.labels_)    
-    #
+    
+    X = data['Neurons']['Activity'] # transpose to conform to nsamples*nfeatures
+    if subset is not None:
+        X = X[subset]
+    # pairwise correlations
+    C = np.ma.corrcoef(X)
+    # find linkage
+    Z = linkage(X, 'ward')
+#    # assign clusters
+    max_d = 1.5
+#    clusters = fcluster(Z, max_d, criterion='distance')
+    # assign clusters
+    k=3
+    clusters = fcluster(Z, k, criterion='maxclust')
+    traces = []
+    
+    for index in np.unique(clusters):
+        traces.append(X[np.where(clusters==index)])
+    # store results
     clustres = {}
-    clustres['nCluster'] = pars['nCluster']
-    clustres['labels'] = ward.labels_
-    # average neurons with similar activity
-    clustAct = np.zeros((pars['nCluster'], X.shape[1]))
-    clustIndices = {}
-    labels = np.unique(ward.labels_)
-    for label in labels:
-        neuronID = np.where(ward.labels_==label)
-        clustAct[label] = np.mean(X[neuronID], axis=0)
-        clustIndices[label] = neuronID[0]
-    
-    # mean activity in a cluster
-    clustres['Activity'] = clustAct
+    clustres['linkage'] = Z
+    clustres['clusters'] = traces
+    clustres['leafs'] = clusters
+    clustres['nclusters'] = len(np.unique(clusters))
+    clustres['dmax'] = max_d
+    clustres['threshold'] = Z[-(k-1),2]  
 
-    # maps cluster indices back to neurons in that cluster
-    clustres['originalIndices'] = clustAct
-    
-    plt.subplot(211)
-    plt.imshow(X[indices], aspect = 'auto', vmin=-0.1, vmax=2)
-    plt.subplot(212)
-    plt.imshow(clustres['Activity'] , aspect = 'auto', vmin=-0.1, vmax=2)
-
-    plt.show()
     return clustres
 ###############################################    
 # 

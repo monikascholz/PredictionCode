@@ -16,7 +16,7 @@ mpl.rcParams['interactive']  = False
 #
 ###############################################
 typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+condition = 'chip' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -29,8 +29,8 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':25, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':100, # gauss window for angle velocity derivative. Acts on full (50Hz) data
+dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
+            'gaussWindow':150, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
             'interpolateNans': 12,#interpolate gaps smaller than this of nan values in calcium data
@@ -49,7 +49,7 @@ for kindex, key in enumerate(keyList):
 
 pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':False, #timewarp so behaviors are equally represented
-        'trainingCut': 0.8, # what fraction of data to use for training 
+        'trainingCut': 0.6, # what fraction of data to use for training 
         'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart

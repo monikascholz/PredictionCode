@@ -130,12 +130,12 @@ axetho.set_xticks([])
 axetho.xaxis.label.set_visible(False)
 #axetho.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
 #           ncol=2, mode="expand", borderaxespad=0.)
-cax1 = plotHeatmap(time, moving['Neurons']['RawActivity'][results['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=1)
+cax1 = plotHeatmap(time, moving['Neurons']['RawActivity'][results['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=2)
 axhm.xaxis.label.set_visible(False)
 axetho.xaxis.label.set_visible(False)
 cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
-cbar.set_ticks([-0.5,0,1])
-cbar.set_ticklabels(['<-0.5',0,'>1'])
+cbar.set_ticks([-0.5,0,2])
+cbar.set_ticklabels(['<-0.5',0,'>2'])
 cbar.outline.set_visible(False)
 pos = axcb.get_position().get_points()
 pos[:,0] -=0.04
@@ -145,7 +145,7 @@ axcb.set_position(posNew)
 axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -10)
 
 # plot the weights
-pcs = movingAnalysis['PCA']['neuronWeights']
+pcs = results['neuronWeights']
 # normalize by max for each group
 rank = np.arange(0, len(pcs))
 for i in range(np.min([3,pcs.shape[1]])):
@@ -196,7 +196,7 @@ ax4.set_yticks([])
 # plot manifold! MANIFOOOOOLD!
 ax5 = plt.subplot(gsHeatmap[2,1:3], projection='3d')
 # color PCA by ethogram
-x,y,z = movingAnalysis['PCA']['pcaComponents'][:3]
+x,y,z = results['pcaComponents'][:3]
 # make smoooth
 smooth = 12
 x = gaussian_filter1d(x, smooth)
@@ -208,12 +208,12 @@ multicolor(ax5,x,y,z,colorBy,c= ethocmap, threedim = True, etho = True, cg = 1)
 ax5.scatter3D(x[::12], y[::12], z[::12], c=colorBy[::12], cmap=ethocmap, s=10)
 ax5.view_init(elev=30, azim=70)
 ax5.dist = 8
-axmin, axmax = -0.04, 0.04
+axmin, axmax = -5, 5
 ticks = [axmin,0, axmax]
 #plt.setp(ax5.get_xticklabels(), fontsize=10)
 #plt.setp(ax5.get_yticklabels(), fontsize=10)
 #plt.setp(ax5.get_zticklabels(), fontsize=10)
-ax5.set_xlim([axmin, axmax])
+ax5.set_xlim([5*axmin, 5*axmax])
 ax5.set_ylim([axmin, axmax])
 ax5.set_zlim([axmin, axmax])
 #ax5.set_xticks(ticks)
@@ -247,11 +247,13 @@ moveAxes(ax5, action='left', step=0.04 )
     #ax5.text(scX +l[0]*0.5,scY+l[1]*0.5,scZ+l[2]*0.5,names[i], color='k')
 #ax5.ticklabel_format(style='sci',scilimits=(0,0),axis='both')
 # pc axes projection
-sciformat = 100.
+sciformat = 1.
 axproj = plt.subplot(gsHeatmap[2,3])
 multicolor(axproj,x*sciformat,y*sciformat,None,colorBy,c=ethocmap, threedim = False, etho = True, cg = 1)
-axproj.set_xlabel(r'PC1 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[0])
-axproj.set_ylabel(r'PC2 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[1])
+#axproj.set_xlabel(r'PC1 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[0])
+#axproj.set_ylabel(r'PC2 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[1])
+axproj.set_xlabel(r'PC1', labelpad=0, color=Ls[0])
+axproj.set_ylabel(r'PC2', labelpad=0, color=Ls[1])
 
 ################################################
 #
@@ -355,7 +357,7 @@ axscheme1.axis('equal')
 axscheme2 = plt.subplot(gsScheme[0,1], sharey=axscheme1)
 # input are PCs, let's only show the testset
 #
-x,y,z = movingAnalysis['PCA']['pcaComponents'][:3, test]
+x,y,z = results['pcaComponents'][:3, test]
 t = moving['Neurons']['Time'][test]
 scale = np.ptp(t)*0.8
 ylocs = np.linspace(0,scale,3)
