@@ -69,7 +69,7 @@ ethocmap = mpl.colors.ListedColormap([mpl.colors.to_rgb(R1), mpl.colors.to_rgb(N
 ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 colDict = {-1:R1, 0: N1, 1:L3, 2:B1}
-labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
+labelDict = {-1:'Rev',0:'Pause',1:'Fwd',2:'Turn'}
 #=============================================================================#
 #                           moving axes
 #=============================================================================#
@@ -97,17 +97,38 @@ def moveAxes(ax, action, step ):
         pos = ax.get_position().get_points()
         pos[1,1] +=step/2.
         pos[0,1] -=step/2.
+    if action =='scalex':
+        pos = ax.get_position().get_points()
+        pos[1,0] +=step/2.
+        pos[0,0] -=step/2.
         
     posNew = mpl.transforms.Bbox(pos)
     ax.set_position(posNew)
 
+#=============================================================================#
+#                           clean away spines
+#=============================================================================#
+def cleanAxes(ax, where='all'):
+    '''remove plot spines, ticks, and labels. Either removes both, left or bottom axes.'''
+    if where=='all':
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.set_yticks([])
+        ax.set_xticks([])
+    if where=='x':
+        ax.spines['bottom'].set_visible(False)
+        ax.set_xticks([])
+    if where=='y':
+        ax.spines['left'].set_visible(False)
+        ax.set_yticks([])
+        
 #=============================================================================#
 #                           plot normal plots
 #=============================================================================#
 def plotEthogram(ax, T, etho, alpha = 0.5, yValMax=1, yValMin=0, legend=0):
     """make a block graph ethogram for elegans behavior"""
     #colDict = {-1:'red',0:'k',1:'green',2:'blue'}
-    labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
+    #labelDict = {-1:'Reverse',0:'Pause',1:'Forward',2:'Turn'}
     #y1 = np.where(etho==key,1,0)
     
     for key in colDict.keys():

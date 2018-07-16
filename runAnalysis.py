@@ -13,7 +13,7 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
+typ = 'AML70' # possible values AML32, AML18, AML70
 condition = 'immobilized' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
@@ -80,7 +80,7 @@ elasticnet = 0
 # this requires moving animals
 if condition != 'immobilized':
     predNeur = 1
-    svm = 1
+    svm = 0
     lasso = 1
     elasticnet = 1#True
     predPCA = 1
@@ -99,7 +99,7 @@ if createIndicesTest:
             if transient:
                train = np.where(dataSets[key]['Neurons']['Time']<4*60)[0]
                 # after 4:30 min
-               test = np.where(dataSets[key]['Neurons']['Time']>7*60)[0]
+               test = np.where((dataSets[key]['Neurons']['Time']>7*60)*(dataSets[key]['Neurons']['Time']<14*60))[0]
                resultDict[key]['Training']['Half'] ={'Train':train}
                resultDict[key]['Training']['Half']['Test'] = test
             else:
@@ -196,6 +196,7 @@ if half_pca:
         splits = resultDict[key]['Training']
         resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'])
         resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset =splits['Half']['Test'])
+        resultDict[key]['PCArankCorr'] = dr.rankCorrPCA(resultDict[key])
 #%%
 ###############################################    
 # 

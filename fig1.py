@@ -140,7 +140,7 @@ ax3.spines['left'].set_visible(False)
 ax3.set_yticks([])
 # plot dimensionality for inactive and active plus together
 nComp = 10#results['nComp']
-for y, col in zip([results['expVariance'][:nComp],results2half['expVariance'][:nComp], resultshalf['expVariance'][:nComp]], ['k', R1, B1]):
+for y, col in zip([results['expVariance'][:nComp],resultshalf['expVariance'][:nComp], results2half['expVariance'][:nComp]], ['k', R1, B1]):
     ax4.fill_between(np.arange(0.5,nComp+0.5),y*100, step='post', color=col, alpha=0.5)
     ax4.plot(np.arange(1,nComp+1),np.cumsum(y)*100, 'o-',color = col, lw=1, markersize =3) 
 

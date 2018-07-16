@@ -211,12 +211,9 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     #print comp.shape, pcs.shape, 0/0
     if deriv:
         comp = np.cumsum(comp, axis=1)
-    print pcs.shape 
+    
     indices = np.argsort(pcs[:,whichPC])
-    plt.imshow(Neuro[indices], aspect='auto')
-    plt.subplot(212)
-    plt.plot(pcs[:,0][indices])
-    plt.show()
+    
     #print indices.shape
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
@@ -282,6 +279,15 @@ def timewarp(data):
     neurData = np.concatenate(neurArr, axis=1)
     return neurData
 
+def rankCorrPCA(results):
+    """correlate the first and second half PCA weights by rank."""
+    tmpdata = np.zeros((3,3))
+    for pc1 in range(3):
+        for pc2 in range(3):
+            rankHalf1 = np.argsort(results['PCAHalf1']['neuronWeights'][:,pc1])
+            rankHalf2 = np.argsort(results['PCAHalf2']['neuronWeights'][:,pc2])
+            tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
+    return tmpdata
 ###############################################    
 # 
 # correlate neurons and behavior
@@ -342,12 +348,15 @@ def runPeriodogram(data, pars, testset = None):
     Neuro = np.copy(data['Neurons']['Activity'])
     time = data['Neurons']['Time']
     B = np.array(data['Behavior']['Ethogram'], dtype=float)
-    B -=np.mean(B)
-    B/= np.std(B)
+    
     if testset is not None:
         Neuro = np.array(Neuro)[:,testset]
         time = time[testset]
         B = B[testset]
+    Neuro -=np.mean(Neuro, axis=0)
+    Neuro /=np.std(Neuro, axis=0)
+    B -=np.mean(B)
+    B/= np.std(B)
     autocorr = np.array([fftconvolve(y, y[::-1], mode='full')/len(y) for y in Neuro])
     periods = np.arange(-len(y), len(y)-1)/6. # in seconds
     # behavior
@@ -1285,7 +1294,7 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         
         score = lin.score(pcs[train],behavior[train])
         scorepred = lin.score(pcs[test], behavior[test])
-        print 'PCA prediction results'
+        print 'PCA prediction results:'
         print 'Train R2: ',score 
         print 'Test R2: ', scorepred
         linData[label] = {}
@@ -1295,8 +1304,18 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         
-        
         linData[label]['output'] = lin.predict(pcs)
-    
-    
+        
+        # check how well it performs with more PCs
+        r2_more = []
+        for nC in range(1, Neuro.shape[1], 1):
+            pca = PCA(n_components = nC)
+            pcs = pca.fit_transform(Neuro)
+            lin.fit(pcs[train], behavior[train])
+            r2_more.append(lin.score(pcs[test], behavior[test]))
+            
+        linData[label]['r2PCS'] = r2_more
+        linData[label]['r2PCSx'] = range(1, Neuro.shape[1], 1)
+        plt.plot(linData[label]['r2PCSx'], linData[label]['r2PCS'], 'ro-')
+        plt.show()
     return linData
