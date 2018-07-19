@@ -211,12 +211,9 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     #print comp.shape, pcs.shape, 0/0
     if deriv:
         comp = np.cumsum(comp, axis=1)
-    print pcs.shape 
+    
     indices = np.argsort(pcs[:,whichPC])
-    plt.imshow(Neuro[indices], aspect='auto')
-    plt.subplot(212)
-    plt.plot(pcs[:,0][indices])
-    plt.show()
+    
     #print indices.shape
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
@@ -282,6 +279,15 @@ def timewarp(data):
     neurData = np.concatenate(neurArr, axis=1)
     return neurData
 
+def rankCorrPCA(results):
+    """correlate the first and second half PCA weights by rank."""
+    tmpdata = np.zeros((3,3))
+    for pc1 in range(3):
+        for pc2 in range(3):
+            rankHalf1 = np.argsort(results['PCAHalf1']['neuronWeights'][:,pc1])
+            rankHalf2 = np.argsort(results['PCAHalf2']['neuronWeights'][:,pc2])
+            tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
+    return tmpdata
 ###############################################    
 # 
 # correlate neurons and behavior
@@ -342,12 +348,15 @@ def runPeriodogram(data, pars, testset = None):
     Neuro = np.copy(data['Neurons']['Activity'])
     time = data['Neurons']['Time']
     B = np.array(data['Behavior']['Ethogram'], dtype=float)
-    B -=np.mean(B)
-    B/= np.std(B)
+    
     if testset is not None:
         Neuro = np.array(Neuro)[:,testset]
         time = time[testset]
         B = B[testset]
+    Neuro -=np.mean(Neuro, axis=0)
+    Neuro /=np.std(Neuro, axis=0)
+    B -=np.mean(B)
+    B/= np.std(B)
     autocorr = np.array([fftconvolve(y, y[::-1], mode='full')/len(y) for y in Neuro])
     periods = np.arange(-len(y), len(y)-1)/6. # in seconds
     # behavior
@@ -778,7 +787,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             nfold = 5
         else:
             a = np.logspace(-3,0,100)
-            nfold =15
+            nfold =5
         #if label =='Eigenworm3':
         #    nfold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
@@ -855,15 +864,18 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #
 ##############################################    
 
-def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
+def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
     """run EN to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
         Y = np.copy(data['Behavior'][label])
-        Y = np.reshape(Y, (-1,1))
+        Y = np.reshape(Y, (-1,))
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = np.copy(data['Neurons']['rankActivity'].T)
+        if pars['useRaw']:
+            X = np.copy(data['Neurons']['RawActivity'].T)
+            X -= np.mean(X, axis = 0)
         elif pars['useClust']:
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
@@ -871,6 +883,9 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['deconvolvedActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        if scramble:
+            # similar to GFP control: scamble timeseries
+            np.random.shuffle(Y)
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # implement time lagging -- forward and reverse
         if lag is not None:
@@ -888,26 +903,25 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         Xtrain, Xtest = X[trainingsInd],X[testInd]
         Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit elasticNet and validate
-        cv = 10
+        
         if label =='Eigenworm3':
             l1_ratio = [0.95]
             #l1_ratio = [0.95]
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
-            nfold = 10
+            nfold = 5
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
-            fold = cv
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-4,-2,200)
-            nfold = 15
+            nfold = 5
         #cv = 15
         #a = np.logspace(-3,-1,100)
        # fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random')#, tol=1e-5)# alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -1285,7 +1299,7 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         
         score = lin.score(pcs[train],behavior[train])
         scorepred = lin.score(pcs[test], behavior[test])
-        print 'PCA prediction results'
+        print 'PCA prediction results:'
         print 'Train R2: ',score 
         print 'Test R2: ', scorepred
         linData[label] = {}
@@ -1295,8 +1309,17 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
         
-        
         linData[label]['output'] = lin.predict(pcs)
-    
-    
+        
+#        # check how well it performs with more PCs
+#        r2_more = []
+#        for nC in range(1, Neuro.shape[1], 1):
+#            pca = PCA(n_components = nC)
+#            pcs = pca.fit_transform(Neuro)
+#            lin.fit(pcs[train], behavior[train])
+#            r2_more.append(lin.score(pcs[test], behavior[test]))
+#            
+#        linData[label]['r2PCS'] = r2_more
+#        linData[label]['r2PCSx'] = range(1, Neuro.shape[1], 1)
+        
     return linData

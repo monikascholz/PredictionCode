@@ -60,7 +60,7 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - S1 : Supl. to Neural dynamics in freely moving animals', figsize=(9.5, 9*4/4.))
+fig = plt.figure('Fig - S1 : Suppl. to Neural dynamics in freely moving animals', figsize=(9.5, 9*4/4.))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(3, 6)
 gs1.update(left=0.07, right=0.98, wspace=0.25, bottom = 0.07, top=1, hspace=0.35)
@@ -90,20 +90,15 @@ for keys in [movExp, imExp]:
         
         dset = data[key]['analysis']
         for idn in dset.keys():
-            tmpdata = np.zeros((3,3))
+            rankC = dset[idn]['PCArankCorr']
             
-            for pc1 in range(3):
-                for pc2 in range(3):
-                    
-                    rankHalf1 = np.argsort(dset[idn]['PCAHalf1']['neuronWeights'][:,pc1])
-                    rankHalf2 = np.argsort(dset[idn]['PCAHalf2']['neuronWeights'][:,pc2])
-                    tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
-#             ax = plt.subplot(gs1[index])       
-#            im  = ax.imshow(tmpdata)
-#            plt.colorbar(im)
             r2.append( np.max(tmpdata))
             index +=1
-    print np.mean(r2)
+
+# calculate the rank for each half
+
+
+
 #index = 0
 #for key in movExp:
 ##key = '{}_{}'.format(typ, condition)

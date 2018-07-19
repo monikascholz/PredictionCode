@@ -16,7 +16,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.ticker as mtick
 
-#
+
+
 #import singlePanels as sp
 #import makePlots as mp
 import dataHandler as dh
@@ -64,12 +65,12 @@ fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(
 # this gridspec makes one example plot of a heatmap with its PCA
 #gs1 = gridspec.GridSpec(4, 3, width_ratios = [1,1,1], height_ratios=[0.1, 1,1,2])
 #gsHeatmap = gridspec.GridSpecFromSubplotSpec(4,5, subplot_spec=gs1[0:4,:], width_ratios=[1.25, 0.1, 0.5,0.5,0.5], height_ratios = [0.1,10,10,10], wspace=0.3, hspace=0.25)
-gsHeatmap = gridspec.GridSpec(4,5,  width_ratios=[1.5, 0.1, 0.5,0.5,0.5], height_ratios = [1,0.1,1,1], wspace=0.35, hspace=0.25)
-gsHeatmap.update(left=0.07, right=0.98,  bottom = 0.07, top=0.98, hspace=0.35, wspace=0.35)
+gsHeatmap = gridspec.GridSpec(5,4,  width_ratios=[1.5, 0.1, 0.5, 0.5], height_ratios = [1,0.1,0.75,0.1, 0.75])
+gsHeatmap.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0.45)
 
 ################################################
 #
-# first row
+# letters
 #
 ################################################
 
@@ -107,6 +108,7 @@ gsHeatmap.update(left=0.07, right=0.98,  bottom = 0.07, top=0.98, hspace=0.35, w
 #
 ################################################
 # select a special dataset - transiently immobilized
+transientData = 'BrainScanner20180511_134913'
 transient = data['AML32_chip']['input']['BrainScanner20180511_134913']
 transientAnalysis = data['AML32_chip']['analysis']['BrainScanner20180511_134913']
 # time first half, second half. Indices of times
@@ -116,229 +118,53 @@ time2Half = np.arange(1600, transient['Neurons']['Activity'].shape[1])
 time = transient['Neurons']['TimeFull']
 timeActual = transient['Neurons']['Time']
 noNeurons = transient['Neurons']['Activity'].shape[0]
-results = transientAnalysis['PCAHalf2']
+results = transientAnalysis['PCA']
 resultshalf = transientAnalysis['PCAHalf1']
 results2half = transientAnalysis['PCAHalf2']
-# plot heatmap ordered by PCA
-# colorbar in a nested gridspec because its much better          
-
-#ethogram
-axetho = plt.subplot(gsHeatmap[1,0])
-# legend for ethogram
-axEthoLeg = plt.subplot(gsHeatmap[1,1:3],clip_on=False)
-# make bars in correct colors
-for i in [-1,0]:
-    xmin, xmax = 0, 0.1
-    ymin = (i+1)*0.95
-    ymax= ymin+0.25
-    axEthoLeg.axhspan(ymin, ymax, xmin, xmax, color=colDict[i])
-    axEthoLeg.text(xmax, np.mean([ymin, ymax]), labelDict[i], color=colDict[i], verticalalignment ='center')
-for i in [1,2]:
-    xmin, xmax = 0.5, 0.6
-    ymin = (i-1)*0.95
-    ymax= ymin+0.25
-    axEthoLeg.axhspan(ymin, ymax, xmin, xmax, color=colDict[i])
-    axEthoLeg.text(xmax, np.mean([ymin, ymax]), labelDict[i], color=colDict[i], verticalalignment ='center', fontsize=12)
-axEthoLeg.spines['left'].set_visible(False)
-axEthoLeg.spines['bottom'].set_visible(False)
-axEthoLeg.set_yticks([])
-axEthoLeg.set_xticks([])
-
-#moveAxes(axEthoLeg, 'scaley', 0.08)
-moveAxes(axEthoLeg, 'left', 0.04)
-moveAxes(axetho, action='scaley', step=0.01 )
-moveAxes(axetho, action='down', step=0.04 )
-#
+test, train = transientAnalysis['Training']['Half']['Test'], transientAnalysis['Training']['Half']['Train']
+colorsExp = {'moving': R1, 'immobilized': B1}
+colorsCtrl = {'moving': N0,'immobilized': N1}
+         
+#heatmap axes
 axhm = plt.subplot(gsHeatmap[0,0])
 axcb = plt.subplot(gsHeatmap[0,1])
-
-#gsweights = gridspec.GridSpecFromSubplotSpec(2,3, subplot_spec=gsHeatmap[1:3,2:], width_ratios=[0.5,1,1], wspace=0.5, hspace=0.5)
-# weights
-ax2 =plt.subplot(gsHeatmap[0,2])
-# weight rank correlation
-axweights = plt.subplot(gsHeatmap[0,3])
-moveAxes(axweights, 'left', 0.02)
-# principal components projected
-axproj = plt.subplot(gsHeatmap[0,4])
-
-# principal components
-ax4 =plt.subplot(gsHeatmap[2,0], sharex=axhm)
- 
- 
-plotEthogram(axetho, time, transient['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
-axetho.set_xticks([])
-axetho.xaxis.label.set_visible(False)
-moveAxes(axetho, 'scaley', 0.025)
-#axetho.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-#           ncol=2, mode="expand", borderaxespad=0.)
-cax1 = plotHeatmap(time, transient['Neurons']['RawActivity'][results['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=2)
+#heatmap
+cax1 = plotHeatmap(time, transient['Neurons']['ActivityFull'][results2half['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=2)
 axhm.xaxis.label.set_visible(False)
-axetho.xaxis.label.set_visible(False)
+axhm.set_xticks([])
+# colorbar
 cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
 cbar.set_ticks([-0.5,0,2])
 cbar.set_ticklabels(['<-0.5',0,'>2'])
 cbar.outline.set_visible(False)
-pos = axcb.get_position().get_points()
-pos[:,0] -=0.04
-posNew = mpl.transforms.Bbox(pos)
-axcb.set_position(posNew)
-#axcb.set_position()
+moveAxes(axcb, 'left', 0.06)
+moveAxes(axcb, 'scaley', -0.08)
 axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -25)
+#ethogram
+axetho = plt.subplot(gsHeatmap[1,0], clip_on=False)
+plotEthogram(axetho, time, transient['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
+cleanAxes(axetho, 'all')
+moveAxes(axetho, 'scaley', 0.02)
+axetho.xaxis.label.set_visible(False)
+# legend for ethogram
+axEthoLeg = plt.subplot(gsHeatmap[1:2,1])#,clip_on=False)
+#moveAxes(axEthoLeg, 'right', 0.045)
+cleanAxes(axEthoLeg, where='all')
+handles, labels = axetho.get_legend_handles_labels()
+leg = mpl.legend.Legend(axEthoLeg, handles[::-1], labels[::-1],frameon=False, loc=1, markerscale=0)#,bbox_to_anchor=(-1, 0.9), loc=9)
+for hndl in leg.legendHandles:
+    hndl._sizes = [0]
+axEthoLeg.add_artist(leg);
 
-# plot the weights
-pcs = results['neuronWeights']
-# normalize by max for each group
-rank = np.arange(0, len(pcs))
-print rank
-for i in range(np.min([3,pcs.shape[1]])):
-    print i
-    y= pcs[:,i]
-    print len(y), len(results['neuronOrderPCA'])
-    ax2.fill_betweenx(rank, np.zeros(noNeurons),y[results['neuronOrderPCA']], step='pre',\
-    alpha=1.0-i*0.25, color=Ls[i])
-    
-#ax2.set_ylabel('Neuron weights')
-ax2.set_ylim([0, len(pcs)])
-ax2.spines['left'].set_visible(False)
-ax2.spines['bottom'].set_visible(False)
-ax2.set_yticks([])
-ax2.set_xticks([])
-moveAxes(ax2, action='left', step=0.03 )
-
-# plot rank of neuron in first vs second half
-for pc in range(3):
-    for pc2 in range(3):
-        rankHalf1, rankHalf2 = np.argsort(resultshalf['neuronWeights'][:,pc]),  np.argsort(results2half['neuronWeights'][:,pc2])
-        axweights.scatter(rankHalf1, rankHalf2, alpha=0.75, s = 5,color = Ls[pc] )
-        print 'R2', np.corrcoef(rankHalf1, rankHalf2)[0,1]
-axweights.set_xlabel('rank moving')
-axweights.set_ylabel('rank immobilized')
-
-# plot dimensionality for inactive and active plus together
-#nComp = 10#results['nComp']
-#for y, col, lab in zip([results['expVariance'][:nComp],results2half['expVariance'][:nComp], resultshalf['expVariance'][:nComp]]\
-#        , ['k', R1, B1], ['Full', 'Moving', 'Paralyzed']):
-#    #ax3.fill_between(np.arange(0.5,nComp+0.5),y*100, step='post', color=col, alpha=0.5)
-#    ax3.plot(np.arange(1,nComp+1),np.cumsum(y)*100, 'o-',color = col, lw=1, markersize =3, label = lab) 
-#ax3.legend(loc=4, fontsize=12)
-#ax3.set_ylabel('Explained variance (%)', labelpad=-5)
-#ax3.set_yticks([0,25,50,75,100])
-#ax3.set_xlabel('# of components')
-#ax3.set_xticks([0,5, 10])
-
-#### move everything up a bit
-#for axi in [axhm, ax2, axweights, axcb,axproj ]:
-#    moveAxes(axi, 'up', 0.04)
-
-
-#################################################
-##
-## second row
-##
-#################################################
-#
-# plot PCA components
-for i in range(np.min([len(results['pcaComponents']), 3])):
-    #y = results['pcaComponents'][i]
-    y = results['fullData'][i]
-    # normalize
-    y =y -np.min(y)
-    y =y/np.max(y)
-    ax4.text(-100, np.mean(y)+i*1.05, 'PC{}'.format(i+1), color = Ls[i])
-    ax4.plot(time[transient['Neurons']['valid']], i*1.1+y, label='Component {}'.format(i+1), lw=1, color = Ls[i])
-## draw a box for the testset
-#ax4.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
-#ax4.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
-ax4.set_xlabel('Time (s)')
-ax4.set_xlim([np.min(timeActual), np.max(timeActual)])
-ax4.spines['left'].set_visible(False)
-ax4.set_yticks([])
-moveAxes(ax4, action='up', step=0.02 )
-# plot manifold! MANIFOOOOOLD!
-ax5 = plt.subplot(gsHeatmap[2,2:5], projection='3d')
-# plot manifold for split dataset
-x,y,z = results['fullData'][:3]
-# make smoooth
-smooth = 12
-x = gaussian_filter1d(x, smooth)
-y = gaussian_filter1d(y, smooth)
-z = gaussian_filter1d(z, smooth)
-# color by before and after
-colorBy = np.zeros(len(timeActual))
-colorBy[:6*60*4] = 1 # first four minutes is m9
-multicolor(ax5,x,y,z,colorBy,c= transientcmap, threedim = True, etho = False, cg = 1)
-ax5.scatter3D(x[::12], y[::12], z[::12], c=colorBy[::12], cmap=transientcmap, s=10)
-ax5.view_init(elev=40, azim=-15)
-ax5.dist = 7
-axmin, axmax = -5, 5
-ticks = [axmin,0, axmax]
-
-ax5.set_xlim([axmin, axmax])
-ax5.set_ylim([axmin, axmax])
-ax5.set_zlim([axmin, axmax])
-#
-ax5.tick_params(axis='both', which='major', pad=0)
-ax5.axes.xaxis.set_ticklabels([])
-ax5.axes.yaxis.set_ticklabels([])
-ax5.axes.zaxis.set_ticklabels([])
-
-# make scalebar
-axesNames = [ax5.xaxis, ax5.yaxis, ax5.zaxis]
-for tmp, loc in zip(axesNames, [(0,0,0),(1,1,1),(2,2,2)]):
-    tmp._axinfo['juggled']=loc
-
-# make a scale bar in 3d
-scX, scY, scZ = 0.02,0.005,-0.04
-names = ['PC1', 'PC2', 'PC3']
-align = ['right', 'left','center']
-for i in range(3):
-    l = np.zeros(3)
-    l[i] = 1
-    ax5.plot([scX, scX +l[0]], [scY, scY+l[1]], [scZ, scZ+l[2]], color='k')
-    l = np.zeros(3)+axmin
-    l[i] = axmax+0.0075*2.5
-    if i ==2:
-        l[i] = axmax+0.0075
-    ax5.text(l[0], -l[1], l[2], names[i], horizontalalignment=align[i],\
-        verticalalignment='center', color = Ls[i])
-
-moveAxes(ax5, action='left', step=0.04 )
-#moveAxes(ax5, action='down', step=0.04 )
-#moveAxes(ax5, action='scaley', step=0.02 )
-
-# pc axes projection
-sciformat = 1.
-multicolor(axproj,x*sciformat,y*sciformat,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
-#axproj.set_xlabel(r'PC1 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[0])
-#axproj.set_ylabel(r'PC2 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[1])
-axproj.set_xlabel(r'PC1', labelpad=0, color=Ls[0])
-axproj.set_ylabel(r'PC2', labelpad=0, color=Ls[1])
-#moveAxes(axproj, action='up', step=0.02 )
-
-#### move everything up a bit
-for axi in [axetho, ax4]:
-    moveAxes(axi, 'up', 0.04)
-#################################################
-##
-## third row - autocorrelations
-##
-#################################################
 # plot mean autocorrelation moving versus immobile
-# Todo variance explained for moving and immobile
-colorsExp = {'moving': R1, 'immobilized': B1}
-colorsCtrl = {'moving': N0,'immobilized': N1}
-
-# all moving gcamps
 movExp = ['AML32_moving', 'AML70_chip']
-imExp = ['AML32_immobilized', 'AML70_immobilized']
-
+imExp = ['AML32_immobilized']#, 'AML70_immobilized']
 
 # all moving gfp
 movCtrl = ['AML18_moving', 'AML175_moving']
 imCtrl = ['AML18_immobilized']
 
-
-gsPer= gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=gsHeatmap[3,:], wspace=0.1)
+gsPer= gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gsHeatmap[0,2:], wspace=0.1)
 colorsExp = {'moving': R1, 'immobilized': B1}
 colorCtrl = {'moving': N0,'immobilized': N1}
 ax13 = plt.subplot(gsPer[0])
@@ -353,22 +179,235 @@ for typ, colors, axes in zip([[movExp, imExp], [movCtrl, imCtrl]], [colorsExp, c
             dset = data[key]['analysis']
             
             for idn in dset.keys():
-                results=  dset[idn]['Period']
                 
                 tmpdata.append(np.mean(dset[idn]['Period']['NeuronACorr'],axis=0)) 
                 T = dset[idn]['Period']['Periods']
         m, s = np.nanmean(tmpdata, axis=0), np.nanstd(tmpdata, axis=0)
         tmpdata= np.array(tmpdata)
-        ax.plot(T,tmpdata.T ,'-',color = colors[condition], lw=1, alpha=0.35,label = '{} {}'.format(typ, condition))
+        ax.plot(T,tmpdata.T ,'-',color = colors[condition], lw=1.5, alpha=0.35,label = '{} {}'.format(typ, condition))
         ax.plot(T,tmpdata[0] ,'-',color = colors[condition], lw=2, alpha=1,label = '{} {}'.format(typ, condition))
         #ax.plot(T,np.mean(tmpdata,axis=0) ,'-',color = colors[condition], lw=5, alpha=0.5,label = '{} {}'.format(typ, condition))
         #ax.fill_between(dset[idn]['Period']['Periods'], m-s, m+s, alpha=0.5, zorder=-1,color = colors[condition])
         ax.axhline(color='k', linestyle = '--', zorder=-1)
         ax.set_ylim([-0.2,1])
-        
+        ax.text(0.5, 0.9,condition, transform=ax.transAxes, horizontalalignment='center')
+#ax13.set_ylabel('Autocorrelation')
+ax13.text(-0.5,0,'Autocorrelation', fontsize=14,transform = ax13.transAxes, rotation=90, verticalalignment ='center')
+ax15.set_xlabel('Lag (s)')
+ax16.set_xlabel('Lag (s)')
+ax13.set_xticks([])
+ax14.set_xticks([])
+ax14.set_yticks([])
+ax16.set_yticks([])
 
-        ax.set_xlabel('Lag (s)')
-ax13.set_ylabel('Autocorrelation')
+# plot autocorr of our favorite dataset
+#ax13.plot(transientAnalysis['Period1Half']['Periods'],np.mean(transientAnalysis['Period1Half']['NeuronACorr'],axis=0))
+#ax14.plot(transientAnalysis['Period2Half']['Periods'],np.mean(transientAnalysis['Period2Half']['NeuronACorr'],axis=0))
+
+# plot dimensionality for inactive and active plus together
+ax3 = plt.subplot(gsHeatmap[2,2])
+nComp = 10#results['nComp']
+for y, col, lab, mark in zip([results['expVariance'][:nComp],resultshalf['expVariance'][:nComp], results2half['expVariance'][:nComp]]\
+        , ['k', R1, B1], ['Full', 'Moving', 'Paralyzed'], ['o', '^', 's']):
+    #ax3.fill_between(np.arange(0.5,nComp+0.5),y*100, step='post', color=col, alpha=0.5)
+    ax3.plot(np.arange(1,nComp+1),np.cumsum(y)*100, 'o-',color = col, label = lab, marker=mark) 
+
+ax3.set_ylabel('Variance exp. (%)', labelpad=-5)
+ax3.set_yticks([0,25,50,75,100])
+ax3.set_xlabel('# of components')
+ax3.set_xticks([0,5, 10])
+
+# # Todo variance explained for moving and immobile -- should be in supplementary
+
+#ax11 = plt.subplot(gsHeatmap[2,-1])
+#for condition, keys, mark in zip([ 'immobilized','moving'], [ imExp,movExp], ['s', '^']):
+#    for key in keys:
+#        dset = data[key]['analysis']
+#        tmpdata = []
+#        for idn in dset.keys():
+#            results=  dset[idn]['PCA']
+#            rescale=  data[key]['input'][idn]['Neurons']['Activity'].shape[0]
+#            tmpdata.append(np.cumsum(results['expVariance'][:nComp]*100))       
+#    ax11.plot(np.arange(1,nComp+1),np.mean(tmpdata, axis=0) ,'-',color =colorsExp[condition], lw=1, label = '{} {}'.format(typ, condition))
+#    ax11.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = colorsExp[condition], marker=mark)
+#
+##ax11.set_ylabel('Explained variance (%)')
+#ax11.set_yticks([0,25,50,75,100])
+##ax12.set_yticks([0,25,50,75,100])
+#ax11.set_xlabel('# of components')
+#plt.legend()
+
+#################################################
+##
+## second row
+##
+#################################################
+# principal components
+ax4 =plt.subplot(gsHeatmap[2:3,0])#, sharex=axhm)
+# plot PCA components
+for i in range(np.min([len(results2half['pcaComponents']), 3])):
+    #y = results['pcaComponents'][i]
+    y = results2half['fullData'][i]
+    # normalize
+    y =y -np.min(y)
+    y =y/np.max(y)
+    ax4.text(-100, np.mean(y)+i*1.05, 'PC{}'.format(i+1), color = 'k')
+    ax4.plot(time[transient['Neurons']['valid']], i*1.1+y, label='Component {}'.format(i+1), lw=1, color = 'k')
+
+yloc = ax4.get_ylim()[-1]
+## indicate immobilization etc
+for label, segment in zip(['moving', 'immobilized'], [train, test]):
+
+    ax4.text(np.mean(timeActual[segment]), 1.02*yloc, label,horizontalalignment='center', color=colorsExp[label])
+    ax4.plot([timeActual[segment[0]],timeActual[segment[-1]]], [yloc, yloc], color=colorsExp[label])
+    
+# labels and such
+ax4.set_xlabel('Time (s)')
+ax4.set_xlim([np.min(timeActual), np.max(timeActual)])
+cleanAxes(ax4, where='y')
+
+
+# plot manifold! MANIFOOOOOLD!
+ax5 = plt.subplot(gsHeatmap[2,3], projection='3d', clip_on = False, zorder=-10)
+# plot manifold for split dataset
+x,y,z = results2half['fullData'][:3]
+x/=np.max(x)
+y/=np.max(y)
+z/=np.max(z)
+
+# make smoooth
+smooth = 12
+x = gaussian_filter1d(x, smooth)
+y = gaussian_filter1d(y, smooth)
+z = gaussian_filter1d(z, smooth)
+# color by before and after
+colorBy = np.zeros(len(timeActual))
+colorBy[:6*60*4] = 1 # first four minutes is m9
+multicolor(ax5,x[train],y[train],z[train],colorBy[train],c= transientcmap, threedim = True, etho = False, cg = 1)
+multicolor(ax5,x[test],y[test],z[test],colorBy[test],c= transientcmap, threedim = True, etho = False, cg = 1)
+ax5.scatter3D(x[::12], y[::12], z[::12], c=colorBy[::12], cmap=transientcmap, s=5)
+ax5.view_init(elev=15, azim=35)
+ax5.dist = 7
+axmin, axmax = -1, 1
+ticks = [axmin,0, axmax]
+
+ax5.set_xlim([axmin, axmax])
+ax5.set_ylim([axmin/2., axmax])
+ax5.set_zlim([axmin, axmax])
+#
+ax5.tick_params(axis='both', which='major', pad=-10)
+ax5.axes.xaxis.set_ticklabels([])
+ax5.axes.yaxis.set_ticklabels([])
+ax5.axes.zaxis.set_ticklabels([])
+
+# make scalebar
+axesNames = [ax5.xaxis, ax5.yaxis, ax5.zaxis]
+for tmp, loc in zip(axesNames, [(0,0,0),(1,1,1),(2,2,2)]):
+    tmp._axinfo['juggled']=loc
+
+# make a scale bar in 3d
+scX, scY, scZ = 0,2,-0.04
+names = [r'PC$_1$', 'PC$_2$', 'PC$_3$']
+align = ['left', 'left','left']
+for i in range(3):
+    l = np.zeros(3)
+    l[i] = 0.25
+    ax5.plot([scX, scX +l[0]], [scY, scY+l[1]], [scZ, scZ+l[2]], color='k')
+    l = np.zeros(3)+axmin
+    l[i] = axmax+0.05
+    if i ==0:
+        l[i] = axmax+0.1
+    ax5.text(l[0], l[1], l[2], names[i], horizontalalignment=align[i],\
+        verticalalignment='center', color = 'k')
+#ax5.spines['left'].set_position('zero')
+moveAxes(ax5, action='left', step=0.02 )
+#moveAxes(ax5, action='up', step=0.02 )
+moveAxes(ax5, action='scale', step=0.02 )
+
+# pc axes projection
+#sciformat = 1.
+#multicolor(axproj,x*sciformat,y*sciformat,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
+##axproj.set_xlabel(r'PC1 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[0])
+##axproj.set_ylabel(r'PC2 ($\times \, 10^{-2}$)', labelpad=0, color=Ls[1])
+#axproj.set_xlabel(r'PC1', labelpad=0, color=Ls[0])
+#axproj.set_ylabel(r'PC2', labelpad=0, color=Ls[1])
+##moveAxes(axproj, action='up', step=0.02 )
+#
+##### move everything up a bit
+#for axi in [axetho, ax4]:
+#    moveAxes(axi, 'up', 0.04)
+#################################################
+##
+## third row - autocorrelations
+##
+#################################################
+# individual rank order correlations for three examples
+gsRank = gridspec.GridSpecFromSubplotSpec(1,6,subplot_spec=gsHeatmap[4,:], width_ratios=[1, 1,1,1,0.2,1])
+ax8 = plt.subplot(gsRank[1])
+ax9 = plt.subplot(gsRank[2])
+ax10 = plt.subplot(gsRank[3])
+axcbar2 = plt.subplot(gsRank[4])
+
+movData = 'BrainScanner20170613_134800'
+immData = 'BrainScanner20180510_092218'
+transientData = 'BrainScanner20180511_134913'
+for key, dset, label, ax in zip(['AML32_moving', 'AML32_immobilized', 'AML32_chip'],[movData, immData, transientData], ['moving', 'immobilized', 'transient'], [ax8, ax9, ax10]):
+    rankC = data[key]['analysis'][dset]['PCArankCorr']
+    cax1 = ax.imshow(rankC, vmin=0, vmax=0.5)
+    for i in range(3):
+        # find best match, delete that option
+        ym, xm = np.unravel_index(np.abs(rankC).argmax(), rankC.shape)
+        if np.max(rankC)>0.25:
+            c = 'k'
+        else:
+            c='w'
+        ax.text(xm,ym, np.round(np.max(rankC), decimals=2), color=c, horizontalalignment ='center', verticalalignment ='center')
+        rankC[ym,:] =0
+        rankC[:,xm] =0
+#    for index, entry in enumerate(np.ravel(rankC)):
+#        loc = np.unravel_index(index, rankC.shape)
+#        ax.text(loc[0],loc[1], np.round(entry, decimals=2), horizontalalignment ='center', verticalalignment ='center')
+    ax.set_title(label)
+# colorbar for rank correlations
+cbar = fig.colorbar(cax1, cax=axcbar2, use_gridspec = True)
+cbar.set_ticks([0,0.5])
+cbar.set_ticklabels(['0', '>0.5'])
+cbar.outline.set_visible(False)
+moveAxes(axcbar2, 'scaley', -0.08)
+axcbar2.set_ylabel(r'Correlation', labelpad = -25)
+for ax in [ax8, ax9, ax10, axcbar2]:
+    moveAxes(ax, 'down', 0.05)
+
+# rank order of PCA weights
+ax11 = plt.subplot(gsRank[5])
+boxplot = []
+for keys in [movExp, imExp]:
+    r2 = []
+    for key in keys:
+        dset = data[key]['analysis']
+        for idn in dset.keys():
+            
+            rankC = np.abs(dset[idn]['PCArankCorr'])
+            tmp = []
+            for i in range(3):
+                # find best match, delete that option
+                tmp.append(np.max(rankC))
+                xm, ym = np.unravel_index(rankC.argmax(), rankC.shape)
+                rankC[xm,:] =0
+                rankC[:,ym] =0
+            
+            r2.append( np.mean(tmp))
+            
+    boxplot.append(r2)
+mkStyledBoxplot(ax11,[1,2], np.array(boxplot), [R1, B1], ['moving', 'immobilized'])
+ax11.set_ylim([0,0.5])
+ax11.set_yticks([0,0.5])
+ax11.set_xlim([0.5,2.5])
+# add single star for the transition dataset
+ax11.scatter([1.5],np.max(np.abs(transientAnalysis['PCArankCorr'])),s = 15, marker='s',lw=1, color= R1)
+ax11.scatter([1.5],np.max(np.abs(transientAnalysis['PCArankCorr'])),s = 15, marker='<',lw=1, color= B1)
+
+plt.show()
         #ax.imshow( tmpdata, aspect='auto', interpolation='none', origin='lower',extent=[T[0],T[-1],len(tmpdata),0],vmax=1)
 #ax13.text(-0.25,0,'Autocorrelation', fontsize=14,transform = ax13.transAxes, rotation=90, verticalalignment ='center')
 

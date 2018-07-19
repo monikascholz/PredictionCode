@@ -953,7 +953,7 @@ def plotSingleLinearFit(fig, gridloc, pars, results, data, splits, behaviors):
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
     
         # calculate y from model
-        yPred = np.dot(weights, x) + intercept
+        yPred =results[label]['output']# np.dot(weights, x) + intercept
         
         yTrain = np.ones(yPred.shape)*np.nan
         yTrain[trainingsInd] = yPred[trainingsInd]
