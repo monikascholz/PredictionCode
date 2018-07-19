@@ -73,14 +73,15 @@ movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 
 fig = plt.figure('Fig - 4 : Recreating postures', figsize=(9.5, 4.5))
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(2, 2, width_ratios = [1,1], height_ratios=[2,1])
+gs1 = gridspec.GridSpec(2, 2, width_ratios = [1,1], height_ratios=[2, 1])
 gs1.update(left=0.03, right=0.99, wspace=0.35, bottom = 0.1, top=0.99, hspace=0.15)
-# second row
+# third row
 gsNL = gridspec.GridSpecFromSubplotSpec(1, 6, subplot_spec=gs1[1,:], wspace=0.5, hspace=0.5, width_ratios = [1,1,1,1,1,1])
 
 ax3= plt.subplot(gsNL[0,0])
 ax1 = plt.subplot(gs1[0,0], aspect='equal')
 ax2 = plt.subplot(gs1[0,1], aspect='equal')
+
 # add a,b,c letters, 9 pt final size = 18pt in this case
 letters = ['A', 'B']
 y0 = 0.99
@@ -117,11 +118,11 @@ pc3New, pc2New, pc1New = pcsNew
 cl2 = dh.calculateCLfromEW(pcsNew, eigenworms, meanAngle, lengths, refPoint)
 # transform eigenworms exactly the same way. Otherwise we get some artefacts from nans
 r =(pcsNew[2]**2+pcsNew[1]**2)
-#r = (pcs[2]**2+pcs[1]**2)
+
 #=============================================================================#
 # here we reconstruct from the true angular velocity to check the math. This is smoothed, so we need to compare with this version
 #=============================================================================#
-xt, yt, zt = dh.recrWorm(avTrue, pc3, thetaTrue, r=r)
+xt, yt, zt = dh.recrWorm(avTrue, pc3, thetaTrue, r=r, show=False)
 pcsR = np.vstack([zt,yt, xt])
 clApprox = dh.calculateCLfromEW(pcsR, eigenworms, meanAngle, lengths, refPoint)
 #=============================================================================#
@@ -181,20 +182,11 @@ def fitfun(x,A,m,s):
     #return A*erf((x-m)/s)#*x
     #
     return (A*(1-np.exp(-(x-m)**2/s**2))+1)*x
-#plt.figure()
-#plt.scatter(ydata, abs(xdata-ydata),alpha=0.2)    
-#plt.show()
-p0 = [4,0,3] 
 
-#plt.figure()
-#plt.plot(fitfun(np.arange(-10,10,0.1), *p0))
-#plt.show()
+p0 = [4,0,3] 
 
 popt, pcov = curve_fit(fitfun, xdata, ydata, p0)#,bounds=[[-2,-10, -10], [15,10,10]])
 
-#plt.figure()
-#plt.plot(fitfun(xdata, *popt))
-#plt.show()
 print popt
 # new tP
 tPnew = fitfun(tP, *popt)
@@ -213,10 +205,10 @@ cl3 -= originalCMS
 # find samples that are starting with a reset
 print np.where(test%60==0)[0]
 print t[np.where(test%60==0)[0]]
-loc1, loc2 = 1090, 610
+loc1, loc2 = 1330, 610
 
 # plot predicted behaviors and location of postures
-ybeh = [10, 20]
+ybeh = [10, 15]
 #print -time[samplePost[0]]+time[samplePost[-1]]
 for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
             [N1, N1], [R1, B1], ybeh, ['Wave speed', 'Turn'], ['center', 'center']):
@@ -246,21 +238,22 @@ ax3.spines['left'].set_visible(False)
 ax3.spines['bottom'].set_visible(False)
 ax3.set_yticks([])
 ax3.set_xticks([])
+testloc1, testloc2 =test[loc1:loc1+60:6], test[loc2:loc2+60:6]
 
-for ax, samplePost, color in zip([ax1, ax2], [test[loc1:loc1+60:6], test[loc2:loc2+60:6]], [L0, L2]):
+for ax, samplePost, color in zip([ax1, ax2], [testloc1, testloc2], [L0, L2]):
     #=============================================================================#    
     # calculate mse
     #=============================================================================#
 #    plt.figure()
 #    mse = np.mean(np.sum((clPred - clApprox)**2, axis=2), axis=1)
-#    plt.plot(mse)
-#    plt.plot(test, np.abs(beh)*np.max(mse)/10)
+#    #plt.plot(mse)
+#    plt.plot(np.abs(beh)*np.max(mse)/10)
 #    print np.where(mse<1)
 #    plt.show()
     #=============================================================================#    
     # create finite-width worms
     #=============================================================================#
-    # offsets to create aspect ratio and spacing in equal proprtion plots
+    # offsets to create aspect ratio and spacing in equal proportion plots
     offsetx = 450
     offsety = 500
     # original worms
@@ -346,15 +339,21 @@ ax1.set_yticklabels(['original', 'inferred', 'linear', 'non-linear'])
 moveAxes(ax1, 'right', 0.07)
 
 
+#################################################
+##
+##second row - phase shift and mse
+##
+#################################################
+#mse = np.mean(np.sum((clPred - clApprox)**2, axis=2), axis=1)
+#ax1b.plot(np.arange(len(testloc1))*offsetx, mse[testloc1])
+#ax2b.plot(np.arange(len(testloc2))*offsetx, mse[testloc2])
+
 ################################################
 #
-#second row - non-linearity
+#third row - non-linearity
 #
 ################################################
-
-
 ax4 = plt.subplot(gsNL[0,1])
-
 # show non-linearity for one neuron
 ax4.scatter(xdata, ydata, color='k', alpha=0.01)
 ax4.plot(xdata, tPnew[indices], color=R1, linestyle='--', label='fit')
@@ -416,7 +415,7 @@ for key in ['AML32_moving', 'AML70_chip']:
         xdataS= xdata[indices]
         ydataS= ydata[indices]
        
-        p0 = [1,1,10] 
+        p0 = [4,5,10] 
 #        plt.plot(xdataS, fitfun(xdataS, *popt))
 #        plt.scatter(xdataS, ydataS)
 #        plt.show()

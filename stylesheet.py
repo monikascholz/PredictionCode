@@ -121,6 +121,8 @@ def cleanAxes(ax, where='all'):
     if where=='y':
         ax.spines['left'].set_visible(False)
         ax.set_yticks([])
+    else:
+        print 'Command not found. Use "x" or "y" or "all"'
         
 #=============================================================================#
 #                           plot normal plots

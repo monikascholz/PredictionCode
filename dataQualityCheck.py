@@ -16,7 +16,7 @@ mpl.rcParams['interactive']  = False
 #
 ###############################################
 typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'chip' # Moving, immobilized, chip
+condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -29,11 +29,11 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
+dataPars = {'medianWindow':25, # smooth eigenworms with gauss filter of that size, must be odd
             'gaussWindow':150, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
-            'interpolateNans': 12,#interpolate gaps smaller than this of nan values in calcium data
+            'interpolateNans': 6,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 
@@ -41,6 +41,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyList = np.sort(dataSets.keys())
     
 print keyList
+#keyList = keyList[-1:]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -58,6 +59,7 @@ pars ={'nCompPCA':10, # no of PCA components
         'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
         'useClust':False,# use clusters in the fitting procedure.
         'useDeriv':False,# use neural activity derivative for PCA
+        'useRaw':False,# use neural R/R0
         'testVolumes' : 6*60*1, # 2 min of data for test sets in nested validation
         'periods': np.arange(0, 300) # relevant periods in seconds for timescale estimate
         
@@ -72,12 +74,12 @@ behaviors = ['AngleVelocity','Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-overview = 0#False
+overview = 1#False
 predNeur = 0
-predPCA = 1
+predPCA = 0
 bta = 0
 svm = 0
-pca = 1#False
+pca = 0#False
 kato_pca= 0
 hierclust = False
 linreg = False
@@ -108,7 +110,7 @@ if createIndicesTest:
 ##############################################
 if overview:
         # line plots of neuronal activity, pretty
-    mp.neuralActivity(dataSets, keyList)
+    #mp.neuralActivity(dataSets, keyList)
         # cimple scatter of behavior versus neurons
     #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
         # heatmaps of neuronal activity ordered by behavior

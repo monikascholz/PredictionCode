@@ -601,7 +601,7 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
                                     # which neuron it is in dataset
                                     rowNeur = relevant[nneur]
                                     if rowNeur not in stored:
-                                        interestingNeurons.append([labels[candNeurons[nneur]], dset[idn]['Neurons']['RawActivity'][rowNeur, valid], dset[idn]['Behavior']['AngleVelocity'], dset[idn]['Behavior']['Eigenworm3']])
+                                        interestingNeurons.append([labels[candNeurons[nneur]], dset[idn]['Neurons']['RawActivity'][rowNeur], dset[idn]['Behavior']['AngleVelocity'], dset[idn]['Behavior']['Eigenworm3']])
                                         stored.append(rowNeur)
                                 #ax.text(xS[relevant[ nneur]], yS[relevant[ nneur]], labels[candNeurons[nneur]][:4], fontsize=8, alpha=1, color=c, horizontalalignment='center')
                         except ValueError:

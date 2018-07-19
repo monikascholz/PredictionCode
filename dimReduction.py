@@ -787,7 +787,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
             nfold = 5
         else:
             a = np.logspace(-3,0,100)
-            nfold =15
+            nfold =5
         #if label =='Eigenworm3':
         #    nfold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
@@ -864,15 +864,18 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #
 ##############################################    
 
-def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
+def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lag = None):
     """run EN to fit behavior and neural activity with a linear model."""
     linData = {}
     for label in behaviors:
         Y = np.copy(data['Behavior'][label])
-        Y = np.reshape(Y, (-1,1))
+        Y = np.reshape(Y, (-1,))
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = np.copy(data['Neurons']['rankActivity'].T)
+        if pars['useRaw']:
+            X = np.copy(data['Neurons']['RawActivity'].T)
+            X -= np.mean(X, axis = 0)
         elif pars['useClust']:
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
@@ -880,6 +883,9 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
             X = data['Neurons']['deconvolvedActivity'].T
         else:
             X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        if scramble:
+            # similar to GFP control: scamble timeseries
+            np.random.shuffle(Y)
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # implement time lagging -- forward and reverse
         if lag is not None:
@@ -897,26 +903,25 @@ def runElasticNet(data, pars, splits, plot = False, behaviors = ['AngleVelocity'
         Xtrain, Xtest = X[trainingsInd],X[testInd]
         Ytrain, Ytest = Y[trainingsInd],Y[testInd]
         # fit elasticNet and validate
-        cv = 10
+        
         if label =='Eigenworm3':
             l1_ratio = [0.95]
             #l1_ratio = [0.95]
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
-            nfold = 10
+            nfold = 5
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
-            fold = cv
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-4,-2,200)
-            nfold = 15
+            nfold = 5
         #cv = 15
         #a = np.logspace(-3,-1,100)
        # fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random')#, tol=1e-5)# alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -1306,16 +1311,15 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         
         linData[label]['output'] = lin.predict(pcs)
         
-        # check how well it performs with more PCs
-        r2_more = []
-        for nC in range(1, Neuro.shape[1], 1):
-            pca = PCA(n_components = nC)
-            pcs = pca.fit_transform(Neuro)
-            lin.fit(pcs[train], behavior[train])
-            r2_more.append(lin.score(pcs[test], behavior[test]))
-            
-        linData[label]['r2PCS'] = r2_more
-        linData[label]['r2PCSx'] = range(1, Neuro.shape[1], 1)
-        plt.plot(linData[label]['r2PCSx'], linData[label]['r2PCS'], 'ro-')
-        plt.show()
+#        # check how well it performs with more PCs
+#        r2_more = []
+#        for nC in range(1, Neuro.shape[1], 1):
+#            pca = PCA(n_components = nC)
+#            pcs = pca.fit_transform(Neuro)
+#            lin.fit(pcs[train], behavior[train])
+#            r2_more.append(lin.score(pcs[test], behavior[test]))
+#            
+#        linData[label]['r2PCS'] = r2_more
+#        linData[label]['r2PCSx'] = range(1, Neuro.shape[1], 1)
+        
     return linData

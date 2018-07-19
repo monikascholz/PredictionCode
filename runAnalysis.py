@@ -13,8 +13,8 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML70' # possible values AML32, AML18, AML70
-condition = 'immobilized' # Moving, immobilized, chip
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -51,6 +51,7 @@ pars ={'nCompPCA':20, # no of PCA components
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
         'useDeconv': 0, # use the deconvolved transformed version of neural data for all analyses
+        'useRaw': 0, # use the deconvolved transformed version of neural data for all analyses
         'nCluster': 10, # use the deconvolved transformed version of neural data for all analyses
         'useClust':False,# use clusters in the fitting procedure.
         'periods': np.arange(0, 300) # relevant periods in seconds for timescale estimate
@@ -294,6 +295,9 @@ if elasticnet:
         subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
         resultDict[key]['ConversePredictionEN'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
         
+        # run scrambled control
+        print 'Running Elastic Net scrambled'
+        resultDict[key]['ElasticNetRandomized'] = dr.runElasticNet(dataSets[key], pars,splits, plot=0, behaviors = behaviors, scramble=True)
 
 #%%
 ###############################################    

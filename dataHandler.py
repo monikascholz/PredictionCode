@@ -21,9 +21,15 @@ def recrWorm(av, turns, thetaTrue, r, show = 0):
     """recalculate eigenworm prefactor from angular velocity and turns."""
     thetaCum = np.cumsum(av)
     # reset theta every minute to real value   
-    dt = np.arange(30, len(thetaCum), 60)
+    dt = np.arange(0, len(thetaCum), 60)
     for tt in dt:    
         thetaCum[tt:] -= -thetaTrue[tt]+thetaCum[tt]
+    radius = np.zeros(len(av)) 
+    for tt in dt:
+        radius[tt:] = r[tt]
+#    plt.plot(radius)
+#    plt.show()
+    r = radius
 #    thetaCum -= thetaCum[50]-thetaTrue[50] 
 #    thetaCum -= np.mean(thetaCum)- np.mean(thetaTrue)
     #tt = 0
@@ -253,6 +259,7 @@ def transformEigenworms(pcs, dataPars):
     theta = np.unwrap(np.arctan2(pcs[2], pcs[1]))
     # convolution with gaussian kernel derivative
     velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
+    # velo is in radians/frame
     for pcindex, pc in enumerate(pcs):
         pcs[pcindex] = gaussian_filter1d(pc, dataPars['medianWindow'])
     return pcs, velo, theta
@@ -309,7 +316,8 @@ def loadData(folder, dataPars, ew=1):
     pcs, velo, theta = transformEigenworms(pcsFull, dataPars)
     #downsample to 6 volumes/sec
     pc3, pc2, pc1 = pcs[:,clIndices]
-    velo = velo[clIndices]
+
+    velo = velo[clIndices]*50/6. # to get it in per Volume units
     theta = theta[clIndices]
     cl = clFull[clIndices]
     # ethogram redone
@@ -345,7 +353,7 @@ def loadData(folder, dataPars, ew=1):
     # make a map with all nans smoothed out if larger than some window    
     nanmask =[np.repeat(np.nanmean(chunky_window(line, window= dataPars['interpolateNans']), axis=1), dataPars['interpolateNans']) for line in Ratio]
     nanmask = np.array(nanmask)[:,:Y.shape[1]]   
-    Rfull = dR
+    Rfull = np.copy(dR)
     Rfull[np.isnan(nanmask)] =np.nan
     
     Y = Y[order]
@@ -392,7 +400,7 @@ def loadData(folder, dataPars, ew=1):
     dataDict['Neurons']['TimeFull'] =  time # actual time
     dataDict['Neurons']['ActivityFull'] =  Rfull[order] # full activity
     dataDict['Neurons']['Activity'] = preprocessing.scale(Y[:,nonNan].T).T # redo because nans
-    dataDict['Neurons']['RawActivity'] = dR#[:,nonNan]
+    dataDict['Neurons']['RawActivity'] = dR[:,nonNan]
     dataDict['Neurons']['derivActivity'] = dY[:,nonNan]
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
     dataDict['Neurons']['Positions'] = neuroPos
