@@ -487,7 +487,7 @@ axweight = plt.subplot(weightLocs[0,0], aspect='equal', clip_on=False)
 axweight2 = plt.subplot(weightLocs[0,1], aspect='equal', clip_on=False)
 axweight3 = plt.subplot(weightLocs[1,0], aspect='equal', clip_on=False)
 axweight4 = plt.subplot(weightLocs[1, 1], aspect='equal', clip_on=False)
-from pycpd import deformable_registration, rigid_registration
+from pycpd import deformable_registration, rigid_registration, affine_registration
 index = 0
 markers = ['p', '^', '*', 'X', '+', '8', 's']
 # use the moving dataset as reference
@@ -497,7 +497,7 @@ Xref -=np.mean(Xref,axis=0)
 neuron2D = 'utility/celegans277positionsKaiser.csv'
 labels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
 neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
-relevantIds = (neuronAtlas2D[:,0]>0.0)#*(Xref[:,0]<0.1)
+relevantIds = (neuronAtlas2D[:,0]>-0.1)#*(Xref[:,0]<0.1)
 A = neuronAtlas2D[relevantIds]
 A[:,0] = -A[:,0]
 labels = labels[relevantIds]
@@ -506,11 +506,11 @@ A /= np.ptp(A, axis=0)
 A*= 1.2*np.ptp(Xref[:,:2], axis=0)
 # register atlas to reference dataset
 registration = rigid_registration
-reg = registration(Xref[:,:2], A)
+reg = registration(Xref[:,:2], A, tolerance=1e-5)
 reg.register(callback=None)
-registration = deformable_registration
+registration =deformable_registration
 
-reg = registration(Xref[:,:2],reg.TY)
+reg = registration(Xref[:,:2],reg.TY, tolerance=1e-5)
 def callback(iteration, error, X, Y):
     return 0
 reg.register(callback)
@@ -531,11 +531,11 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
             xS, yS, _ = X.T
             registration = rigid_registration
             
-            reg = registration(Xref, X)
+            reg = registration(Xref, X, tolerance=1e-5)
             reg.register(callback=None)
             registration = deformable_registration
             
-            reg = registration(Xref, reg.TY)
+            reg = registration(Xref, reg.TY, tolerance=1e-5)
             reg.register(callback=None)
             xS, yS, zS = reg.TY.T
             #print reg.R
@@ -564,22 +564,23 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
                 
                 if len(avRelevant)>0:
                     axweight.scatter(xS,yS,color=N1, s = s0, alpha=0.2)
-                    axweight.scatter(xS[avRelevant],yS[avRelevant],color=R2, s = np.linspace(8,64,len(avRelevant)), marker=markers[index], alpha=0.5)
+                    axweight.scatter(xS[avRelevant],yS[avRelevant],color=R2, s = s0, marker=markers[index], alpha=0.5)
                     
                 
                 axweight2.scatter(xS,yS,color=N1, s = s0, alpha=0.2)
-                axweight2.scatter(xS[tRelevant],yS[tRelevant],color=B1, s = np.linspace(8,64,len(tRelevant)), marker=markers[index], alpha=0.5)
+                axweight2.scatter(xS[tRelevant],yS[tRelevant],color=B1, s = s0, marker=markers[index], alpha=0.5)
                 
-                n = 3
+                n = 5
+                radius = 5
+                #plot circles around relevant regions
+                #if len(avRelevant)>0:
+                    
+                    # axweight3.scatter(xS[avRelevant[-n:]],yS[avRelevant[-n:]],color=R2, s = s1, marker=markers[index], alpha=0.5)
+                    
+                #axweight4.scatter(xS[tRelevant[-n:]],yS[tRelevant[-n:]],color=B1, s = s2, marker=markers[index], alpha=0.5)
                 
-                #axweight3.scatter(xS,yS,color=N1, s = s0, alpha=0.2)
-                if len(avRelevant)>0:
-                    axweight3.scatter(xS[avRelevant[-n:]],yS[avRelevant[-n:]],color=R2, s = s1, marker=markers[index], alpha=0.5)
-                
-                
-                #axweight4.scatter(xS,yS,color=N1, s = s0, alpha=0.2)
-                axweight4.scatter(xS[tRelevant[-n:]],yS[tRelevant[-n:]],color=B1, s = s2, marker=markers[index], alpha=0.5)
-                # show a few text labels next to neurons
+               
+                 # show a few text labels next to neurons
                 # calculate distance of neuron to text
                 stored = []
                 for axes, relevant, c in zip([[axweight, axweight3], [axweight2, axweight4]], [avRelevant, tRelevant], [R1, B1]):
@@ -603,7 +604,11 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
                                     if rowNeur not in stored:
                                         interestingNeurons.append([labels[candNeurons[nneur]], dset[idn]['Neurons']['RawActivity'][rowNeur, valid], dset[idn]['Behavior']['AngleVelocity'], dset[idn]['Behavior']['Eigenworm3']])
                                         stored.append(rowNeur)
-                                #ax.text(xS[relevant[ nneur]], yS[relevant[ nneur]], labels[candNeurons[nneur]][:4], fontsize=8, alpha=1, color=c, horizontalalignment='center')
+                                    ax.text(xS[relevant[ nneur]], yS[relevant[ nneur]], labels[candNeurons[nneur]][:4], fontsize=8, alpha=1, color=c, horizontalalignment='center')
+                                    xAt, yAt = A[candNeurons[nneur]]
+                                    circle = plt.Circle((xAt, yAt), radius=radius, color=c, alpha=0.5)
+                                    ax.add_patch(circle)
+                            
                         except ValueError:
                             pass
                 
