@@ -54,10 +54,10 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - 2 : Behavior is represented in the brain', figsize=(9.5, 4.5))
+fig = plt.figure('Fig - 2 : Behavior is represented in the brain', figsize=(9.5, 9*3/4))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.5,0.5], height_ratios=[1,0.1,0.9, 0.75])
-gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0.45)
+gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0.25)
 ################################################
 #
 # letters
@@ -127,8 +127,9 @@ cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
 cbar.set_ticks([-0.5,0,2])
 cbar.set_ticklabels(['<-0.5',0,'>2'])
 cbar.outline.set_visible(False)
-moveAxes(axcb, 'left', 0.06)
+moveAxes(axcb, 'left', 0.04)
 moveAxes(axcb, 'scaley', -0.08)
+moveAxes(axcb, 'scalex', -0.02)
 axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -25)
 #ethogram
 
@@ -200,10 +201,13 @@ ax8.set_xlim([timeActual[0], timeActual[-1]])
 # right column
 #
 ################################################
+# one nice gridspec
+gsPred = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[0:3,2:],width_ratios=[1.5,1], hspace=0.35, wspace=0.5)
+
 # output of behavior prediction from PCA
 flag = 'PCAPred'
 ybeh = [0, -5]
-axscheme1 = plt.subplot(gs1[0,2])
+axscheme1 = plt.subplot(gsPred[0,0])
 for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
             [N1, N1], [R1, B1], ybeh, ['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior]
@@ -224,14 +228,14 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
 l =120
 y = axscheme1.get_ylim()[0]
 axscheme1.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
-axscheme1.text(t[0]+l*0.5,y*0.9, '2 min', horizontalalignment='center')
+axscheme1.text(t[0]+l*0.5,y*0.95, '2 min', horizontalalignment='center')
 cleanAxes(axscheme1)
 
 
 # output of behavior prediction from elastic net
 flag = 'ElasticNet'
 ybeh = [0, -5]
-axscheme2 = plt.subplot(gs1[2,2])
+axscheme2 = plt.subplot(gsPred[1,0], sharex=axscheme1)
 for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
             [N1, N1], [R1, B1], ybeh, ['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior]
@@ -252,31 +256,33 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
 l =120
 y = axscheme2.get_ylim()[0]
 axscheme2.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
-axscheme2.text(t[0]+l*0.5,y*0.9, '2 min', horizontalalignment='center')
+axscheme2.text(t[0]+l*0.5,y*0.95, '2 min', horizontalalignment='center')
 cleanAxes(axscheme2)
-#for axtmp in [axscheme1, axscheme2]:
-#    axtmp.spines['left'].set_visible(False)
-#    axtmp.spines['bottom'].set_visible(False)
-#    axtmp.set_yticks([])
-#    axtmp.set_xticks([])
-    #axtmp.set_xlabel('Time (s)')
+###################################
+# scatter of Prediction versus True
+###################################
+gsScatter = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsPred[1,1])
+axscatter1 = plt.subplot(gsScatter[0])
+axscatter2 = plt.subplot(gsScatter[1])
 
-
-
-# predict neural activity from behavior
-gsLasso = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs1[0,3], width_ratios=[1,1], wspace=0.2, hspace=0.1)
+for behavior, cpred, yl, label, ax in zip(['AngleVelocity','Eigenworm3' ], \
+            [R1, B1], ybeh, ['Velocity', 'Turn'],[axscatter1, axscatter2] ):
+    beh = moving['Behavior'][behavior][test]
+    behPred = movingAnalysis[flag][behavior]['output'][test]
+    xPlot, y, yerr = sortnbin(beh, behPred, nBins=10, rng=[np.min(beh), np.max(beh)])
+    ax.errorbar(xPlot, y, yerr=yerr, color=cpred, linestyle='None', marker='o')
+    
+    ax.plot([min(xPlot),max(xPlot)], [min(xPlot), max(xPlot)], 'k:')
+########################################
+# predict behavior from PCA axes
+########################################
 flag = 'PCAPred'
 
-axNav= plt.subplot(gsLasso[0,0])
-axNt = plt.subplot(gsLasso[0,1])
-
-gsBrokenAxis = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsLasso[0,0])
-
-for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, N0), (B2, N0)], [axNav, axNt ]):
-
+axR2 = plt.subplot(gsPred[0,1])
+scores = []
+locs = [0, 0.75]
+for behavior, color, loc in zip(['AngleVelocity', 'Eigenworm3'], [R1, B1], locs):
     alldata = []
-    # experiment
-    c = colors[0]
     for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
         dset = data[key]['analysis']
         keep = []
@@ -286,31 +292,69 @@ for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, N0), (B
             
         keep = np.array(keep)
         rnd1 = np.random.rand(len(keep))*0.2
-        axR2.scatter(np.zeros(len(keep))+rnd1, keep, marker = marker, c = c, edgecolor=c, alpha=0.5)
+        axR2.scatter(np.zeros(len(keep))+rnd1+loc+0.15, keep, marker = marker,s=15, c = color, alpha=0.5)
         alldata.append(keep)
-    alldata = np.array(alldata)
-    mkStyledBoxplot(axR2, [-0.5, 1.5], alldata.T, [c], ['GCamp6s'], scatter=False)
-    # controls
-    c = colors[1]
-    ctrldata = []
-    xoff = 1.5
-    for key, marker in zip(['AML18_moving', 'AML175_moving'],['o', "p"]):
+    scores.append(np.concatenate(alldata))
+scores = np.array(scores)
+print scores
+mkStyledBoxplot(axR2, locs, scores, [R1, B1], ['Velocity', 'Turn'], scatter=False, rotate=False)
+axR2.axhline(linestyle=':', color='k')
+
+axR2.set_xlim([-0.25, 1.25])
+axR2.set_ylabel(r'$R^2$ (Testset)')
+
+################################################################
+# Plot test results!
+###################################################################
+flag='ElasticNet'
+gsLasso = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs1[3,1:], width_ratios=[1.5,1])
+axV = plt.subplot(gsLasso[0])
+axT = plt.subplot(gsLasso[1])
+## designate colors
+colorsExp = {'AngleVelocity': R1, 'Eigenworm3': B1}
+colorCtrl = {'AngleVelocity': N0,'Eigenworm3': N1}
+# get all the scores for gcamp
+gcamp = []
+for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [0, 3]):
+    scores = []
+    for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
         dset = data[key]['analysis']
         keep = []
         for idn in dset.keys():
             results=  dset[idn][flag][behavior]
-            keep.append(results['scorepredicted'])
+            try:
+                keep.append(np.array([results['scorepredicted'], np.max(results['individualScore'])]))
+            except ValueError:
+                keep.append(np.array([results['scorepredicted'], 0]))
+        # do some plotting
         keep = np.array(keep)
         rnd1 = np.random.rand(len(keep))*0.2
-        axR2.scatter(xoff+np.zeros(len(keep))+rnd1, keep, marker = marker,c = c, edgecolor=c, alpha=0.5)
-        ctrldata.append(keep)
-    ctrldata = np.array(ctrldata)
-    mkStyledBoxplot(axR2, [-0.5+xoff, 1.5+xoff], ctrldata.T, [c,], ['Control (GFP)'], scatter=False)
-    
-    axR2.set_xlim([-1, 2.5])
-    axR2.set_xticks([-0.5,-0.5+xoff])
-    axR2.set_xticklabels(['GCaMP6s', 'GFP'])
-axNav.set_ylabel(r'$R^2$ (Testset)')
+        rnd2 = np.random.rand(len(keep))*0.2
+        c = colorsExp[behavior]
+        axV.set_color_cycle( [c if line[0]>line[1] else N2 for line in keep])
+        axV.scatter(xoff+np.zeros(len(keep))+rnd1, keep[:,0], marker = marker,c = c, edgecolor=c, alpha=0.5, s=25)
+        axV.scatter(xoff+np.ones(len(keep))+rnd2, keep[:,1], marker = marker, c = c, edgecolor=c, alpha=0.5, s=25)
+        
+        axV.plot(np.vstack([rnd1, 1+rnd2])+xoff, keep.T, zorder=-2, linestyle=':')
+   
+        scores.append(keep)
+    gcamp.append(np.concatenate(scores, axis=0))
+gcamp = np.array(gcamp)
+print gcamp.shape
+# now boxplot for the full set
+binloc = [-0.25, 2.25]
+x0 = -0.25
+mkStyledBoxplot(axV, [x0, x0+3],gcamp[:,:,0],[R1, B1], [1,2],scatter=False, dx=1.25  )
+mkStyledBoxplot(axV, [x0+1.75, x0+1.75+3],gcamp[:,:,1],[R1, B1], [1,2], scatter=False, dx=1.25)
+axV.set_xlim([-0.5,4.75])
+axV.set_xticks([x0, x0+1.75, x0+3, x0+1.75+3 ])
+axV.set_xticklabels(['G', 'S', 'G', 'S'])
+
+#scores_gcamp = np.array(scores_gcamp)      
+### plotting starts here
+
+#mkStyledBoxplot(axV, [0,1], )
+
 
 plt.show()
 # get all the weights for the different samples

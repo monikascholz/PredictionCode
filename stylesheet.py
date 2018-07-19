@@ -190,9 +190,10 @@ def multicolor(ax,x,y,z,t,c, threedim = True, etho = False, cg = 1):
     return lc
 
 
-def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True) : 
+def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True, rotate=True, dx=None) : 
     """nice boxplots with scatter"""
-    dx = np.min(np.diff(x_data))
+    if dx==None:
+        dx = np.min(np.diff(x_data))
     lw = 1.5
     for xd, yd, cl in zip(x_data, y_data, clrs) :
        
@@ -219,7 +220,10 @@ def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True) :
     ax.xaxis.set_ticks_position('bottom') # turn off top ticks
     ax.get_xaxis().set_tick_params(direction='out')
     ax.patch.set_facecolor('white') # ('none')
-    ax.set_xticklabels(lbls, rotation=30)
+    if rotate:
+        ax.set_xticklabels(lbls, rotation=30)
+    else:
+        ax.set_xticklabels(lbls)
 
 
 def plotManifoooold(x,y,z,colorBy, ax):
