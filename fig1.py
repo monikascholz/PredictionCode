@@ -15,7 +15,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.ticker as mtick
 #
-import singlePanels as sp
+#import singlePanels as sp
 import makePlots as mp
 import dataHandler as dh
 

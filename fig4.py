@@ -211,7 +211,7 @@ loc1, loc2 = 1330, 610
 ybeh = [10, 15]
 #print -time[samplePost[0]]+time[samplePost[-1]]
 for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
-            [N1, N1], [R1, B1], ybeh, ['Wave speed', 'Turn'], ['center', 'center']):
+            [N1, N1], [R1, B1], ybeh, ['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior][test]
     
     meanb, maxb = np.mean(beh),np.std(beh)
@@ -415,11 +415,11 @@ for key in ['AML32_moving', 'AML70_chip']:
         xdataS= xdata[indices]
         ydataS= ydata[indices]
        
-        p0 = [4,5,10] 
+        p0 = [10,5,10] 
 #        plt.plot(xdataS, fitfun(xdataS, *popt))
 #        plt.scatter(xdataS, ydataS)
 #        plt.show()
-        popt, pcov = curve_fit(fitfun, xdataS, ydataS, p0)#,  bounds=[[-10,1, -10], [10,4,100]])
+        popt, pcov = curve_fit(fitfun, xdataS, ydataS, p0,  bounds=[[0,1, -10], [10,10,100]])
         print popt
         fitdata.append(popt[0])
         
