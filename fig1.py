@@ -27,8 +27,8 @@ from stylesheet import *
 ################################################
 
 data = {}
-for typ in ['AML32', 'AML18']:
-    for condition in ['chip', 'moving', 'immobilized']:# ['moving', 'immobilized', 'chip']:
+for typ in ['AML32', 'AML18', 'AML70', 'AML175']:
+    for condition in ['chip', 'moving', 'immobilized', 'chip']:# ['moving', 'immobilized', 'chip']:
         folder = '{}_{}/'.format(typ, condition)
         dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
         outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
@@ -316,23 +316,29 @@ ax15 = plt.subplot(gsAct[0,2])
 bins = np.linspace(-1,2,50)
 x = bins[:-1] + np.diff(bins)*0.5
 activities = []
-for typ in ['AML32', 'AML18']:
+gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
+gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
+for typ in [gfp, gcamp]:
     for condition in ['moving', 'immobilized']:
-        key = '{}_{}'.format(typ, condition)
-        dset = data[key]['input']
+        keys = typ[condition]
         tmpdata = []
-        for idn in dset.keys():
-            tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in dset[idn]['Neurons']['RawActivity']], axis=0))
+        for key in keys:
+            dset = data[key]['input']
+            
+            for idn in dset.keys():
+                tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in dset[idn]['Neurons']['RawActivity']], axis=0))
         activities.append(tmpdata)
+
+
 # plot gfp and gcamp moving in a panel
 histograms = []
-for hindex, (hist, c) in enumerate(zip([activities[0],  activities[2]], [colorsExp['moving'], colorCtrl['moving']])):
+for hindex, (hist, c) in enumerate(zip([activities[2],  activities[0]], [colorsExp['moving'], colorCtrl['moving']])):
     m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
     ax13.plot(x, m, color = c, zorder=2)
     ax13.fill_between(x, m-s,m+s, color = c, alpha=0.5)
     histograms.append(m)
 # plot gfp and gcamp immobiulized in a panel
-for hindex, (hist, c) in enumerate(zip([activities[1],  activities[3]], [colorsExp['immobilized'], colorCtrl['immobilized']])):
+for hindex, (hist, c) in enumerate(zip([activities[3],  activities[1]], [colorsExp['immobilized'], colorCtrl['immobilized']])):
     m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
     ax14.plot(x, m, color = c, zorder=2)
     ax14.fill_between(x, m-s,m+s, color = c, alpha=0.5)
@@ -358,16 +364,33 @@ ax15.set_yticks([0.5,1])
 # boxplot of signal percentage in each recording
 ax12 = plt.subplot(gs1[2,3])
 color, labels, ydata = [],[],[]
-for typ, colors in zip(['AML32', 'AML18'], [colorsExp, colorCtrl]):
+
+gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
+gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
+for typ in [gfp, gcamp]:
     for condition in ['moving', 'immobilized']:
-        color.append(colors[condition])
-        labels.append('{} {}'.format(typ, condition))
+        keys = typ[condition]
         tmpdata = []
-        key = '{}_{}'.format(typ, condition)
-        dset = data[key]['input']
-        for idn in dset.keys():
-            tmpdata.append(np.mean(dset[idn]['Neurons']['Activity']))
+        for key in keys:
+            dset = data[key]['input']
+            
+            for idn in dset.keys():
+                tmpdata.append(np.nanmean(dset[idn]['Neurons']['RawActivity']))
         ydata.append(tmpdata)
+
+color = [N0, N1, R1, B1]
+labels = ['M(CTrl)', 'I(Ctrl)', 'M', 'I']
+#for typ, colors in zip(['AML32', 'AML18'], [colorsExp, colorCtrl]):
+#    for condition in ['moving', 'immobilized']:
+#        color.append(colors[condition])
+#        labels.append('{} {}'.format(typ, condition))
+#        tmpdata = []
+#        key = '{}_{}'.format(typ, condition)
+#        dset = data[key]['input']
+#        for idn in dset.keys():
+#            tmpdata.append(np.mean(dset[idn]['Neurons']['Activity']))
+#        ydata.append(tmpdata)
+
 x_data = np.arange(len(ydata))
 mkStyledBoxplot(ax12, x_data, ydata, color, labels)
 
