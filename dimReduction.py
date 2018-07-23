@@ -284,9 +284,17 @@ def rankCorrPCA(results):
     tmpdata = np.zeros((3,3))
     for pc1 in range(3):
         for pc2 in range(3):
+            # rank correlation
             rankHalf1 = np.argsort(results['PCAHalf1']['neuronWeights'][:,pc1])
             rankHalf2 = np.argsort(results['PCAHalf2']['neuronWeights'][:,pc2])
-            tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
+            
+            #tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
+            print np.corrcoef(rankHalf1, rankHalf2)[0,1],
+            #dot product instead
+            v1 = results['PCAHalf1']['neuronWeights'][:,pc1]
+            v2 = results['PCAHalf2']['neuronWeights'][:,pc2]
+            tmpdata[pc1, pc2] = np.dot(v1, v2)/np.linalg.norm(v1)/np.linalg.norm(v2)
+            print tmpdata[pc1, pc2]
     return tmpdata
 ###############################################    
 # 

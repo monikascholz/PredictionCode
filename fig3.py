@@ -648,20 +648,20 @@ axweight.text(xmax, ymid, 'P', horizontalalignment = 'left', verticalalignment =
 #
 ################################################
 print labels_moving
-gsDendro = gridspec.GridSpecFromSubplotSpec(4,3, gs1[4, :], width_ratios=[0.5,1,0.35], hspace=0.1, wspace=0.1)
-ax1 = plt.subplot(gsDendro[:3,0])
+gsDendro = gridspec.GridSpecFromSubplotSpec(2,3, gs1[4, :], width_ratios=[0.5,1,0.5], hspace=0.1, wspace=0.1)
+ax1 = plt.subplot(gsDendro[:2,0])
 ax2 = plt.subplot(gsDendro[:2,1])
 ax3 = plt.subplot(gsDendro[:2,2], zorder=1)
-ax4 = plt.subplot(gsDendro[3:,0])
-ax5 = plt.subplot(gsDendro[2:,1])
-ax6 = plt.subplot(gsDendro[2:,2], sharey=ax3)
-axs = [[ax1, ax2, ax3], [ax4, ax5, ax6]]
+#ax4 = plt.subplot(gsDendro[3:,0])
+#ax5 = plt.subplot(gsDendro[2:,1])
+#ax6 = plt.subplot(gsDendro[2:,2], sharey=ax3)
+axs = [[ax1, ax2, ax3]]
 links = [L1, L2, L3, L0]
 set_link_color_palette(links)
 
 neurons = moving['Neurons']['RawActivity']
 t = moving['Neurons']['Time']
-for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity', 'Eigenworm3'], [R1, B1], ['Wave speed', 'Turn'])):
+for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity'], [R1, B1], ['Wave speed', 'Turn'])):
     beh =moving['Behavior'][behavior]
     
     Weights =movingAnalysis[flag][behavior]['weights']
@@ -713,9 +713,9 @@ for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity', 'Eigenworm3'], [R1,
         axs[0][2].plot([xPlot[0], xPlot[0]], [3,3.5], color=c, lw = 2)
         axs[0][2].text(xPlot[0]+0.005,3.25 , r'$\Delta R/ R_0 = 0.5$', verticalalignment = 'center')
         
-    axs[1][2].set_xticks([-10, 10])
-    axs[1][2].set_xticklabels(['Ventral',' Dorsal'])
-    axs[0][2].set_xticks([-0.02, 0.04])
+#    axs[1][2].set_xticks([-10, 10])
+#    axs[1][2].set_xticklabels(['Ventral',' Dorsal'])
+    axs[0][2].set_xticks([-0.2, 0.4])
     axs[0][2].set_xticklabels(['Reverse',' Forward'])
         
     axs[b][2].spines['left'].set_visible(False)
@@ -728,14 +728,14 @@ for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity', 'Eigenworm3'], [R1,
     axs[0][1].spines['bottom'].set_visible(False)
    
     axs[b][1].set_yticks([])
-    axs[1][0].spines['bottom'].set_visible(False)
+#    axs[1][0].spines['bottom'].set_visible(False)
     axs[0][0].spines['bottom'].set_visible(False)
     axs[0][0].set_xticks([])
-    axs[1][1].set_xlabel('Time (s)')
+#    axs[1][1].set_xlabel('Time (s)')
     
-for ax in [ax1, ax4]:
-    moveAxes(ax, 'left', 0.05)
-for ax in [ax1, ax2, ax3, ax4, ax5, ax6]:
+
+moveAxes(ax1, 'left', 0.05)
+for ax in [ax1, ax2, ax3]:
     #moveAxes(ax, 'scale', 0.025)
     moveAxes(ax, 'up', 0.05)
 plt.show()

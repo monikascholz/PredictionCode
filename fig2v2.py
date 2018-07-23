@@ -54,9 +54,9 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - 2 : Behavior is represented in the brain', figsize=(9.5, 9*3/4))
+fig = plt.figure('Fig - 2 : Behavior is represented in the brain', figsize=(9.5,8))
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.5,0.5], height_ratios=[1,0.1,0.9, 0.75])
+gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.5,0.5], height_ratios=[1,0.1,0.9,1.25])
 gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0.25)
 ################################################
 #
@@ -202,7 +202,7 @@ ax8.set_xlim([timeActual[0], timeActual[-1]])
 #
 ################################################
 # one nice gridspec
-gsPred = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[0:3,2:],width_ratios=[1.5,1], hspace=0.35, wspace=0.5)
+gsPred = gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=gs1[:,2:],height_ratios=[1,1,1.5],width_ratios=[1.5,1], hspace=0.35, wspace=0.5)
 
 # output of behavior prediction from PCA
 flag = 'PCAPred'
@@ -266,18 +266,26 @@ moveAxes(axscheme2, 'down', 0.04)
 ###################################
 # scatter of Prediction versus True
 ###################################
-gsScatter = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsPred[1,1])
+gsScatter = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec=gsPred[1,1])
 axscatter1 = plt.subplot(gsScatter[0])
-axscatter2 = plt.subplot(gsScatter[1])
+#axscatter2 = plt.subplot(gsScatter[1])
 
 for behavior, cpred, yl, label, ax in zip(['AngleVelocity','Eigenworm3' ], \
-            [R1, B1], ybeh, ['Velocity', 'Turn'],[axscatter1, axscatter2] ):
+            [R1, B1], ybeh, ['Velocity', 'Turn'],[axscatter1, axscatter1] ):
     beh = moving['Behavior'][behavior][test]
     behPred = movingAnalysis[flag][behavior]['output'][test]
+    maxb=np.max(beh)
+    beh/=maxb
+    behPred/=maxb
     xPlot, y, yerr = sortnbin(beh, behPred, nBins=10, rng=[np.min(beh), np.max(beh)])
+    
     ax.errorbar(xPlot, y, yerr=yerr, color=cpred, linestyle='None', marker='o')
     
     ax.plot([min(xPlot),max(xPlot)], [min(xPlot), max(xPlot)], 'k:')
+    
+    #ax.text(0.5, 1, label, transform =ax.transAxes, horizontalalignment='center')
+axscatter1.set_ylabel('Predicted')
+axscatter1.set_xlabel('True')
 ########################################
 # predict behavior from PCA axes
 ########################################
@@ -312,10 +320,13 @@ axR2.set_ylabel(r'$R^2$ (Testset)')
 # Plot test results!
 ###################################################################
 flag='ElasticNet'
-gsLasso = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[3,1:], width_ratios=[2,1], height_ratios=[2,1])
-axV = plt.subplot(gsLasso[:,0])
-axT = plt.subplot(gsLasso[0,1])
-axTb = plt.subplot(gsLasso[1,1],zorder=-10, fc='none')
+#gsLasso = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gsPred[2,:])#, width_ratios=[2,1], height_ratios=[2,1])
+
+# double for broken axis
+gsLasso = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsPred[2,:], height_ratios=[3,1])#, width_ratios=[2,1], height_ratios=[2,1])
+axV = plt.subplot(gsLasso[0])
+axVb = plt.subplot(gsLasso[1],zorder=-10, fc='none')
+#axT = plt.subplot(gsLasso[0])
 ## designate colors
 colorsExp = {'AngleVelocity': R1, 'Eigenworm3': B1}
 colorCtrl = {'AngleVelocity': N0,'Eigenworm3': N1}
@@ -353,14 +364,13 @@ x0 = -0.25
 mkStyledBoxplot(axV, [x0, x0+3],gcamp[:,:,0],[R1, B1], [1,2],scatter=False, dx=1.25  )
 mkStyledBoxplot(axV, [x0+1.75, x0+1.75+3],gcamp[:,:,1],[R1, B1], [1,2], scatter=False, dx=1.25)
 axV.set_xlim([-0.5,4.75])
-axV.set_xticks([x0, x0+1.75, x0+3, x0+1.75+3 ])
-axV.set_xticklabels(['G', 'S', 'G', 'S'])
-axR2.set_ylabel(r'$R^2$ (Testset)')
-axV.text(0.33, -0.1, 'Velocity', transform = axV.TransAxes)
-axV.text(0.66, -0.1, 'Turn', transform = axV.TransAxes)
+
+axV.set_ylabel(r'$R^2$ (Testset)')
+axV.text(0.1, 0.95, 'Velocity', transform = axV.transAxes)
+axV.text(0.75,0.95, 'Turn', transform = axV.transAxes)
 ### plotting starts here
 gfp = []
-for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [0, 1]):
+for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [2.25, 5.25]):
     scores = []
     for key, marker in zip(['AML18_moving', 'AML175_moving'],['o', "p"]):
         dset = data[key]['analysis']
@@ -376,40 +386,42 @@ for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [0, 1]):
         rnd1 = np.random.rand(len(keep))*0.2
         rnd2 = np.random.rand(len(keep))*0.2
         c = colorCtrl[behavior]
-#        axV.set_color_cycle( [c if line[0]>line[1] else N2 for line in keep])
-        axT.scatter(xoff+np.zeros(len(keep))+rnd1, keep[:,0], marker = marker,c = c, edgecolor=c, alpha=0.5, s=25)
-#        axV.scatter(xoff+np.ones(len(keep))+rnd2, keep[:,1], marker = marker, c = c, edgecolor=c, alpha=0.5, s=25)
-#        
-#        axV.plot(np.vstack([rnd1, 1+rnd2])+xoff, keep.T, zorder=-2, linestyle=':')
-   
+        axV.scatter(xoff+np.zeros(len(keep))+rnd1, keep[:,0], marker = marker,c = c, edgecolor=c, alpha=0.5, s=25)
+        axVb.scatter(xoff+np.zeros(len(keep))+rnd1, keep[:,0], marker = marker,c = c, edgecolor=c, alpha=0.5, s=25)
+
         scores.append(keep)
     gfp.append(np.concatenate(scores, axis=0))
 gfp = np.array(gfp)
 
 # now boxplot for the full set
-x0 = -0.25
-mkStyledBoxplot(axT, [x0, x0+1],gfp[:,:,0],[N0, N1], ['Velocity', 'Turn'],scatter=False, dx=0.75  )
-axT.set_xlim([-0.5,1.25])
-axT.axhline(color='k', linestyle=':')
+x0 = 2
+mkStyledBoxplot(axV, [x0, x0+3],gfp[:,:,0],[N0, N1], ['Velocity', 'Turn'],scatter=False, dx=1.25  )
+mkStyledBoxplot(axVb, [x0, x0+3],gfp[:,:,0],[N0, N1], ['Velocity', 'Turn'],scatter=False, dx=1.25  )
+axV.set_xlim([-0.5,5.5])
+axVb.set_xlim([-0.5,5.5])
+axV.axhline(color='k', linestyle=':')
 # broken axis stuff
-axT.set_ylim([-0.4,axV.get_ylim()[-1]])
-axTb.set_ylim([-2,-1.5])
+axV.set_ylim([-0.2,axV.get_ylim()[-1]])
+axVb.set_ylim([-0.5,-3])
 # remove labels and spines
-axT.spines['bottom'].set_visible(False)
-axT.set_xticks([])
+axV.spines['bottom'].set_visible(False)
+axV.set_xticks([])
 # add fancy linebreaks
 d = .015 # how big to make the diagonal lines in axes coordinates
 # arguments to pass plot, just so we don't keep repeating them
-kwargs = dict(transform=axT.transAxes, color='k', clip_on=False)
-axT.plot((-d,d), (-d,+d), **kwargs)
-kwargs = dict(transform=axTb.transAxes, color='k', clip_on=False)
-axTb.plot((-d,d),(1-d*3,1+d*2), **kwargs)
+kwargs = dict(transform=axV.transAxes, color='k', clip_on=False)
+axV.plot((-d,d), (-d,+d), **kwargs)
+kwargs = dict(transform=axVb.transAxes, color='k', clip_on=False)
+axVb.plot((-d,d),(1-d*3,1+d*2), **kwargs)
 #
-kwargs = dict(transform=axT.transAxes, color='k', clip_on=False)
-axT.plot((-d,d), (-d,+d), **kwargs)
-kwargs = dict(transform=axTb.transAxes, color='k', clip_on=False)
-axTb.plot((-d,d),(1-d*3,1+d*2), **kwargs)
+kwargs = dict(transform=axV.transAxes, color='k', clip_on=False)
+axV.plot((-d,d), (-d,+d), **kwargs)
+kwargs = dict(transform=axVb.transAxes, color='k', clip_on=False)
+axVb.plot((-d,d),(1-d*3,1+d*2), **kwargs)
 
+x0= -0.25
+axVb.set_xticks([x0, x0+1.75,x0+2.5, x0+3, x0+1.75+3 , x0+5.5])
+axVb.set_xticklabels(['G', 'S','Ctrl', 'G', 'S', 'Ctrl'])
 plt.show()
 # get all the weights for the different samples
 

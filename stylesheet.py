@@ -290,4 +290,4 @@ def sortnbin(x, y, nBins, rng):
         n.append(len(_t))
 
     xPlot = b[:-1] + np.diff(b) *0.5
-    return xPlot, np.array(avg), np.array(std)/np.sqrt(n)
+    return xPlot, np.array(avg), np.array(std)#/np.sqrt(n)

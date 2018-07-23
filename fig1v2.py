@@ -342,44 +342,56 @@ moveAxes(ax5, action='scale', step=0.02 )
 ##
 #################################################
 # individual rank order correlations for three examples
-gsRank = gridspec.GridSpecFromSubplotSpec(1,6,subplot_spec=gsHeatmap[4,:], width_ratios=[1, 1,1,1,0.2,1])
-ax8 = plt.subplot(gsRank[1])
-ax9 = plt.subplot(gsRank[2])
-ax10 = plt.subplot(gsRank[3])
-axcbar2 = plt.subplot(gsRank[4])
+gsRank = gridspec.GridSpecFromSubplotSpec(1,5,subplot_spec=gsHeatmap[4,:], width_ratios=[ 1,1,1,0.1,0.75])
+ax8 = plt.subplot(gsRank[0])
+ax9 = plt.subplot(gsRank[1])
+ax10 = plt.subplot(gsRank[2])
+axcbar2 = plt.subplot(gsRank[3])
 
 movData = 'BrainScanner20170613_134800'
 immData = 'BrainScanner20180510_092218'
 transientData = 'BrainScanner20180511_134913'
 for key, dset, label, ax in zip(['AML32_moving', 'AML32_immobilized', 'AML32_chip'],[movData, immData, transientData], ['moving', 'immobilized', 'transient'], [ax8, ax9, ax10]):
-    rankC = data[key]['analysis'][dset]['PCArankCorr']
-    cax1 = ax.imshow(rankC, vmin=0, vmax=0.5)
+    rankC = np.abs(np.copy(data[key]['analysis'][dset]['PCArankCorr']))
+    cax1 = ax.imshow(rankC, vmin=0, vmax=0.5,origin='lower')
+    ax.set_xticks(np.arange(0,3,1))
+    ax.set_yticks(np.arange(0,3,1))
+    ax.set_xticklabels([r'$PC_{11}$',r'$PC_{21}$',r'$PC_{31}$'])
+    ax.set_yticklabels([r'$PC_{12}$',r'$PC_{22}$',r'$PC_{32}$'])
     for i in range(3):
         # find best match, delete that option
-        ym, xm = np.unravel_index(np.abs(rankC).argmax(), rankC.shape)
+        ym, xm = np.unravel_index(rankC.argmax(), rankC.shape)
         if np.max(rankC)>0.25:
             c = 'k'
         else:
             c='w'
         ax.text(xm,ym, np.round(np.max(rankC), decimals=2), color=c, horizontalalignment ='center', verticalalignment ='center')
+        print np.max(rankC)        
         rankC[ym,:] =0
         rankC[:,xm] =0
+#        plt.imshow(rankC)
+#        plt.show()
+#        print np.max(rankC)
+#        print xm, ym
 #    for index, entry in enumerate(np.ravel(rankC)):
 #        loc = np.unravel_index(index, rankC.shape)
 #        ax.text(loc[0],loc[1], np.round(entry, decimals=2), horizontalalignment ='center', verticalalignment ='center')
     ax.set_title(label)
 # colorbar for rank correlations
-cbar = fig.colorbar(cax1, cax=axcbar2, use_gridspec = True)
+cbar = fig.colorbar(cax1, cax = axcbar2, ax = [ax8, ax9, ax10], use_gridspec = True)
+
 cbar.set_ticks([0,0.5])
 cbar.set_ticklabels(['0', '>0.5'])
 cbar.outline.set_visible(False)
 moveAxes(axcbar2, 'scaley', -0.08)
-axcbar2.set_ylabel(r'Correlation', labelpad = -25)
+moveAxes(axcbar2, 'left', 0.04)
+axcbar2.set_ylabel(r'Correlation', labelpad = 0)
 for ax in [ax8, ax9, ax10, axcbar2]:
     moveAxes(ax, 'down', 0.05)
+    moveAxes(ax, 'left', 0.05)
 
 # rank order of PCA weights
-ax11 = plt.subplot(gsRank[5])
+ax11 = plt.subplot(gsRank[4])
 boxplot = []
 for keys in [movExp, imExp]:
     r2 = []
@@ -388,20 +400,21 @@ for keys in [movExp, imExp]:
         for idn in dset.keys():
             
             rankC = np.abs(dset[idn]['PCArankCorr'])
+            print idn, rankC
             tmp = []
             for i in range(3):
                 # find best match, delete that option
                 tmp.append(np.max(rankC))
                 xm, ym = np.unravel_index(rankC.argmax(), rankC.shape)
-                rankC[xm,:] =0
-                rankC[:,ym] =0
-            
+                rankC[ym,:] =0
+                rankC[:,xm] =0
+            print tmp
             r2.append( np.mean(tmp))
             
     boxplot.append(r2)
 mkStyledBoxplot(ax11,[1,2], np.array(boxplot), [R1, B1], ['moving', 'immobilized'])
-ax11.set_ylim([0,0.5])
-ax11.set_yticks([0,0.5])
+ax11.set_ylim([0,1])
+ax11.set_yticks([0,0.5, 1])
 ax11.set_xlim([0.5,2.5])
 # add single star for the transition dataset
 ax11.scatter([1.5],np.max(np.abs(transientAnalysis['PCArankCorr'])),s = 15, marker='s',lw=1, color= R1)

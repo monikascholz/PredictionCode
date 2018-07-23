@@ -14,7 +14,7 @@ import dimReduction as dr
 #
 ###############################################
 typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+condition = 'chip' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -86,7 +86,7 @@ if condition != 'immobilized':
     elasticnet = 1#True
     predPCA = 1
 
-transient = 0
+transient = 1
 ###############################################    
 # 
 # create training and test set indices
