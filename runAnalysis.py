@@ -13,8 +13,8 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'chip' # Moving, immobilized, chip
+typ = 'Special' # possible values AML32, AML18, AML70
+condition = 'transition' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -29,9 +29,9 @@ outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 # data parameters
 dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
             'gaussWindow':150, # sgauss window for angle velocity derivative. must be odd
-            'rotate':True, # rotate Eigenworms using previously calculated rotation matrix
-            'windowGCamp': 5,  # gauss window for red and green channel
-            'interpolateNans': 12,#interpolate gaps smaller than this of nan values in calcium data
+            'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
+            'windowGCamp': 6,  # gauss window for red and green channel
+            'interpolateNans': 6,#interpolate gaps smaller than this of nan values in calcium data
             }
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
@@ -85,8 +85,9 @@ if condition != 'immobilized':
     lasso = 1
     elasticnet = 1#True
     predPCA = 1
+    lagregression =0
 
-transient = 1
+transient = 0
 ###############################################    
 # 
 # create training and test set indices
@@ -180,9 +181,9 @@ if kato_pca:
     for kindex, key in enumerate(keyList):
         resultDict[key]['katoPCA'] = dr.runPCANormal(dataSets[key], pars, deriv = True)
         splits = resultDict[key]['Training']
-        resultDict[key]['katoPCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'])
+        resultDict[key]['katoPCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'], deriv=True)
   
-        resultDict[key]['katoPCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Test'])
+        resultDict[key]['katoPCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Test'], deriv=True)
   
 ###############################################    
 # 
@@ -298,6 +299,20 @@ if elasticnet:
         # run scrambled control
         print 'Running Elastic Net scrambled'
         resultDict[key]['ElasticNetRandomized'] = dr.runElasticNet(dataSets[key], pars,splits, plot=0, behaviors = behaviors, scramble=True)
+
+
+#%%
+###############################################    
+# 
+# lag-time fits of neural activity
+#
+##############################################
+if lagregression:
+    for kindex, key in enumerate(keyList):
+        print 'Running lag calculation',  key
+        splits = resultDict[key]['Training']
+        #resultDict[key]['LagLASSO'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3))
+        resultDict[key]['LagEN'] = dr.timelagRegression(dataSets[key], pars, splits, plot = False, behaviors = ['AngleVelocity', 'Eigenworm3'], lags = np.arange(-18,19, 3), flag='ElasticNet')
 
 #%%
 ###############################################    

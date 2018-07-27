@@ -298,8 +298,6 @@ ax12.set_yticks([0,25,50,75,100])
 ax11.set_xlabel('Number of components')
 plt.legend()
 
-
-
 plt.show()
 
 
@@ -313,7 +311,7 @@ ax13 = plt.subplot(gsAct[0,0])
 ax14 = plt.subplot(gsAct[0,1])
 ax15 = plt.subplot(gsAct[0,2])
 # extract neural activity histogram for all datasets
-bins = np.linspace(-1,2,50)
+bins = np.linspace(-2,3,50)
 x = bins[:-1] + np.diff(bins)*0.5
 activities = []
 gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
@@ -326,7 +324,10 @@ for typ in [gfp, gcamp]:
             dset = data[key]['input']
             
             for idn in dset.keys():
-                tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in dset[idn]['Neurons']['RawActivity']], axis=0))
+                X = dset[idn]['Neurons']['RawActivity']
+                #tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in dset[idn]['Neurons']['RawActivity']], axis=0))
+                tmpdata.append(np.histogram(X[np.isfinite(X)], bins, density=True)[0])
+        
         activities.append(tmpdata)
 
 
@@ -375,11 +376,11 @@ for typ in [gfp, gcamp]:
             dset = data[key]['input']
             
             for idn in dset.keys():
-                tmpdata.append(np.nanmean(dset[idn]['Neurons']['RawActivity']))
+                tmpdata.append(np.nanmean(np.nanstd(dset[idn]['Neurons']['RawActivity'], axis=1)))
         ydata.append(tmpdata)
 
 color = [N0, N1, R1, B1]
-labels = ['M(CTrl)', 'I(Ctrl)', 'M', 'I']
+labels = ['M(Ctrl)', 'I(Ctrl)', 'M', 'I']
 #for typ, colors in zip(['AML32', 'AML18'], [colorsExp, colorCtrl]):
 #    for condition in ['moving', 'immobilized']:
 #        color.append(colors[condition])
@@ -395,7 +396,7 @@ x_data = np.arange(len(ydata))
 mkStyledBoxplot(ax12, x_data, ydata, color, labels)
 
 
-
+plt.show()
 # dynamics are slower for immobilized - show autocorrelations 
 #ax17 = plt.subplot(gs1[3,1:2])
 #for typ, colors, ax in zip(['AML70', 'AML18'], [colorsExp, colorCtrl], [ax11, ax12]):

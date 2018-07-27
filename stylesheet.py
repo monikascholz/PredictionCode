@@ -123,7 +123,43 @@ def cleanAxes(ax, where='all'):
         ax.set_yticks([])
     else:
         print 'Command not found. Use "x" or "y" or "all"'
+    
+    
+def alignAxes(ax1, ax2, where='x'):
+    """move axes such that the x or y corners align. Reference is ax1, ax2 gets moved."""
+    if where =='xspan':
+        x0 = ax1.get_position().get_points()[0][0]
+        x1 = ax1.get_position().get_points()[1][0]
+        pos = ax2.get_position().get_points()
+        pos[0][0] = x0
+        pos[1][0] = x1
+        ax2.set_position(mpl.transforms.Bbox(pos))  
+    if where =='yspan':
+        y0 = ax1.get_position().get_points()[0][1]
+        y1 = ax1.get_position().get_points()[1][1]
+        pos = ax2.get_position().get_points()
+        pos[0][1] = y0
+        pos[1][1] = y1
+        ax2.set_position(mpl.transforms.Bbox(pos))  
+    if where =='x':
+        x0 = ax1.get_position().get_points()[0][0]
+        pos = ax2.get_position().get_points()
+        diffx = pos[0][0]-x0
+        pos[0][0] = x0
+        pos[1][0] -= diffx
+        ax2.set_position(mpl.transforms.Bbox(pos))  
+    if where =='y':
+        y0 = ax1.get_position().get_points()[0][1]
+        y1 = ax1.get_position().get_points()[1][1]
+        pos = ax2.get_position().get_points()
+        diffy = pos[0][1]-y0
+        pos[0][1] = y0
+        pos[1][1] -= diffy
+        ax2.set_position(mpl.transforms.Bbox(pos))
         
+    else:
+        print 'specify alignment, either enter "x" or "y"'
+    
 #=============================================================================#
 #                           plot normal plots
 #=============================================================================#

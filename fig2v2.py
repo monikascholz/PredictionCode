@@ -54,7 +54,7 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - 2 : Behavior is represented in the brain', figsize=(9.5,8))
+fig = plt.figure('Fig - 2 : Predicting behavior from neural dynamics', figsize=(9.5,3*2.25))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.5,0.5], height_ratios=[1,0.1,0.9,1.25])
 gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0.25)
@@ -64,33 +64,41 @@ gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0
 #
 ################################################
 
-# add a,b,c letters, 9 pt final size = 18pt in this case
-#letters = ['A', 'B', 'C']
-#y0 = 0.99
-#locations = [(0,y0),  (0.55,y0), (0.76,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
-#            horizontalalignment='left',verticalalignment='top',)
+################################################
+# mark locations on the figure to get good guess for a,b,c locs
+#for y in np.arange(0,1.1,0.1):
+#    plt.figtext(0, y, y)
+#for x in np.arange(0,1.1,0.1):
+#    plt.figtext(x, 0.95, x)
 #
-#letters = ['D', 'E', 'F']
-#y0 = 0.79
-#locations = [(0,y0),  (0.44,y0), (0.76,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
-#            horizontalalignment='left',verticalalignment='top',)
+#letters = map(chr, range(65, 91)) 
+## add a,b,c letters, 9 pt final size = 18pt in this case
+letters = ['A', 'B', 'C', 'D']
+x0 = 0
+locations = [(x0,0.97),  (x0,0.69), (x0,0.6),  (x0,0.39)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
 #
-#letters = ['G', 'H']
-#y0 = 0.62
-#locations = [(0,y0),  (0.44,y0), (0.76,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
+letters = ['E','F']
+y0 = 0.97
+locations = [(0.54,y0), (0.785,y0)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
 #            horizontalalignment='left',verticalalignment='top',)
-#
-#letters = ['I', 'J']
-#y0 = 0.27
-#locations = [(0,y0),  (0.22,y0), (0.76,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
+letters = ['G','H']
+y0 = 0.69
+locations = [(0.54,y0), (0.785,y0)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
+letters = ['I']
+y0 = 0.39
+locations = [(0.49,y0), (0.77,y0)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
 #            horizontalalignment='left',verticalalignment='top',)
 ################################################
 #
@@ -98,7 +106,7 @@ gs1.update(left=0.07, right=0.98,  bottom = 0.1, top=0.98, hspace=0.25, wspace=0
 #
 ################################################
 # select a special dataset - moving AML32
-movingAML32 = 'BrainScanner20170613_134800'
+movingAML32 = 'BrainScanner20170613_134800'#'BrainScanner20170424_105620'#'
 moving = data['AML32_moving']['input'][movingAML32]
 movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 label = 'AngleVelocity'
@@ -139,14 +147,15 @@ moveAxes(axetho, 'scaley', 0.02)
 axetho.xaxis.label.set_visible(False)
 # legend for ethogram
 
-moveAxes(axEthoLeg, 'right', 0.045)
+moveAxes(axEthoLeg, 'right', 0.02)
+moveAxes(axEthoLeg, 'up', 0.025)
 cleanAxes(axEthoLeg, where='all')
 handles, labels = axetho.get_legend_handles_labels()
-leg = mpl.legend.Legend(axEthoLeg, handles[::-1], labels[::-1],frameon=False, loc=1, markerscale=0)#,bbox_to_anchor=(-1, 0.9), loc=9)
+handles, labels = axetho.get_legend_handles_labels()
+leg = mpl.legend.Legend(axEthoLeg, handles[::-1], labels[::-1],frameon=1, loc=1,prop={'size':12},handlelength=0.5, labelspacing=0,handletextpad=0.5)#,bbox_to_anchor=(-1, 0.9), loc=9)
 for hndl in leg.legendHandles:
     hndl._sizes = [0]
 axEthoLeg.add_artist(leg);
-
 
 ax4 = plt.subplot(gs1[2,0])
 # plot PCA components
@@ -155,8 +164,8 @@ for i in range(np.min([len(results['pcaComponents']), 3])):
     # normalize
     y =y -np.min(y)
     y =y/np.max(y)
-    ax4.text(-100, np.max(y)+i*1.15, 'PC{}'.format(i+1), color = 'k')
-    ax4.plot(time[moving['Neurons']['valid']], i*1.1+y, label='Component {}'.format(i+1), lw=1, color = 'k')
+    ax4.text(-100, np.mean(y)-i*1.15, 'PC{}'.format(i+1), color = 'k')
+    ax4.plot(time[moving['Neurons']['valid']], -i*1.1+y, label='Component {}'.format(i+1), lw=1, color = 'k')
 # draw a box for the testset
 ax4.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 ax4.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
@@ -192,7 +201,9 @@ ax8.plot(timeActual,moving['Behavior']['Eigenworm3'], color = B1)
 ax8.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 #ax8.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
 ax8.axhline(color='k', linestyle ='--', zorder=-1)
-ax8.set_ylabel('Turn')
+ax8.set_ylabel('Turn', labelpad=-7)
+ax8.get_yaxis().set_label_coords(-0.12, 0.5)
+ax7.get_yaxis().set_label_coords(-0.12, 0.5)
 ax8.set_xlabel('Time (s)')
 ax8.set_xlim([timeActual[0], timeActual[-1]])
 
@@ -221,7 +232,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
     
     axscheme1.plot(t, beh+yl, color=color)
     axscheme1.plot(t, behPred+yl, color=cpred)
-    axscheme1.text(t[-1], np.max(yl+beh), \
+    axscheme1.text(t[-1], np.max(yl+beh)*1.3, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
     axscheme1.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
 
@@ -251,7 +262,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
     
     axscheme2.plot(t, beh+yl, color=color)
     axscheme2.plot(t, behPred+yl, color=cpred)
-    axscheme2.text(t[-1], np.max(yl+beh), \
+    axscheme2.text(t[-1], np.max(yl+behPred), \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
     axscheme2.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
 
@@ -259,7 +270,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
 l =120
 y = axscheme2.get_ylim()[0]
 axscheme2.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
-axscheme2.text(t[0]+l*0.5,y*0.95, '2 min', horizontalalignment='center')
+axscheme2.text(t[0]+l*0.5,y*0.93, '2 min', horizontalalignment='center')
 cleanAxes(axscheme2)
 moveAxes(axscheme1, 'down', 0.04)
 moveAxes(axscheme2, 'down', 0.04)
@@ -314,7 +325,7 @@ mkStyledBoxplot(axR2, locs, scores, [R1, B1], ['Velocity', 'Turn'], scatter=Fals
 axR2.axhline(linestyle=':', color='k')
 
 axR2.set_xlim([-0.25, 1.25])
-axR2.set_ylabel(r'$R^2$ (Testset)')
+axR2.set_ylabel(r'$R^2$ (Testset)', labelpad=-10)
 
 ################################################################
 # Plot test results!
@@ -348,11 +359,11 @@ for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [0, 3]):
         rnd1 = np.random.rand(len(keep))*0.2
         rnd2 = np.random.rand(len(keep))*0.2
         c = colorsExp[behavior]
-        axV.set_color_cycle( [c if line[0]>line[1] else N2 for line in keep])
+        #axV.set_color_cycle( [c if line[0]>line[1] else N2 for line in keep])
         axV.scatter(xoff+np.zeros(len(keep))+rnd1, keep[:,0], marker = marker,c = c, edgecolor=c, alpha=0.5, s=25)
         axV.scatter(xoff+np.ones(len(keep))+rnd2, keep[:,1], marker = marker, c = c, edgecolor=c, alpha=0.5, s=25)
         
-        axV.plot(np.vstack([rnd1, 1+rnd2])+xoff, keep.T, zorder=-2, linestyle=':')
+        axV.plot(np.vstack([rnd1, 1+rnd2])+xoff, keep.T, zorder=-2, linestyle=':', color=c)
    
         scores.append(keep)
     gcamp.append(np.concatenate(scores, axis=0))

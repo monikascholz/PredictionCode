@@ -200,7 +200,7 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     if pars['useRank']:
         Neuro = data['Neurons']['rankActivity']
     else:
-        Neuro = data['Neurons']['Activity']
+        Neuro = np.copy(data['Neurons']['Activity'])
     if testset is not None:
         Y = Neuro[:,testset].T
     else:
@@ -233,7 +233,7 @@ def runPCATimeWarp(data, pars):
     neurons = timewarp(data)
     pcs = pca.fit_transform(neurons.T)
     
-    pcs = pca.transform(data['Neurons']['Activity'].T)
+    pcs = pca.transform(np.copy(data['Neurons']['Activity']).T)
     
     # order neurons by weight in first component
     indices = np.arange(len( data['Neurons']['Activity']))
@@ -285,16 +285,13 @@ def rankCorrPCA(results):
     for pc1 in range(3):
         for pc2 in range(3):
             # rank correlation
-            rankHalf1 = np.argsort(results['PCAHalf1']['neuronWeights'][:,pc1])
-            rankHalf2 = np.argsort(results['PCAHalf2']['neuronWeights'][:,pc2])
-            
+            #rankHalf1 = np.argsort(results['PCAHalf1']['neuronWeights'][:,pc1])
+            #rankHalf2 = np.argsort(results['PCAHalf2']['neuronWeights'][:,pc2])
             #tmpdata[pc1, pc2] = np.corrcoef(rankHalf1, rankHalf2)[0,1]
-            print np.corrcoef(rankHalf1, rankHalf2)[0,1],
             #dot product instead
             v1 = results['PCAHalf1']['neuronWeights'][:,pc1]
             v2 = results['PCAHalf2']['neuronWeights'][:,pc2]
             tmpdata[pc1, pc2] = np.dot(v1, v2)/np.linalg.norm(v1)/np.linalg.norm(v2)
-            print tmpdata[pc1, pc2]
     return tmpdata
 ###############################################    
 # 
@@ -391,7 +388,7 @@ def runPeriodogram(data, pars, testset = None):
 def runHierarchicalClustering(data, pars, subset):
     """cluster neural data."""
     
-    X = data['Neurons']['Activity'] # transpose to conform to nsamples*nfeatures
+    X = np.copy(data['Neurons']['Activity']) # transpose to conform to nsamples*nfeatures
     if subset is not None:
         X = X[subset]
     # pairwise correlations
@@ -430,7 +427,7 @@ def discreteBehaviorPrediction(data, pars, splits):
     if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
     else:
-        X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        X = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
     # use ethogram for behavior
     Y = data['Behavior']['Ethogram']
     label = 'AngleVelocity'
@@ -477,7 +474,7 @@ def runBehaviorTriggeredAverage(data, pars):
         clustres = runHierarchicalClustering(data, pars)
         Y = clustres['Activity'].T
     else:
-        Y = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        Y = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
     # use ethogram for behavior
     X = data['Behavior']['Ethogram']
     
@@ -523,7 +520,7 @@ def runLinearModel(data, results, pars, splits, plot = False, behaviors = ['Angl
             clustres = runHierarchicalClustering(data, pars)
             X = clustres['Activity'].T
         else:
-            X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+            X = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
         if subset is not None:
             # only a few neurons
             if len(subset[label])<1:
@@ -792,10 +789,11 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
 #        # balanced sets
         if label =='Eigenworm3':
             a = np.logspace(-3,-1,100)
-            nfold = 5
+            nfold = 5#int(len(X)/250)
         else:
             a = np.logspace(-3,0,100)
-            nfold =5
+            nfold =5#%int(len(X)/500)
+        print nfold
         #if label =='Eigenworm3':
         #    nfold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
@@ -803,7 +801,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         #fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
         reg = linear_model.LassoCV(cv=fold,  verbose=0, \
-         max_iter=10000, tol=0.0001)#, eps=1e-2)#, normalize=False)
+         max_iter=10000, tol=1e-4)#, alphas = a)#, normalize=False)
         
         reg.fit(Xtrain, Ytrain)
         alphas = reg.alphas_
@@ -890,7 +888,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
         elif pars['useDeconv']:
             X = data['Neurons']['deconvolvedActivity'].T
         else:
-            X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+            X = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
         if scramble:
             # similar to GFP control: scamble timeseries
             np.random.shuffle(Y)
@@ -918,7 +916,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
-            nfold = 5
+            nfold = 10
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
@@ -929,7 +927,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
         #a = np.logspace(-3,-1,100)
        # fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random')#, tol=1e-5)# alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -1121,7 +1119,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
         if pars['useRank']:
             X = data['Neurons']['rankActivity'].T
         else:
-            X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+            X = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
         trainingsInd, testInd = splits[label]['Train'], splits[label]['Test']
         # individual predictive scores
         indScore = []
@@ -1169,7 +1167,7 @@ def reorganizeLinModel(data, results, splits, pars, fitmethod = 'LASSO', behavio
         clustres = runHierarchicalClustering(data, pars)
         X = clustres['Activity']
     else:
-        X = data['Neurons']['Activity'].T # transpose to conform to nsamples*nfeatures
+        X = np.copy(data['Neurons']['Activity']).T # transpose to conform to nsamples*nfeatures
     # get weights
     pcs = np.vstack([results[fitmethod][label]['weights'] for label in behaviors])
     indices = np.argsort(pcs[0])
@@ -1218,7 +1216,7 @@ def predictNeuralDynamicsfromBehavior(data,  splits, pars):
     # also reduce dimensionality of the neural dynamics.
     nComp = 10#pars['nCompPCA']
     pca = PCA(n_components = nComp)
-    Neuro = data['Neurons']['Activity'].T
+    Neuro = np.copy(data['Neurons']['Activity']).T
     pcs = pca.fit_transform(Neuro)
     #comp = pca.components_.T
     #now we use a linear model to train and test our predictions
@@ -1298,7 +1296,7 @@ def predictBehaviorFromPCA(data,  splits, pars, behaviors):
         # also reduce dimensionality of the neural dynamics.
         nComp = 3#pars['nCompPCA']
         pca = PCA(n_components = nComp)
-        Neuro = data['Neurons']['Activity'].T
+        Neuro = np.copy(data['Neurons']['Activity']).T
         pcs = pca.fit_transform(Neuro)
         #now we use a linear model to train and test our predictions
         # lets build a linear model

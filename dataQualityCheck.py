@@ -16,7 +16,7 @@ mpl.rcParams['interactive']  = False
 #
 ###############################################
 typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+condition = 'moving'# # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
@@ -66,7 +66,7 @@ pars ={'nCompPCA':10, # no of PCA components
      }
 
 behaviors = ['AngleVelocity','Eigenworm3']
-#behaviors = ['CMSVelocity']
+#behaviors = ['Eigenworm3']
 
 ###############################################    
 # 
@@ -74,7 +74,7 @@ behaviors = ['AngleVelocity','Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-overview = 1#False
+overview = 0#False
 predNeur = 0
 predPCA = 0
 bta = 0
@@ -87,7 +87,7 @@ periodogram = 0
 nestedvalidation = 0
 lasso = 0
 elasticnet = 1#True
-lagregression = 0
+lagregression = 1
 positionweights = 0#True
 resultsPredictionOverview = 0
 ###############################################    
@@ -110,7 +110,7 @@ if createIndicesTest:
 ##############################################
 if overview:
         # line plots of neuronal activity, pretty
-    #mp.neuralActivity(dataSets, keyList)
+    mp.neuralActivity(dataSets, keyList)
         # cimple scatter of behavior versus neurons
     #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
         # heatmaps of neuronal activity ordered by behavior
