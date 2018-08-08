@@ -18,6 +18,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report, f1_score
 from sklearn import svm
+from sklearn.covariance import empirical_covariance
 import dataHandler as dh
 from scipy.interpolate import interp1d
 from scipy.optimize import newton 
@@ -191,7 +192,7 @@ def createTrainingTestIndices(data, pars, label):
 #
 ##############################################
 
-def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
+def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False, useRaw=False):
     """run PCA on neural data and return nicely organized dictionary."""
     nComp = pars['nCompPCA']
     pca = PCA(n_components = nComp)
@@ -199,12 +200,19 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
         Neuro = data['Neurons']['derivActivity']
     if pars['useRank']:
         Neuro = data['Neurons']['rankActivity']
+    if useRaw:
+        Neuro = data['Neurons']['Ratio']
     else:
         Neuro = np.copy(data['Neurons']['Activity'])
     if testset is not None:
+        Yfull = np.copy(Neuro).T
         Y = Neuro[:,testset].T
     else:
         Y= Neuro.T
+        Yfull = Y
+    # make sure data is centered
+    sclar= StandardScaler(copy=True, with_mean=True, with_std=False)
+    Y = sclar.fit_transform(Y)
     # neuron activity is transposed such that result = nsamples*nfeatures.
     comp = pca.fit_transform(Y).T
     pcs = pca.components_.T
@@ -218,13 +226,62 @@ def runPCANormal(data, pars, whichPC = 0, testset = None, deriv = False):
     pcares = {}
     pcares['nComp'] =  pars['nCompPCA']
     pcares['expVariance'] =  pca.explained_variance_ratio_
+    pcares['eigenvalue'] =  pca.explained_variance_
     pcares['neuronWeights'] =  pcs
     pcares['neuronOrderPCA'] =  indices
     pcares['pcaComponents'] =  comp
+    # reconstruct with nCompPCA
+    sclar2= StandardScaler(copy=True, with_mean=True, with_std=False)
+    Yfull = sclar2.fit_transform(Yfull)
+    compFull = pca.transform(Yfull).T
+    Yhat = np.dot(compFull.T[:,:nComp],pcs.T[:nComp,:])
+    Yhat += sclar2.mean_
     if testset is not None:
         pcares['testSet'] = testset
-        pcares['fullData'] = pca.transform(Neuro.T).T
+    pcares['fullData'] = compFull
+    pcares['reducedData'] = Yhat.T
+    pcares['covariance'] = empirical_covariance(Yhat, assume_centered=False)
+#    plt.subplot(311)        
+#    plt.imshow(data['Neurons']['Activity'], aspect='auto')
+#    plt.subplot(312)
+#    plt.imshow(Yhat.T,  aspect='auto')
+#    plt.subplot(313)
+#    plt.imshow(pcares['covariance'])
+#    plt.show()
+    pcares['fullShuffle'], pcares['lagShuffle'] = runPCANoiseLevelEstimate(Y, pars)
     return pcares
+###############################################    
+# 
+# noise level estimate PCA
+#
+##############################################
+
+def runPCANoiseLevelEstimate(Y, pars):
+    """run PCA on neural data and return nicely organized dictionary."""
+    nComp = pars['nCompPCA']
+    pca = PCA(n_components = nComp)
+    # now we shuffle the data and calculate the variance explained
+    YS = np.array([np.random.permutation(n) for n in np.copy(Y).T]).T
+    # here we just randomly roll each timeseries by a certain amount i.e. lag or advance a neuron relative to others
+    Nmax = Y.shape[0]
+    YR = np.array([np.roll(n, np.random.randint(low=-Nmax, high=Nmax)) for n in Y.T]).T
+    
+    # make sure data is centered
+    sclar= StandardScaler(copy=True, with_mean=True, with_std=False)
+    YS = sclar.fit_transform(YS)
+    pca.fit(YS)
+    fullShuffle =  pca.explained_variance_
+    # make sure data is centered
+    sclar= StandardScaler(copy=True, with_mean=True, with_std=False)
+    YR = sclar.fit_transform(YR)
+    pca.fit(YR)
+    lagShuffle =  pca.explained_variance_
+#    plt.subplot(211)
+#    plt.imshow(YS.T, aspect='auto')
+#    plt.subplot(212)
+#    plt.imshow(YR.T, aspect='auto')
+#    plt.show()
+    return fullShuffle, lagShuffle
     
 def runPCATimeWarp(data, pars):
     """run PCA on neural data and return nicely orgainzed dictionary."""
@@ -293,6 +350,7 @@ def rankCorrPCA(results):
             v2 = results['PCAHalf2']['neuronWeights'][:,pc2]
             tmpdata[pc1, pc2] = np.dot(v1, v2)/np.linalg.norm(v1)/np.linalg.norm(v2)
     return tmpdata
+    
 ###############################################    
 # 
 # correlate neurons and behavior
@@ -528,8 +586,8 @@ def runLinearModel(data, results, pars, splits, plot = False, behaviors = ['Angl
             else:
                 X = X[:,subset[label]]
 #        cv = 10
-#        reg = linear_model.LinearRegression()
-#        # setting alpha to zero makes this a linear model without regularization
+        reg = linear_model.LinearRegression()
+        # setting alpha to zero makes this a linear model without regularization
         reg = linear_model.Lasso(alpha = results[fitmethod][label]['alpha'])
         reg.fit(X[trainingsInd], Y[trainingsInd])
 #        alphas = reg.alphas_
@@ -875,7 +933,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
     linData = {}
     for label in behaviors:
         Y = np.copy(data['Behavior'][label])
-        Y = np.reshape(Y, (-1,))
+        Y = np.reshape(Y, (-1,1))
         #Y = preprocessing.scale(Y)
         if pars['useRank']:
             X = np.copy(data['Neurons']['rankActivity'].T)
@@ -899,7 +957,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
             # positive lag = behavior lags after neural activity, uses values from the past
             X = np.roll(X, shift = lag, axis = 0)
         # fit scale model
-        scale = False
+        scale = 1
         if scale:
             scalerX = preprocessing.StandardScaler().fit(X[trainingsInd])  
             scalerY = preprocessing.StandardScaler().fit(Y[trainingsInd])  
@@ -916,18 +974,21 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-2,-0.5,200)
-            nfold = 10
+            nfold = 5
+            tol = 1e-10
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
             l1_ratio = [0.95]
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
             a = np.logspace(-4,-2,200)
             nfold = 5
+            tol = 1e-5
+            
         #cv = 15
         #a = np.logspace(-3,-1,100)
        # fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=1e-5)# alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=tol)#, alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -1137,7 +1198,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                 elif fitmethod == 'ElasticNet':
                     
                     reg = linear_model.ElasticNet(alpha = results[fitmethod][label]['alpha'],
-                                                  l1_ratio = results[fitmethod][label]['l1_ratio'], tol=1e-10, selection='random')
+                                                  l1_ratio = results[fitmethod][label]['l1_ratio'], tol=1e-5, selection='random')
                 xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
                 sumScore.append(reg.score(xTmp[testInd], Y[testInd]))

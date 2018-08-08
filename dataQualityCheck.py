@@ -41,7 +41,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyList = np.sort(dataSets.keys())
     
 print keyList
-#keyList = keyList[-1:]
+#keyList = keyList[:1]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -79,17 +79,19 @@ predNeur = 0
 predPCA = 0
 bta = 0
 svm = 0
-pca = 0#False
+pca = 1#False
 kato_pca= 0
+half_pca= 1
 hierclust = False
 linreg = False
-periodogram = 0
+periodogram = 1
 nestedvalidation = 0
-lasso = 0
+lasso = 1
 elasticnet = 1#True
 lagregression = 1
 positionweights = 0#True
 resultsPredictionOverview = 0
+transient = 0
 ###############################################    
 # 
 # create training and test set indices
@@ -100,9 +102,25 @@ if createIndicesTest:
         resultDict[key] = {'Training':{}}
         for label in behaviors:
             train, test = dr.createTrainingTestIndices(dataSets[key], pars, label=label)
+            if transient:
+               train = np.where(dataSets[key]['Neurons']['Time']<4*60)[0]
+                # after 4:30 min
+               test = np.where((dataSets[key]['Neurons']['Time']>7*60)*(dataSets[key]['Neurons']['Time']<14*60))[0]
+               resultDict[key]['Training']['Half'] ={'Train':train}
+               resultDict[key]['Training']['Half']['Test'] = test
+            else:
+                 # add half split
+                midpoint = np.mean(dataSets[key]['Neurons']['Time'])
+                trainhalf = np.where(dataSets[key]['Neurons']['Time']<midpoint)[0]
+                testhalf = np.where(dataSets[key]['Neurons']['Time']>midpoint)[0]
+                resultDict[key]['Training']['Half'] ={'Train':trainhalf}
+                resultDict[key]['Training']['Half']['Test'] = testhalf
             resultDict[key]['Training'][label] = {'Train':train  }
             resultDict[key]['Training'][label]['Test']=test
+           
+
     print "Done generating trainingsets"
+
 ###############################################    
 # 
 # some generic data checking plots
@@ -223,12 +241,13 @@ if pca:
     mp.plotPCAresults(dataSets, resultDict, keyList, pars)
     plt.show()
     
-   
+    mp.plotPCANoise(resultDict, keyList)
+
     # show correlates of PCA
-    mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
+    #mp.plotPCAcorrelates(dataSets, resultDict, keyList, pars, flag='PCA')
     #  plot 3D trajectory of PCA
     mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho')
-    plt.show()
+#    plt.show()
 #        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'time')
 #        plt.show()
 #        mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'velocity')
@@ -256,6 +275,37 @@ if kato_pca:
     #  plot 3D trajectory of PCA
     mp.plotPCAresults3D(dataSets, resultDict, keyList, pars, col = 'etho', flag='katoPCA')
     plt.show()
+###############################################    
+# 
+# run split first-second half PCA
+#
+##############################################
+#%%
+if half_pca:
+    print 'half-split PCA'
+    for kindex, key in enumerate(keyList):
+        # run PCA on each half
+        splits = resultDict[key]['Training']
+        
+        resultDict[key]['PCAHalf1'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset = splits['Half']['Train'])
+        resultDict[key]['PCAHalf2'] = dr.runPCANormal(dataSets[key], pars, whichPC=0, testset =splits['Half']['Test'])
+        resultDict[key]['PCArankCorr'] = dr.rankCorrPCA(resultDict[key])
+    
+################################################    
+## 
+## estimate noise level pca shuffle
+##
+###############################################
+##%%
+#print 'estimate PCA noise level'
+#if pca_noise:
+#    for kindex, key in enumerate(keyList):
+#        # run PCA on each half
+#        splits = resultDict[key]['Training']
+#        resultDict[key]['PCANoise'] = dr.runPCANoiseLevelEstimate(dataSets[key], pars)
+#        resultDict[key]['PCAHalf1Noise'] = dr.runPCANoiseLevelEstimate(dataSets[key], pars, testset = splits['Half']['Train'])
+#        resultDict[key]['PCAHalf2Noise'] = dr.runPCANoiseLevelEstimate(dataSets[key], pars,  testset =splits['Half']['Test'])
+#    mp.plotPCANoise(resultDict, keyList)
 #%%
 ###############################################    
 # 
@@ -323,10 +373,10 @@ if elasticnet:
             resultDict[key]['ElasticNet'][tmpKey].update(tmpDict[tmpKey])
             
         # do converse calculation -- give it only the neurons non-zero in previous case
-        subset = {}
-        subset['AngleVelocity'] = np.where(resultDict[key]['ElasticNet']['Eigenworm3']['weights']>0)[0]
-        subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
-        resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
+#        subset = {}
+#        subset['AngleVelocity'] = np.where(resultDict[key]['ElasticNet']['Eigenworm3']['weights']>0)[0]
+#        subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
+#        resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
         
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
     plt.show()

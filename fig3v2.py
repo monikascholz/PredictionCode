@@ -81,7 +81,7 @@ print 'Done reading data.'
 ################################################
 # we will select a 'special' dataset here, which will have all the individual plots
 # select a special dataset - moving AML32. Should be the same as in fig 2
-movingAML32 = 'BrainScanner20170613_134800'
+movingAML32 ='BrainScanner20170424_105620'# 'BrainScanner20170613_134800'
 moving = data['AML32_moving']['input'][movingAML32]
 movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 # negative bends are ventral for this worm
@@ -273,12 +273,13 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
     for idn in np.sort(dset.keys())[:]:
         if idn==movingAML32:
             movIndex = index
+            
         X = np.copy(dset[idn]['Neurons']['Positions']).T
         #X -=np.mean(Xref,axis=0)
         X[:,1] *=ventral[index-1]
         X[:,1] -=np.min(X[:,1])
         
-        index +=1
+        
         # crop the atlas to be closer to actual size
         #Atmp = A[np.where(A[:,0]>np.min(X[:,0])*(A[:,0]<np.max(X[:,0])))]
         X = registerWorms(Xref, X, dim=3)
@@ -289,6 +290,7 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
         tWeights = res[idn][flag]['Eigenworm3']['weights']
         special.append(np.vstack([avWeights, tWeights]))
         keeping_track.append(np.ones(len(avWeights), dtype=int)*index)
+        index +=1
         
 AN = np.concatenate(AN, axis=0)
 special = np.concatenate(special, axis=1)
@@ -418,14 +420,17 @@ set_link_color_palette(links)
 
 neurons = moving['Neurons']['RawActivity']
 t = moving['Neurons']['Time']
+print keeping_track
 labels_moving = bestGuess[np.where(keeping_track==movIndex)]
-
-for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity'], [R1, B1], ['Wave speed', 'Turn'])):
+print 'labels', len(labels_moving)
+for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity'], [R1, B1], ['Velocity', 'Turn'])):
     beh =moving['Behavior'][behavior]
     
     Weights =movingAnalysis[flag][behavior]['weights']
+    print Weights
     Relevant = np.where(np.abs(Weights>0))[0]
     labels = labels_moving
+    print len(labels)
     for li, lab in enumerate(labels):
         if lab[:3] in motionNeurons:
             # check if guess is good
@@ -444,9 +449,9 @@ for b, (behavior, c, lbl) in enumerate(zip(['AngleVelocity'], [R1, B1], ['Wave s
     pars = None
     subset = Relevant
     clust = dr.runHierarchicalClustering(moving, pars, subset)
-    
-    dn = dendrogram(clust['linkage'],ax = axs[b][0],leaf_font_size=10, leaf_rotation=0,labels=labels,\
-         orientation = 'left', show_leaf_counts=1, above_threshold_color='k', color_threshold= clust['threshold'])
+    print clust['linkage']
+    dn = dendrogram(clust['linkage'],ax = axs[b][0],leaf_font_size=10, leaf_rotation=0,\
+         orientation = 'left', show_leaf_counts=1, above_threshold_color='k',labels = labels, color_threshold= clust['threshold'])
    
     xlbls = axs[b][0].get_ymajorticklabels()
     
