@@ -199,13 +199,15 @@ def createWorm(x, y):
     b = np.vstack([x,y])-lwidths*e1
     return np.concatenate([a, b[:,::-1]], axis=1).T
         
-def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
+def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', velocity = None, save= False):
     """use pythons built-in animation tools to make a centerline animation."""
     if save:
         writer = animation.FFMpegWriter()
         #writer = Writer(fps=6, metadata=dict(artist='Me'), bitrate=1800)
 
-        
+#    if velocity is not None:
+#        data1 += np.vstack([velocity[0],velocity[0]]).T
+#        data2 += np.vstack([velocity[1],velocity[1]]).T   
     def init():
         x1,y1 = data1[0].T
         
@@ -213,19 +215,20 @@ def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
 
         p1.set_xy(Vertices1)
         patch1=ax.add_patch(p1)
+        txt = ax.text(0.9,0.9, 't=0 s', transform=ax.transAxes)
         if data2 is not None:
             x2,y2 = data2[0].T
             Vertices2 = createWorm(x2, y2)
 
             p2.set_xy(Vertices2)
             patch2 = ax.add_patch(p2)
-            
-            return patch1, patch2
-        return patch1
+            line = ax0.axvline(t[0], color='k', lw=2)
+            return patch1, patch2, txt, line
+        return patch1, txt
         
     p1 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
     p2 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
-    patch1, patch2= init()
+    patch1, patch2, txt, line= init()
     
     # animation function.  This is called sequentially
     def animate(i, data1, data2= None):
@@ -240,10 +243,18 @@ def make_animation3(fig, ax, data1, data2, frames, color = 'gray', save= False):
             Vertices2 = createWorm(x2, y2)
             p2.set_xy(Vertices2)
             patch2=ax.add_patch(p2)
-
-            return patch1, patch2
+            txt.set_text('{} s'.format(i/6))
+            if i%60==0:
+                txt.set_color('r')
+            else:
+                txt.set_color('k')
+            line.set_xdata(t[i])
+            
+            return patch1, patch2, txt, line
         return patch1
-        
+#        if velocity is not None:
+#            ax.plot(velocity[0][:i])
+#            ax.plot(velocity[1][:i])
     anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
                                frames=frames, interval=166, blit=True, repeat=False)
     if save:

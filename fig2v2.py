@@ -412,8 +412,8 @@ axV.set_xlim([-0.5,5.5])
 axVb.set_xlim([-0.5,5.5])
 axV.axhline(color='k', linestyle=':')
 # broken axis stuff
-axV.set_ylim([-0.2,axV.get_ylim()[-1]])
-axVb.set_ylim([-0.5,-3])
+axV.set_ylim([-0.5,axV.get_ylim()[-1]])
+axVb.set_ylim([-3,-4])
 # remove labels and spines
 axV.spines['bottom'].set_visible(False)
 axV.set_xticks([])
