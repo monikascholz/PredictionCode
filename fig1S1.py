@@ -7,19 +7,10 @@ Figure 2 - Behavior is represented in the brain
 """
 import numpy as np
 import matplotlib as mpl
-import os
+
 #
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from mpl_toolkits.mplot3d import Axes3D
-from scipy.ndimage.filters import gaussian_filter1d
-import matplotlib.ticker as mtick
-
-
-
-#import singlePanels as sp
-#import makePlots as mp
 import dataHandler as dh
 # deliberate import all!
 from stylesheet import *
@@ -161,11 +152,11 @@ for condition, keys, c in zip([ 'GFP','GCamp6s'], [ movCtrl,movExp], [N0, R1]):
         for idn in dset.keys():
             # correlation with velocity
             cv.append(data[key]['analysis'][idn]['Correlation']['AngleVelocity'])
-            print key, np.max(cv[-1])
+            #print key, np.max(cv[-1])
             ax3.plot(np.linspace(0,1,len(cv[-1])), np.sort(cv[-1]), color=c, alpha=0.75)
             
             cv.append(data[key]['analysis'][idn]['Correlation']['Eigenworm3'])
-            print key, np.max(cv[-1])
+            #print key, np.max(cv[-1])
             ax4.plot(np.linspace(0,1,len(cv[-1])), np.sort(cv[-1]), color=c, alpha=0.75)
             
     corrV.append(cv)
@@ -186,8 +177,9 @@ ax13 = plt.subplot(gsAct[0,0])
 ax14 = plt.subplot(gsAct[0,1])
 ax15 = plt.subplot(gsAct[0,2])
 # extract neural activity histogram for all datasets
-bins = np.linspace(-1.5,3,20)
+bins = np.linspace(-3,3,30)
 xticks = [-1,0,1,2,3]
+#xticks = [-0.1,0.1]
 x = bins[:-1] + np.diff(bins)*0.5
 dx = np.diff(bins)[0]
 activities = []
@@ -201,9 +193,10 @@ for typ in [gfp, gcamp]:
             dset = data[key]['input']
             
             for idn in dset.keys():
-                X = dset[idn]['Neurons']['RawActivity']
-                #tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in dset[idn]['Neurons']['RawActivity']], axis=0))
-                tmpdata.append(np.histogram(X[np.isfinite(X)], bins, density=True)[0]*dx)
+                X = dset[idn]['Neurons']['Activity']
+               
+                #tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in X], axis=0)*dx)
+                tmpdata.append(np.histogram(X[np.isfinite(X)], bins, density=1)[0]*dx)
         
         activities.append(tmpdata)
 
@@ -213,6 +206,10 @@ histograms = []
 meandata = []
 for hindex, (hist, c) in enumerate(zip([activities[2],  activities[0]], [colorsExp['moving'], colorCtrl['moving']])):
     m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
+    # normalize now
+#    s/=np.sum(m)
+#    m /= np.sum(m)
+    #[ax13.plot(x, h, color=c) for h in hist]
     ax13.plot(x, m, color = c, zorder=2)
     ax13.fill_between(x, m-s,m+s, color = c, alpha=0.5)
     histograms.append(m)
@@ -243,23 +240,24 @@ ax15.set_xticks(xticks)
 ax15.set_yticks([0.5,1])
 
 print [np.sum(h[x>1]) for h in histograms]
+print [np.sum(h) for h in histograms]
 # boxplot of signal percentage in each recording
 ax12 = plt.subplot(gsAct[3])
 color, labels, ydata = [],[],[]
 
-gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
-gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
-for typ in [gfp, gcamp]:
-    for condition in ['moving', 'immobilized']:
-        keys = typ[condition]
-        tmpdata = []
-        for key in keys:
-            dset = data[key]['input']
-            
-            for idn in dset.keys():
-                print np.nanstd(dset[idn]['Neurons']['RawActivity'], axis=1).shape
-                tmpdata.append(np.nanmean(np.nanmean(dset[idn]['Neurons']['RawActivity'], axis=1)))
-        ydata.append(tmpdata)
+#gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
+#gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
+#for typ in [gfp, gcamp]:
+#    for condition in ['moving', 'immobilized']:
+#        keys = typ[condition]
+#        tmpdata = []
+#        for key in keys:
+#            dset = data[key]['input']
+#            
+#            for idn in dset.keys():
+#                print np.nanstd(dset[idn]['Neurons']['Activity'], axis=1).shape
+#                tmpdata.append(np.nanmean(np.nanmean(dset[idn]['Neurons']['Activity'], axis=1)))
+#        ydata.append(tmpdata)
 
 color = [N0, N1, R1, B1]
 labels = ['M(Ctrl)', 'I(Ctrl)', 'M', 'I']

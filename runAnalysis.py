@@ -13,9 +13,10 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'Special' # possible values AML32, AML18, AML70
-condition = 'transition' # Moving, immobilized, chip
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
+transient = 0
 ###############################################    
 # 
 #    load data into dictionary
@@ -36,6 +37,7 @@ dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that siz
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
+dh.saveDictToHDF(outLocData, dataSets)
 
 ## results dictionary 
 resultDict = {}
@@ -78,6 +80,7 @@ predPCA = 0
 svm = 0
 lasso = 0
 elasticnet = 0
+lagregression = 0
 # this requires moving animals
 if condition != 'immobilized':
     predNeur = 1
@@ -87,7 +90,7 @@ if condition != 'immobilized':
     predPCA = 1
     lagregression =0
 
-transient = 0
+
 ###############################################    
 # 
 # create training and test set indices
@@ -167,7 +170,9 @@ if pca:
     print 'running PCA'
     for kindex, key in enumerate(keyList):
         resultDict[key]['PCA'] = dr.runPCANormal(dataSets[key], pars)
-    
+        resultDict[key]['PCARaw'] = dr.runPCANormal(dataSets[key], pars, useRaw=True)
+        
+        
         #correlate behavior and PCA
         #resultDict[key]['PCACorrelation']=dr.PCACorrelations(dataSets[key],resultDict[key], behaviors, flag = 'PCA', subset = None)
 ###############################################    
@@ -321,4 +326,3 @@ if lagregression:
 #
 ##############################################
 dh.saveDictToHDF(outLoc, resultDict)
-dh.saveDictToHDF(outLocData, dataSets)

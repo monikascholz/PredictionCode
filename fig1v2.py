@@ -59,9 +59,9 @@ print 'Done reading data.'
 #
 ################################################
 
-fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(9.5, 9*3/4.))
-gsHeatmap = gridspec.GridSpec(5,4,  width_ratios=[1.5, 0.1, 0.5, 0.5], height_ratios = [1,0.1,0.75,0.1, 0.75])
-gsHeatmap.update(left=0.075, right=0.98,  bottom = 0.11, top=0.98, hspace=0.3, wspace=0.45)
+fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(9.5, 4.5))
+gsHeatmap = gridspec.GridSpec(4,4,  width_ratios=[1.5, 0.1, 0.5, 0.5], height_ratios = [1,0.1,0.75,0.05])
+gsHeatmap.update(left=0.05, right=0.98,  bottom = 0.05, top=0.98, hspace=0.3, wspace=0.75)
 #fig.patch.set_alpha(0.0)
 #heatmap axes
 axhm = plt.subplot(gsHeatmap[0,0])
@@ -69,28 +69,37 @@ axcb = plt.subplot(gsHeatmap[0,1])
 # ethogram
 axetho = plt.subplot(gsHeatmap[1,0], clip_on=False)
 # legend for ethogram
-axEthoLeg = plt.subplot(gsHeatmap[1:2,1])#,clip_on=False)
+axEthoLeg = fig.add_axes([0.4,0.4,0.12,0.2])#plt.subplot(gsHeatmap[1:2,1:])#,clip_on=False)
+#moveAxes(axEthoLeg, 'up', 0.06)
+cleanAxes(axEthoLeg, where='all')
 # principal components
 ax4 =plt.subplot(gsHeatmap[2:3,0], clip_on=False)#, sharex=axhm)
+moveAxes(ax4, 'down', 0.02)
 # subpanel layout for autocorr
-gsPer= gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gsHeatmap[:3,2:], wspace=0.35,hspace=0.2, height_ratios=[1,1.25])
+gsPer= gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gsHeatmap[:1,2:], wspace=0.35,hspace=0.2)#, height_ratios=[1,1.25])
 ax13 = plt.subplot(gsPer[0])
 ax14 = plt.subplot(gsPer[1])
 # manifooolds
-ax5 = plt.subplot(gsPer[2], projection='3d', clip_on = False, zorder=-10, aspect='equal')
-ax6 = plt.subplot(gsPer[3], projection='3d', clip_on = False, zorder=-10, aspect='equal')
-# rank correlations
-gsRank = gridspec.GridSpecFromSubplotSpec(1,6,subplot_spec=gsHeatmap[4,:], width_ratios=[1.0,1,1,1,0.1,1.0], wspace=0.2)
+gsPer1= gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gsHeatmap[2:,2:], wspace=0.35,hspace=0.2)#, height_ratios=[1,1.25])
 
-ax11 = plt.subplot(gsRank[5])
-ax8 = plt.subplot(gsRank[1])
-ax9 = plt.subplot(gsRank[2])
-ax10 = plt.subplot(gsRank[3])
-axexpV = plt.subplot(gsRank[0])
-#axcbar2 = plt.subplot(gsHeatmap[4,1])
-axcbar2 = plt.subplot(gsRank[4])
-# scale last plot so it aligns with autocorrelations
-alignAxes(ax14, ax11, where='xspan')
+ax5 = plt.subplot(gsPer1[0], projection='3d', clip_on = False, zorder=-10, aspect='equal')
+ax6 = plt.subplot(gsPer1[1], projection='3d', clip_on = False, zorder=-10, aspect='equal')
+# rank correlations
+#gsRank = gridspec.GridSpecFromSubplotSpec(1,6,subplot_spec=gsHeatmap[4,:], width_ratios=[1.0,1,1,1,0.1,1.0], wspace=0.2)
+#
+
+axexpV = fig.add_axes([0.48,0,0.12,0.2])
+
+#moveAxes(axexpV, 'scaley', -0.05)
+#ax11 = plt.subplot(gsRank[5])
+#ax8 = plt.subplot(gsRank[1])
+#ax9 = plt.subplot(gsRank[2])
+#ax10 = plt.subplot(gsRank[3])
+#axexpV = plt.subplot(gsRank[0])
+##axcbar2 = plt.subplot(gsHeatmap[4,1])
+#axcbar2 = plt.subplot(gsRank[4])
+## scale last plot so it aligns with autocorrelations
+#alignAxes(ax14, ax11, where='xspan')
 
 #plt.show()
 ################################################
@@ -103,30 +112,37 @@ alignAxes(ax14, ax11, where='xspan')
 #    plt.figtext(0, y, y)
 #for x in np.arange(0,1.1,0.1):
 #    plt.figtext(x, 0.95, x)
-#
+##
 #letters = map(chr, range(65, 91)) 
 ## add a,b,c letters, 9 pt final size = 18pt in this case
 letters = ['A', 'B', 'C']
 x0 = 0
-locations = [(x0,0.97),  (x0,0.665), (x0,0.58)]
+locations = [(x0,0.95),  (x0,0.48), (x0,0.4)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
 #
-letters = ['D', 'E']
-x0 = 0.57
-locations = [(x0,0.97),  (x0,0.665)]
+letters = ['D']
+x0 = 0.54
+locations = [(0.55,0.95)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
 
-letters = ['F','G', 'H']
-y0 = 0.3
-locations = [(0,y0),  (0.24,y0), (0.77,y0)]
+letters = ['E', 'F']
+x0 = 0.32
+locations = [(0.4,0.4), (0.6,0.4)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
-#
+
+#letters = ['F','G', 'H']
+#y0 = 0.3
+#locations = [(0,y0),  (0.24,y0), (0.77,y0)]
+#for letter, loc in zip(letters, locations):
+#    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+#            horizontalalignment='left',verticalalignment='baseline',)
+##
 #letters = ['I', 'J']
 #y0 = 0.27
 #locations = [(0,y0),  (0.22,y0), (0.76,y0)]
@@ -157,17 +173,17 @@ colorsExp = {'moving': R1, 'immobilized': B1}
 colorsCtrl = {'moving': N0,'immobilized': N1}
          
 #heatmap
-cax1 = plotHeatmap(time, transient['Neurons']['ActivityFull'][results2half['neuronOrderPCA']], ax=axhm, vmin=-0.5, vmax=2)
+cax1 = plotHeatmap(time, transient['Neurons']['ActivityFull'][results2half['neuronOrderPCA']], ax=axhm, vmin=-2, vmax=2)
 axhm.xaxis.label.set_visible(False)
 axhm.set_xticks([])
 # colorbar
 cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
-cbar.set_ticks([-0.5,0,2])
-cbar.set_ticklabels(['<-0.5',0,'>2'])
+cbar.set_ticks([-2,0,2])
+cbar.set_ticklabels(['<2',0,'>2'])
 cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.06)
 moveAxes(axcb, 'scaley', -0.08)
-axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -25)
+axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -0)
 #ethogram
 
 plotEthogram(axetho, time, transient['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
@@ -175,12 +191,10 @@ cleanAxes(axetho, 'all')
 moveAxes(axetho, 'scaley', 0.02)
 axetho.xaxis.label.set_visible(False)
 # legend for ethogram
-#moveAxes(axEthoLeg, 'right', 0.025)
-moveAxes(axEthoLeg, 'up', 0.02)
-cleanAxes(axEthoLeg, where='all')
+#moveAxes(axEthoLeg, 'right', 0.07)
 
 handles, labels = axetho.get_legend_handles_labels()
-leg = mpl.legend.Legend(axEthoLeg, handles[::-1], labels[::-1],frameon=1, loc=1,prop={'size':12},handlelength=0.5, labelspacing=0,handletextpad=0.5)#,bbox_to_anchor=(-1, 0.9), loc=9)
+leg = mpl.legend.Legend(axEthoLeg, handles[::-1], labels[::-1],frameon=1, loc=2,prop={'size':12},ncol=2,handlelength=0.5, labelspacing=0,handletextpad=0.25)#,bbox_to_anchor=(-1, 0.9), loc=9)
 for hndl in leg.legendHandles:
     hndl._sizes = [0]
 axEthoLeg.add_artist(leg);
@@ -195,8 +209,6 @@ imCtrl = ['AML18_immobilized']
 # color coding
 colorsExp = {'moving': R1, 'immobilized': B1}
 colorCtrl = {'moving': N0,'immobilized': N1}
-
-
 
 typ, colors, axes = [movExp, imExp], colorsExp, [ax13, ax14]
 for  condition, ax, keys in zip(['moving', 'immobilized'], axes, typ):
@@ -218,8 +230,9 @@ for  condition, ax, keys in zip(['moving', 'immobilized'], axes, typ):
     ax.set_ylim([-0.2,1])
     ax.text(0.5, 0.9,condition, transform=ax.transAxes, horizontalalignment='center')
     ax.set_xticks([0,150,300])
+    ax.set_yticks([0,0.5,1])
 ax13.set_ylabel('Autocorrelation')
-#ax13.text(-0.5,0,'Autocorrelation', fontsize=14,transform = ax13.transAxes, rotation=90, verticalalignment ='center')
+#ax13.text(-0.5,0,'Autocorrelation', fontsize=14,transform = ax13.transAxes, rotation=90, verticalment ='center')
 ax13.set_xlabel('Lag (s)')
 ax14.set_xlabel('Lag (s)')
 ax14.set_yticks([])
@@ -291,7 +304,7 @@ ax4.set_xlabel('Time (s)')
 ax4.set_xlim([np.min(timeActual), np.max(timeActual)])
 ax4.set_ylim([ax4.get_ylim()[0], yloc*1.01])
 cleanAxes(ax4, where='y')
-moveAxes(ax4, 'down', 0.02)
+#
 
 # plot manifold! MANIFOOOOOLD!
 
@@ -314,7 +327,7 @@ ax6.plot(x[test],y[test],z[test], color=B1)
 ax5.scatter(x[train[::12]],y[train[::12]],z[train[::12]], color=R1, s=5)
 ax6.scatter(x[test[::12]],y[test[::12]],z[test[::12]], color=B1, s=5)
 
-for ax in [ax5, ax6]:    
+for ax, label  in zip([ax5, ax6], ['moving', 'immobilized']):    
     ax.view_init(elev=40, azim=150)
 #        ax.dist = 7
     axmin, axmax = -1,0.9
@@ -328,6 +341,7 @@ for ax in [ax5, ax6]:
     ax.axes.xaxis.set_ticklabels([])
     ax.axes.yaxis.set_ticklabels([])
     ax.axes.zaxis.set_ticklabels([])
+    ax.set_title(label)
 #        #make scalebar
     axesNames = [ax.xaxis, ax.yaxis, ax.zaxis]
     for tmp, loc in zip(axesNames, [(0,0,0),(1,1,1),(2,2,2)]):
@@ -338,10 +352,10 @@ for ax in [ax5, ax6]:
     ax.set_zlim([axmin, axmax])
 
 
-    moveAxes(ax, action='left', step=0.025 )
-    moveAxes(ax5, action='left', step=0.01 )
-    moveAxes(ax, action='down', step=0.03 )
-    moveAxes(ax, action='scale', step=0.10 )
+#    moveAxes(ax, action='left', step=0.025 )
+#    moveAxes(ax5, action='left', step=0.01 )
+    #moveAxes(ax, action='down', step=0.12 )
+    moveAxes(ax, action='scale', step=0.075 )
 #        # make a scale bar in 3d
 scX, scY, scZ = -1,2,0
 names = [r'PC$_1$', 'PC$_2$', 'PC$_3$']
@@ -356,6 +370,9 @@ for i in range(3):
     #l = np.zeros(3)#+axmin
 
 
+for ax in [axexpV]:
+    alignAxes(ax4, ax, where='y')
+#alignAxes(axetho, axEthoLeg, where='y')
 # pc axes projection
 #sciformat = 1.
 #multicolor(axproj,x*sciformat,y*sciformat,None,colorBy,c=transientcmap, threedim = False, etho = False, cg = 1)
@@ -365,6 +382,7 @@ for i in range(3):
 #axproj.set_ylabel(r'PC2', labelpad=0, color=Ls[1])
 ##moveAxes(axproj, action='up', step=0.02 )
 #
+plt.show()
 
 #################################################
 ##
@@ -426,7 +444,6 @@ axcbar2.yaxis.set_label_position('left')
 #for ax in [ax8, ax9, ax10, axcbar2]:
 #    moveAxes(ax, 'down', 0.05)
 #
-
     
 markers = {'AML32_moving': 'o','AML70_chip':'^' ,'AML32_immobilized':'o', 'AML70_immobilized':'^'}
 x0=0.5
@@ -484,8 +501,7 @@ ax11.set_yticks([0,0.5, 1])
 ax11.set_xlim([0.5,3.5])
 ax11.set_ylabel('Correlation')
 #### move everything left
-#for axi in [ax5, ax13, ax11]:
-#    moveAxes(axi, 'left', 0.03)
+
 #
 #for axind, ax in enumerate(fig.get_axes()):
 

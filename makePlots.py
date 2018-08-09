@@ -1411,3 +1411,31 @@ def plotNeuronPredictedFromBehavior(results, data):
     #print explained_variance_score(data['Neurons']['Activity'], newHM)
     #print explained_variance_score(pca.inverse_transform(pcs).T[:,test], newHM[:,test])
     #print explained_variance_score(pca.inverse_transform(pcs).T, newHM)
+
+
+def plotPCANoise(resultSet, keyList):
+    """make an overview figure of PCA explained variance."""
+    nWorms = len(keyList)
+    
+    fig = plt.figure('PCANoise',(12,8))
+    gs = gridspec.GridSpec(nWorms, 1, hspace=0.25, wspace=0.25)
+    
+    for kindex, key in enumerate(keyList):
+        ax4 = plt.subplot(gs[kindex, 0])
+        results = resultSet[key]['PCA']
+        expVar = results['eigenvalue']
+        nComp = results['nComp']
+        noiseVarShuffle = results['fullShuffle']
+        noiseVarLag = results['lagShuffle']
+        
+        ax4.plot(np.arange(1,nComp+1),noiseVarShuffle, 'ks-', lw=1, label='time shuffle')
+        ax4.plot(np.arange(1,nComp+1),noiseVarLag, 'bo-', lw=1, label = 'time lag')
+        ax4.plot(np.arange(1,nComp+1),expVar, 'rx-', lw=1, label='Data')
+        ax4.set_ylabel('Eigenvalues')
+       # ax4.set_yticks([0,25,50,75,100])
+        ax4.set_xlabel('Number of components')
+        if kindex==0:
+            ax4.legend()
+    gs.tight_layout(fig)
+    plt.show()
+        

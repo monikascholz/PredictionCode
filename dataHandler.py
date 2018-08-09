@@ -16,6 +16,10 @@ import makePlots as mp
 from scipy.ndimage.filters import gaussian_filter1d
 import h5py
 from scipy.special import erf
+#
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA,  FastICA
+
 
 def recrWorm(av, turns, thetaTrue, r, show = 0):
     """recalculate eigenworm prefactor from angular velocity and turns."""
@@ -257,6 +261,7 @@ def transformEigenworms(pcs, dataPars):
         pcs[pcindex] = pc
         
     theta = np.unwrap(np.arctan2(pcs[2], pcs[1]))
+    
     # convolution with gaussian kernel derivative
     velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
     # velo is in radians/frame
@@ -264,6 +269,45 @@ def transformEigenworms(pcs, dataPars):
         pcs[pcindex] = gaussian_filter1d(pc, dataPars['medianWindow'])
     return pcs, velo, theta
 
+def decorrelateNeuronsICA(R, G):
+    """use PCA to remove covariance in Green and Red signals."""
+    Ynew = []
+    ica = FastICA(n_components = 2)
+    var = []
+    for li in range(len(R)):
+        Y = np.vstack([R[li], G[li]]).T
+        sclar2= StandardScaler(copy=True, with_mean=True, with_std=True)
+        Y = sclar2.fit_transform(Y)
+        S = ica.fit_transform(Y)
+        A = ica.mixing_ 
+        # order components by max correlation with red signal
+        v = [np.corrcoef(s,R[li])[0,1] for s in S.T]
+        idn = np.argmin(np.abs(v))
+        # check if signal needs to be inverted
+        sign = np.sign(np.corrcoef(S[:,idn],G[li])[0,1])
+        Ynew.append(sign*S[:,idn])
+    return np.array(Ynew)#, np.mean(var, axis=0), Rs, Gs 
+    
+def decorrelateNeurons(R, G):
+    """use PCA to remove covariance in Green and Red signals."""
+    Ynew = []
+    var = []
+    Rs,Gs=[], []
+    pca = PCA(n_components = 2)
+    for li in range(len(R)):
+        Y = np.vstack([R[li], G[li]]).T
+        sclar2= StandardScaler(copy=True, with_mean=True, with_std=True)
+        Y = sclar2.fit_transform(Y)
+        compFull = pca.fit_transform(Y)
+        pcs = pca.components_
+        Ynew.append(compFull[:,1])
+        
+        var.append(pca.explained_variance_ratio_)
+        Yhat = np.dot(compFull[:,1:],pcs[1:,:])
+        Yhat += sclar2.mean_
+        Rs.append(Yhat[:,0])
+        Gs.append(Yhat[:,1])
+    return np.array(Ynew), np.mean(var, axis=0), np.array(Rs), np.array(Gs)
 
 def preprocessNeuralData(R, G, dataPars):
     """zscore etc for neural data."""
@@ -276,25 +320,38 @@ def preprocessNeuralData(R, G, dataPars):
     # smooth with GCamp6 halftime = 1s
     RS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in R])       
     GS =np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in G])       
-    YR = GS/RS
-    meansubtract = False
-    if meansubtract:
-        # long-window size smoothing filter to subtract overall fluctuation in SNR
-        wind = 90
-        mean = np.mean(rolling_window(np.mean(YR,axis=0), window=2*wind), axis=1)
-        #pad with normal mean in front to correctly center the mean values
-        mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(YR,axis=0)[:wind])))[:-wind]
-        # do the same in the end
-        mean[-wind:] = np.repeat(np.mean(np.mean(YR,axis=0)[:-wind]), wind)
-        YN = YR-mean
-    else:
-        YN = YR
-    # zscore values 
-    Y =  preprocessing.scale(YN.T).T
+#    YR = GS/RS
+    
+##    meansubtract = False#False#True
+##    if meansubtract:
+##        # long-window size smoothing filter to subtract overall fluctuation in SNR
+##        wind = 90
+##        mean = np.mean(rolling_window(np.mean(YR,axis=0), window=2*wind), axis=1)
+##        #pad with normal mean in front to correctly center the mean values
+##        mean = np.pad(mean, (wind,0), mode='constant', constant_values=(np.mean(np.mean(YR,axis=0)[:wind])))[:-wind]
+##        # do the same in the end
+##        mean[-wind:] = np.repeat(np.mean(np.mean(YR,axis=0)[:-wind]), wind)
+##        YN = YR-mean
+##    else:
+#        YN = YR
+    #YN, _,GS,RS = decorrelateNeurons(RS, GS)
+    YN = decorrelateNeuronsICA(R, G)
+    YN = np.array([gaussian_filter1d(line,dataPars['windowGCamp']) for line in YN])
+    #$YN = GS/RS
     # percentile scale
-    R0 = np.percentile(YN, [20])
-    dR = (YN-R0)/R0
-    return Y, dR
+    R0 = np.percentile(YN, [20], axis=1).T
+    dR = np.divide(YN-R0,R0)
+    #dR = YN
+    # zscore values 
+    #d
+    YN =  preprocessing.scale(YN.T).T
+    
+    
+    R0 = np.percentile(GS/RS, [20], axis=1).T
+    RM = np.divide(GS/RS-R0,R0)
+#    plt.imshow(dR, aspect='auto')
+#    plt.show()
+    return YN, dR, GS, RS, RM
 
 def loadData(folder, dataPars, ew=1):
     """load matlab data."""
@@ -318,6 +375,7 @@ def loadData(folder, dataPars, ew=1):
     pc3, pc2, pc1 = pcs[:,clIndices]
 
     velo = velo[clIndices]*50/6. # to get it in per Volume units
+    
     theta = theta[clIndices]
     cl = clFull[clIndices]
     # ethogram redone
@@ -333,7 +391,7 @@ def loadData(folder, dataPars, ew=1):
     G = np.array(data['gPhotoCorr'])[:,:len(np.array(data['hasPointsTime']))]
     #
     Ratio = np.array(data['Ratio2'])[:,:len(np.array(data['hasPointsTime']))]
-    Y, dR = preprocessNeuralData(R, G, dataPars)
+    Y, dR, GS, RS, RM = preprocessNeuralData(R, G, dataPars)
     try:
         dY = np.array(data['Ratio2D']).T
     except KeyError:
@@ -341,8 +399,9 @@ def loadData(folder, dataPars, ew=1):
     order = np.array(data['cgIdx']).T[0]-1
     # read flagged neurons
     try:
-        badNeurs = np.array(data['flagged_neurons'][0])
-        order = np.delete(order, badNeurs)
+        if len(data['flagged_neurons'])>0:
+            badNeurs = np.array(data['flagged_neurons'][0])
+            order = np.delete(order, badNeurs)
     except KeyError:
         pass
     # get rid of predominantly nan neurons
@@ -352,17 +411,22 @@ def loadData(folder, dataPars, ew=1):
     #lets interpolate small gaps but throw out larger gaps.
     # make a map with all nans smoothed out if larger than some window    
     nanmask =[np.repeat(np.nanmean(chunky_window(line, window= dataPars['interpolateNans']), axis=1), dataPars['interpolateNans']) for line in Ratio]
-    nanmask = np.array(nanmask)[:,:Y.shape[1]]   
+    nanmask = np.array(nanmask)[:,:Y.shape[1]]
+    if 'flagged_volumes' in data.keys():
+        if len(data['flagged_volumes'])>0:
+            print data['flagged_volumes']
+            nanmask[:,np.array(data['flagged_volumes'][0])] = np.nan
     Rfull = np.copy(dR)
     Rfull[np.isnan(nanmask)] =np.nan
     
     Y = Y[order]
     dR = dR[order]
+    RM = RM[order]
     #deconvolved data
     YD = deconvolveCalcium(Y)
     #regularized derivative
     dY = dY[order]
-    # store relevant indices -- crop out the long gaps of nans
+    # store relevant indices -- crop out the long gaps of nans adn flagged timepoints
     nonNan  = np.where(np.any(np.isfinite(nanmask),axis=0))[0]
     
     # create a time axis in seconds
@@ -387,7 +451,7 @@ def loadData(folder, dataPars, ew=1):
     dataDict['CL'] = cl[nonNan]
     dataDict['goodVolumes'] = nonNan
     dataDict['Behavior'] = {}
-    
+    print RM.shape
     tmpData = [vel[:,0], pc1, pc2, pc3, velo, theta, etho, xPos, yPos]
     for kindex, key in enumerate(['CMSVelocity', 'Eigenworm1', 'Eigenworm2', \
     'Eigenworm3',\
@@ -403,6 +467,9 @@ def loadData(folder, dataPars, ew=1):
     dataDict['Neurons']['RawActivity'] = dR[:,nonNan]
     dataDict['Neurons']['derivActivity'] = dY[:,nonNan]
     dataDict['Neurons']['deconvolvedActivity'] = YD[:,nonNan]
+    dataDict['Neurons']['RedRaw'] = RS
+    dataDict['Neurons']['Ratio'] = RM[:,nonNan]
+    dataDict['Neurons']['GreenRaw'] = GS
     dataDict['Neurons']['Positions'] = neuroPos
     dataDict['Neurons']['ordering'] = order
     dataDict['Neurons']['valid'] = nonNan
