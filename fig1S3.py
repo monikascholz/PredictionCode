@@ -23,24 +23,30 @@ from stylesheet import *
 # create figure 1: This is twice the normal size
 #
 ################################################
-fig = plt.figure('Fig1 - S3 : PCA noise floor and cov reconstructions.', figsize=(9.5, 9*1/4.))
-gs1 = gridspec.GridSpec(1,4,  width_ratios=[1, 1,1,1])
-gs1.update(left=0.055, right=0.95,  bottom = 0.25, top=0.9, hspace=0.1, wspace=0.45)
+fig = plt.figure('Fig1 - S3 : PCA noise floor and cov reconstructions.', figsize=(9.5, 8.5))
+gs1 = gridspec.GridSpec(2,2)#,  width_ratios=[1, 1,1,1])
+gs1.update(left=0.07, right=0.95,  bottom = 0.07, top=0.95, hspace=0.25, wspace=0.25)
 fig.patch.set_alpha(0.0)
 #eigenvalue axes
 ax1 = plt.subplot(gs1[0,0])
 ax2 = plt.subplot(gs1[0,1])
-ax3 = plt.subplot(gs1[0,2])
-ax4 = plt.subplot(gs1[0,3])
+ax3 = plt.subplot(gs1[1,0])
+ax4 = plt.subplot(gs1[1,1])
 ##covariance axes
 #ax11 = plt.subplot(gs1[1,0])
 #ax21 = plt.subplot(gs1[1,1])
 #ax31 = plt.subplot(gs1[1,2])
 #ax41 = plt.subplot(gs1[1,3])
 # add a,b,c letters, 9 pt final size = 18pt in this case
-letters = ['A', 'B', 'C', 'D']
-y0 = 0.92
-locations = [(0, y0), (0.24, y0), (0.49,y0), (0.72, y0)]
+letters = ['A', 'B']
+y0 = 0.95
+locations = [(0, y0),  (0.5,y0), (0.72, y0)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
+letters = ['C', 'D']
+y0 = 0.45
+locations = [(0, y0), (0.5,y0), (0.72, y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
@@ -87,7 +93,7 @@ imExp = ['AML32_immobilized', 'AML70_immobilized']
 movCtrl = ['AML18_moving', 'AML175_moving']
 imCtrl = ['AML18_immobilized']
 
-for condition, keys, ax in zip([ 'immobilized','moving', 'immobilized (Ctrl)','moving (Ctrl)'], [ imExp,movExp,imCtrl, movCtrl ],  [ax1, ax2, ax3, ax4]):
+for condition, keys, ax in zip([ 'immobilized (GCaMP)','moving (GCaMP)', 'immobilized (Ctrl)','moving (Ctrl)'], [ imExp,movExp,imCtrl, movCtrl ],  [ax1, ax2, ax3, ax4]):
     tmpdata = []
     noiseS = []
     noiseL = []    
@@ -102,21 +108,22 @@ for condition, keys, ax in zip([ 'immobilized','moving', 'immobilized (Ctrl)','m
           
         #ax1.plot(np.arange(1,nComp+1),np.array(tmpdata).T ,'-',color =colorsExp[condition], lw=1, label = '{} {}'.format(typ, condition),alpha=0.3 )
     
-    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseS, axis=0), np.std(noiseS, axis=0), color = 'k', marker='x')
-    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseL, axis=0), np.std(noiseL, axis=0), color = 'b', marker='o')
+    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseS, axis=0), np.std(noiseS, axis=0), color = 'k', marker='x', label= 'Shuffled')
+    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseL, axis=0), np.std(noiseL, axis=0), color = 'b', marker='o', label='Random shift')
     ax.set_ylabel('Eigenvalues')
-    ax.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = 'r', marker='s')    
+    ax.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = 'r', marker='s', label='PCA')    
     ax.set_title(condition)
     x0 = np.arange(1,nComp+1)[np.where((np.mean(tmpdata, axis=0)-np.mean(noiseL, axis=0))<0)[0][0]]
     
     t, p = ttest_ind(tmpdata, noiseL, axis=0, equal_var=False)
     x0 = np.where(p>0.05)[0][0]
     print x0, len(noiseL)
-    ax.axvline(x0, color='k', linestyle='--')
-    #ax.set_yticks([0,25,50,75,100])
+    ax.axvline(x0, color='k', linestyle='--', zorder=-10)
+    ax.set_yticks([0,25,50])
     #ax12.set_yticks([0,25,50,75,100])
     ax.set_xlabel('# of components')
 
+ax1.legend()
 plt.show()
 
 

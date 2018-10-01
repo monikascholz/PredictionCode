@@ -29,7 +29,7 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':25, # smooth eigenworms with gauss filter of that size, must be odd
+dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
             'gaussWindow':150, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
@@ -41,7 +41,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyList = np.sort(dataSets.keys())
     
 print keyList
-#keyList = keyList[:1]
+keyList = keyList[2:3]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -79,14 +79,14 @@ predNeur = 0
 predPCA = 0
 bta = 0
 svm = 0
-pca = 1#False
+pca = 0#False
 kato_pca= 0
-half_pca= 1
+half_pca= 0
 hierclust = False
 linreg = False
-periodogram = 1
+periodogram = 0
 nestedvalidation = 0
-lasso = 1
+lasso = 0
 elasticnet = 1#True
 lagregression = 1
 positionweights = 0#True

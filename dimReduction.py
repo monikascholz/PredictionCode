@@ -446,7 +446,7 @@ def runPeriodogram(data, pars, testset = None):
 def runHierarchicalClustering(data, pars, subset):
     """cluster neural data."""
     
-    X = np.copy(data['Neurons']['Activity']) # transpose to conform to nsamples*nfeatures
+    X = np.copy(data['Neurons']['Ratio']) # transpose to conform to nsamples*nfeatures
     if subset is not None:
         X = X[subset]
     # pairwise correlations
@@ -1199,8 +1199,11 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                     
                     reg = linear_model.ElasticNet(alpha = results[fitmethod][label]['alpha'],
                                                   l1_ratio = results[fitmethod][label]['l1_ratio'], tol=1e-5, selection='random')
+                #reg = linear_model.LinearRegression()
+                
                 xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
+                print xTmp.shape
                 sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
                 mse.append(np.sum((reg.predict(xTmp[testInd])-Y[testInd])**2))
                 

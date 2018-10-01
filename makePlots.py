@@ -23,6 +23,7 @@ from scipy.ndimage.filters import gaussian_filter
 from sklearn.preprocessing import StandardScaler
 #custom
 import dataHandler as dh
+from stylesheet import *
 # change axes
 axescolor = 'k'
 mpl.rcParams["axes.edgecolor"]=axescolor
@@ -199,15 +200,11 @@ def createWorm(x, y):
     b = np.vstack([x,y])-lwidths*e1
     return np.concatenate([a, b[:,::-1]], axis=1).T
         
-def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', velocity = None, save= False):
+def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', velocity = None, save= False, fname='im4.mp4', rx=1000, ry=750):
     """use pythons built-in animation tools to make a centerline animation."""
     if save:
         writer = animation.FFMpegWriter()
         #writer = Writer(fps=6, metadata=dict(artist='Me'), bitrate=1800)
-
-#    if velocity is not None:
-#        data1 += np.vstack([velocity[0],velocity[0]]).T
-#        data2 += np.vstack([velocity[1],velocity[1]]).T   
     def init():
         x1,y1 = data1[0].T
         
@@ -223,12 +220,20 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
             p2.set_xy(Vertices2)
             patch2 = ax.add_patch(p2)
             line = ax0.axvline(t[0], color='k', lw=2)
+            if velocity is not None:
+                
+                trace1, = ax.plot(velocity[0][:1].T, zorder=-10, color=N1)
+                trace2, = ax.plot(velocity[1][:1].T, zorder=-10, color=N1)
+                return patch1, patch2, txt, line, trace1, trace2
             return patch1, patch2, txt, line
         return patch1, txt
         
     p1 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
     p2 = mpl.patches.Polygon(np.zeros((2,2)), closed=True, fc=color, ec='none')
-    patch1, patch2, txt, line= init()
+    if velocity is not None:
+        patch1, patch2, txt, line, tr1, tr2 = init()
+    else:
+        patch1, patch2, txt, line = init()
     
     # animation function.  This is called sequentially
     def animate(i, data1, data2= None):
@@ -249,16 +254,31 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
             else:
                 txt.set_color('k')
             line.set_xdata(t[i])
-            
+            if velocity is not None:
+                v1 = velocity[0][np.max([i-500, 0]):i].T
+                v2 = velocity[1][np.max([i-500, 0]):i].T
+                v1 = (v1 .T- v1[:,-1].T).T
+                v2 = (v2 .T- v2[:,-1].T+(1000,0)).T 
+                # reset to center coordinate of the worm
+#                v1 -= np.tile((v1[:,0]-np.mean(data1[i], axis=0))[:,np.newaxis], (1,v1.shape[1]))
+#                v2 -=  np.tile((v2[:,0]-np.mean(data2[i], axis=0))[:,np.newaxis], (1,v2.shape[1]))
+                #v1 -= np.tile((v1[:,-2])[:,np.newaxis], (1,v1.shape[1]))
+                #v2 -=  np.tile((v2[:,-2] -(500,0))[:,np.newaxis], (1,v2.shape[1]))
+                #print v1.shape
+                tr1.set_data(v1)
+                tr2.set_data(v2)
+#                x0, y0 = np.min(velocity[:,i, 0]), np.min(velocity[:,i, 1])
+#                print x0, y0, 0/0
+#                ax.set_xlim(x0-rx, x0+2*rx)
+#                ax.set_ylim(y0-ry, y0+ry)
+                return tr1, tr2, patch1, patch2, txt, line
             return patch1, patch2, txt, line
         return patch1
-#        if velocity is not None:
-#            ax.plot(velocity[0][:i])
-#            ax.plot(velocity[1][:i])
+        
     anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
                                frames=frames, interval=166, blit=True, repeat=False)
     if save:
-        anim.save('im2.mp4', writer=writer)
+        anim.save(fname, writer=writer, dpi=300)
     plt.show()
     
 

@@ -82,9 +82,9 @@ for ci, condition, keys in zip([0,1,2,3, 4], [ 'immobilized','moving', 'immobili
         for idn in dset.keys():
             
             
-            order=  dset[idn]['PCA']['neuronOrderPCA']
-            results=  dset[idn]['PCA']['covariance'][order]
-            results = results[:,order]
+            #order=  dset[idn]['PCA']['neuronOrderPCA']
+            results=  dset[idn]['PCA']['covariance']#[order]
+            #results = results[:,order]
             
             ax = plt.subplot(gs2[index, ci])
             ax.imshow(results, aspect='auto', vmin=-1, vmax=1)
@@ -124,40 +124,3 @@ for ci, condition, keys in zip([0,1,2,3, 4], [ 'immobilized','moving', 'immobili
 plt.show()
 
 
-#################################################
-##
-## Show covariance matrices
-##
-#################################################
-# variance explained for moving and immobile 
-nComp =10
-movExp = ['AML32_moving']#, 'AML70_chip']
-imExp = ['AML32_immobilized']#, 'AML70_immobilized']
-movCtrl = ['AML18_moving']#, 'AML175_moving']
-imCtrl = ['AML18_immobilized']
-
-for condition, keys, ax in zip([ 'immobilized','moving', 'immobilized (Ctrl)','moving (Ctrl)'], [ imExp,movExp,imCtrl, movCtrl ],  [ax1, ax2, ax3, ax4]):
-    for key in keys:
-        dset = data[key]['analysis']
-        tmpdata = []
-        noiseS = []
-        noiseL = []
-        for idn in dset.keys():
-            results=  dset[idn]['PCA']
-            tmpdata.append(results['eigenvalue'][:nComp])
-            noiseS.append(results['fullShuffle'][:nComp])
-            noiseL.append(results['lagShuffle'][:nComp])
-          
-    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseS, axis=0), np.std(noiseS, axis=0), color = 'k', marker='x')
-    ax.errorbar(np.arange(1,nComp+1), np.mean(noiseL, axis=0), np.std(noiseL, axis=0), color = 'b', marker='o')
-    ax.set_ylabel('Eigenvalues')
-    ax.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = 'r', marker='s')    
-    ax.set_title(condition)
-    
-    
-    #x0 = np.arange(1,nComp+1)[np.where((np.mean(tmpdata, axis=0)-np.mean(noiseL, axis=0))>0)[-1][0]]
-    
-    #ax.set_yticks([0,25,50,75,100])
-    #ax12.set_yticks([0,25,50,75,100])
-    ax.set_xlabel('# of components')
-plt.show()

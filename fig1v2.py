@@ -248,7 +248,7 @@ for y, col, lab, mark in zip([resultshalf['expVariance'][:nComp], results2half['
         , [ R1, B1], [ 'Moving', 'Paralyzed'], [ '^', 's']):
     #ax3.fill_between(np.arange(0.5,nComp+0.5),y*100, step='post', color=col, alpha=0.5)
    axexpV.plot(np.arange(1,nComp+1),np.cumsum(y)*100, 'o-',color = col, label = lab, marker=mark) 
-
+   print 'Variance explained', lab, '3 comps', np.cumsum(y)[2]*100
 axexpV.set_ylabel('Variance exp. (%)', labelpad=-5)
 axexpV.set_yticks([0,25,50,75,100])
 axexpV.set_xlabel('# of components')

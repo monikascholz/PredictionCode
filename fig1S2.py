@@ -117,6 +117,13 @@ locations = [(x0,0.95),  (x0,0.70), (x0,0.66), (x0,0.48),  (x0,0.23), (x0,0.18)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
+# add a,b,c letters, 9 pt final size = 18pt in this case
+letters = ['G', 'H', 'I', 'J', 'K', 'L']
+x0 = 0.45
+locations = [(x0,0.95),  (x0,0.70), (x0,0.66), (x0,0.48),  (x0,0.23), (x0,0.18)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='baseline',)
 
 ################################################
 #
@@ -126,7 +133,7 @@ for letter, loc in zip(letters, locations):
 movData = 'BrainScanner20170613_134800'
 immData = 'BrainScanner20180510_092218'
 #transientData = 'BrainScanner20180329_152141'
-flag = 'PCAHalf2'
+flag = 'PCA'
 for key, axhm,axetho, axpc, dset, title  in zip([movData, immData], \
     [axhm1, axhm2], [axetho1, axetho2],[axpc1, axpc2],\
     [data['AML32_moving'],data['AML32_immobilized']],\

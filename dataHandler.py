@@ -273,19 +273,18 @@ def decorrelateNeuronsICA(R, G):
     """use PCA to remove covariance in Green and Red signals."""
     Ynew = []
     ica = FastICA(n_components = 2)
-    var = []
     for li in range(len(R)):
         Y = np.vstack([R[li], G[li]]).T
         sclar2= StandardScaler(copy=True, with_mean=True, with_std=True)
         Y = sclar2.fit_transform(Y)
         S = ica.fit_transform(Y)
-        A = ica.mixing_ 
         # order components by max correlation with red signal
         v = [np.corrcoef(s,R[li])[0,1] for s in S.T]
         idn = np.argmin(np.abs(v))
         # check if signal needs to be inverted
         sign = np.sign(np.corrcoef(S[:,idn],G[li])[0,1])
-        Ynew.append(sign*S[:,idn])
+        signal = sign*(S[:,idn])
+        Ynew.append(signal)
     return np.array(Ynew)#, np.mean(var, axis=0), Rs, Gs 
     
 def decorrelateNeurons(R, G):
@@ -340,15 +339,12 @@ def preprocessNeuralData(R, G, dataPars):
     #$YN = GS/RS
     # percentile scale
     R0 = np.percentile(YN, [20], axis=1).T
-    dR = np.divide(YN-R0,R0)
+    dR = np.divide(YN-R0,np.abs(R0))
     #dR = YN
     # zscore values 
-    #d
     YN =  preprocessing.scale(YN.T).T
-    
-    
     R0 = np.percentile(GS/RS, [20], axis=1).T
-    RM = np.divide(GS/RS-R0,R0)
+    RM = np.divide(GS/RS-R0,np.abs(R0))
 #    plt.imshow(dR, aspect='auto')
 #    plt.show()
     return YN, dR, GS, RS, RM
@@ -374,7 +370,7 @@ def loadData(folder, dataPars, ew=1):
     #downsample to 6 volumes/sec
     pc3, pc2, pc1 = pcs[:,clIndices]
 
-    velo = velo[clIndices]*50/6. # to get it in per Volume units
+    velo = velo[clIndices]*50/6. # to get it in per Volume units. This is radians per sec
     
     theta = theta[clIndices]
     cl = clFull[clIndices]
@@ -416,7 +412,7 @@ def loadData(folder, dataPars, ew=1):
         if len(data['flagged_volumes'])>0:
             print data['flagged_volumes']
             nanmask[:,np.array(data['flagged_volumes'][0])] = np.nan
-    Rfull = np.copy(dR)
+    Rfull = np.copy(Y)
     Rfull[np.isnan(nanmask)] =np.nan
     
     Y = Y[order]

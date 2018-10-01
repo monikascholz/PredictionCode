@@ -117,7 +117,8 @@ pcsNew, meanAngle, lengths, refPoint = dh.calculateEigenwormsFromCL(cl, eigenwor
 pc3New, pc2New, pc1New = pcsNew
 cl2 = dh.calculateCLfromEW(pcsNew, eigenworms, meanAngle, lengths, refPoint)
 # transform eigenworms exactly the same way. Otherwise we get some artefacts from nans
-r =(pcsNew[2]**2+pcsNew[1]**2)
+r = (pcsNew[2]**2+pcsNew[1]**2)
+r =np.repeat(np.mean((pcsNew[2]**2+pcsNew[1]**2)), len(pcsNew[0]))
 
 #=============================================================================#
 # here we reconstruct from the true angular velocity to check the math. This is smoothed, so we need to compare with this version
@@ -170,26 +171,31 @@ indices = np.argsort(tP)
 xdata, ydata = tP[indices], pc3[indices]
 # bin the data
 def nonlinear(x,A):
-    return A*np.abs(x*2)
+    return A*np.abs(x)*x
 
 # bin the data
 def fitfun(x,A,m,s):
     # taper off towards the ends, otherwise overshoot horribly
-    #return -A*(1-np.exp(-(x-m)**2/s**2))*x
-    #return A*x
-    #return A*np.abs(x)*x
-    #return  -A*(1-np.exp(-(x-m)**2/s**2))
+    #return A*(1-np.exp(-(x-m)**2/s**2))*x
+    #return A*np.sqrt(np.abs(x))*x 
+    #return A*x + m*x**3 + s*x**2
+    return A*np.abs(x**2)*x +m*x
+    #return  A*(1-np.exp(-(x-m)**2/s**2))
     #return A*erf((x-m)/s)#*x
     #
-    return (A*(1-np.exp(-(x-m)**2/s**2))+1)*x
+    #return (A*(1-np.exp(-(x-m)**2/s**2))-1)#*x
 
-p0 = [4,0,3] 
+p0 = [5,1,13]
 
-popt, pcov = curve_fit(fitfun, xdata, ydata, p0)#,bounds=[[-2,-10, -10], [15,10,10]])
+popt, pcov = curve_fit(fitfun, xdata, ydata, p0, sigma= 1./(np.abs(xdata-ydata)))#,bounds=[[-2,-10, -10], [15,10,10]])
 
 print popt
 # new tP
 tPnew = fitfun(tP, *popt)
+#plt.figure()
+#plt.hexbin(xdata, (ydata-xdata), gridsize=30)
+#plt.show()
+
 xP, yP, zP = dh.recrWorm(avP, tPnew, thetaTrue,r=r)
 pcsP = np.vstack([zP,yP, xP])
 cl3 = dh.calculateCLfromEW(pcsP, eigenworms, meanAngle, lengths, refPoint)
@@ -205,7 +211,7 @@ cl3 -= originalCMS
 # find samples that are starting with a reset
 print np.where(test%60==0)[0]
 print t[np.where(test%60==0)[0]]
-loc1, loc2 = 1330, 610
+loc1, loc2 = 1096, 76
 
 # plot predicted behaviors and location of postures
 ybeh = [10, 15]
@@ -356,6 +362,7 @@ moveAxes(ax1, 'right', 0.07)
 ax4 = plt.subplot(gsNL[0,1])
 # show non-linearity for one neuron
 ax4.scatter(xdata, ydata, color='k', alpha=0.01)
+
 ax4.plot(xdata, tPnew[indices], color=R1, linestyle='--', label='fit')
 ax4.set_xlabel('Predicted turn')
 ax4.set_ylabel('True turn', labelpad=-10)
@@ -403,6 +410,7 @@ print 'fit', popt[0]
 #=============================================================================#
 fitdata = []
 r2s = []
+dataAll = []
 for key in ['AML32_moving', 'AML70_chip']:
     dset = data[key]['input']
     res = data[key]['analysis']
@@ -414,13 +422,14 @@ for key in ['AML32_moving', 'AML70_chip']:
         indices = np.argsort(xdata[train])
         xdataS= xdata[indices]
         ydataS= ydata[indices]
-       
-        p0 = [10,5,10] 
+        dataAll.append([xdata, ydata])
+        #p0 = [50,10,1] 
 #        plt.plot(xdataS, fitfun(xdataS, *popt))
 #        plt.scatter(xdataS, ydataS)
 #        plt.show()
-        popt, pcov = curve_fit(fitfun, xdataS, ydataS, p0,  bounds=[[0,1, -10], [10,10,100]])
-        print popt
+        
+        popt, pcov = curve_fit(fitfun, xdataS, ydataS, p0,  bounds=[[0,0, -10], [100,190,100]])
+        
         fitdata.append(popt[0])
         
 #        plt.figure()
@@ -428,11 +437,36 @@ for key in ['AML32_moving', 'AML70_chip']:
 #        plt.plot(xdata)
 #        plt.plot(fitfun(ydata, *popt), 'r--')
 #        plt.show()
-        ax8.plot(np.arange(-10,10, 0.1), fitfun(np.arange(-10,10, 0.1), *popt), color='k', alpha=0.25)
+        ax8.plot(np.arange(-15,15, 0.1), fitfun(np.arange(-15,15, 0.1), *popt), color='k', alpha=0.25)
         r2s.append([r2_score( ydata[test],xdata[test]), r2_score(ydata[test],fitfun(xdata[test], *popt))])
-print fitdata
+
+# fit all jointly
+xD, yD = np.concatenate(dataAll, axis=1)
+popt, pcov = curve_fit(fitfun, xD, yD, p0,  bounds=[[0,1, -10], [10,10,100]])
+print popt
+ax8.plot(np.arange(-15,15, 0.1), fitfun(np.arange(-15,15, 0.1), *popt), color='r', alpha=0.75)
+ax8.scatter(xD, yD, s=3, c='k', alpha=0.1)
+
+fitdata = []
+r2s = []
+dataAll = []
+for key in ['AML32_moving', 'AML70_chip']:
+    dset = data[key]['input']
+    res = data[key]['analysis']
+    for idn in dset.keys():
+        xdata =res[idn]['ElasticNet']['Eigenworm3']['output']
+        ydata = dset[idn]['Behavior']['Eigenworm3']
+        test = res[idn]['Training']['Eigenworm3']['Test']
+        train = res[idn]['Training']['Eigenworm3']['Train']
+        indices = np.argsort(xdata[train])
+        xdataS= xdata[indices]
+        ydataS= ydata[indices]
+        #use joined fit fun
+        r2s.append([r2_score( ydata[test],xdata[test]), r2_score(ydata[test],fitfun(xdata[test], *popt))])
+
 #mkStyledBoxplot(ax8, [0,1], np.reshape(fitdata, (1,-1)),[L1], ['A'])
 mkStyledBoxplot(ax9, [0,1], np.array(r2s).T,[L1, L3], ['L', 'NL'])
+print 'R2_scores', np.mean(r2s, axis=0)
 ax9.set_xlim([-0.5,1.5])
 ax9.set_ylabel(r'$R^2$')
 ax8.set_xlabel('Linear')

@@ -13,9 +13,9 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
-first = True # if true, create new HDF5 file
+typ = 'AML70' # possible values AML32, AML18, AML70
+condition = 'chip' # Moving, immobilized, chip
+first = True # if 0true, create new HDF5 file
 transient = 0
 ###############################################    
 # 

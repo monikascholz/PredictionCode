@@ -16,6 +16,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 import dataHandler as dh
 # deliberate import all!
 from stylesheet import *
+from scipy.stats import pearsonr
 ################################################
 #
 # grab all the data we will need
@@ -56,7 +57,7 @@ print 'Done reading data.'
 
 fig = plt.figure('Fig - 2 : Predicting behavior from neural dynamics', figsize=(9.5,5))
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.3,0.7], height_ratios=[1,0.1,0.75,0.75])
+gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.2,0.7], height_ratios=[1,0.1,0.75,0.75])
 gs1.update(left=0.085, right=0.97,  bottom = 0.1, top=0.96, hspace=0.25, wspace=0.25)
 ################################################
 #
@@ -65,14 +66,14 @@ gs1.update(left=0.085, right=0.97,  bottom = 0.1, top=0.96, hspace=0.25, wspace=
 ################################################
 
 ################################################
-# mark locations on the figure to get good guess for a,b,c locs
+## mark locations on the figure to get good guess for a,b,c locs
 #for y in np.arange(0,1.1,0.1):
 #    plt.figtext(0, y, y)
 #for x in np.arange(0,1.1,0.1):
 #    plt.figtext(x, 0.95, x)
-#
-#letters = map(chr, range(65, 91)) 
-## add a,b,c letters, 9 pt final size = 18pt in this case
+
+letters = map(chr, range(65, 91)) 
+# add a,b,c letters, 9 pt final size = 18pt in this case
 letters = ['A', 'B', 'C', 'D']
 x0 = 0
 locations = [(x0,0.95),  (x0,0.6), (x0,0.54),  (x0,0.35)]
@@ -93,13 +94,7 @@ locations = [(0.52,y0), (0.785,y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
-#letters = ['I']
-#y0 = 0.39
-#locations = [(0.49,y0), (0.77,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
-#            horizontalalignment='left',verticalalignment='baseline',)
-#            horizontalalignment='left',verticalalignment='top',)
+  
 ################################################
 #
 #first row
@@ -133,7 +128,7 @@ axhm.set_xticks([])
 # colorbar
 cbar = fig.colorbar(cax1, cax=axcb, use_gridspec = True)
 cbar.set_ticks([-2,0,2])
-cbar.set_ticklabels(['<-0.5',0,'>2'])
+cbar.set_ticklabels(['<-2',0,'>2'])
 cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.04)
 moveAxes(axcb, 'scaley', -0.08)
@@ -182,11 +177,13 @@ ax7.plot(timeActual, moving['Behavior']['AngleVelocity'], color = R1)
 ax7.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 ax7.axhline(color='k', linestyle = '--', zorder=-1)
 #ax7.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
-ax7.set_ylabel('Velocity', labelpad=10)
+#ax7.set_ylabel('v(rad/s)', labelpad=-1, color=R1)
 ax7.set_xlim([timeActual[0], timeActual[-1]])
+cleanAxes(ax7, where='x')
 # make scalebar
 xscale = timeActual[0]-20
 yscale =  [-0.025, 0.025]
+
 #ax7.plot([xscale, xscale], yscale, color=R1, clip_on=False)
 #ax7.text(xscale, np.max(ax7.get_ylim())*1.1, 'Velocity', color=R1,horizontalalignment='center',verticalalignment='center')
 #ax7.text(xscale, 0, np.ptp(yscale), color=R1, rotation = 90,horizontalalignment='right',verticalalignment='center')
@@ -200,12 +197,24 @@ ax8.plot(timeActual,moving['Behavior']['Eigenworm3'], color = B1)
 ax8.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 #ax8.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
 ax8.axhline(color='k', linestyle ='--', zorder=-1)
-ax8.set_ylabel('Turn', labelpad=10)
+#ax8.set_ylabel('Turn', labelpad=10, color=B1)
 ax8.get_yaxis().set_label_coords(-0.12, 0.5)
 ax7.get_yaxis().set_label_coords(-0.12, 0.5)
 ax8.set_xlabel('Time (s)')
 ax8.set_xlim([timeActual[0], timeActual[-1]])
 moveAxes(ax7, 'up', 0.04)
+moveAxes(ax8, 'up', 0.01)
+moveAxes(ax7, 'scaley', 0.03)
+moveAxes(ax8, 'scaley', 0.03)
+ax7.text(-140, 0, 'velocity\n(rad/s)', color = R1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
+ax8.text(-120, 0, 'turn\n(a.u.)', color = B1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
+
+# move axis to the right
+ax7.yaxis.tick_right()
+ax8.yaxis.tick_right()
+ax8.spines['right'].set_visible(True)
+ax7.spines['right'].set_visible(True)
+
 ################################################
 #
 # right column
@@ -217,10 +226,11 @@ gsPred = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs1[:,2:],height_ra
 # output of behavior prediction from PCA
 flag = 'PCAPred'
 ybeh = [0, -6]
+yoff = [1.5, 2]
 axscheme1 = plt.subplot(gsPred[0,0])
 axscheme1.set_title('PCA model', y=1.05)
-for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
-            [N1, N1], [R1, B1], ybeh, ['Velocity', 'Turn'], ['center', 'center']):
+for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenworm3' ], \
+            [N1, N1], [R1, B1], ybeh, yoff,['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior]
 
     meanb, maxb = np.nanmean(beh),np.nanstd(beh)
@@ -231,7 +241,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
     
     axscheme1.plot(t, beh+yl, color=color)
     axscheme1.plot(t, behPred+yl, color=cpred)
-    axscheme1.text(t[-1], np.max(yl+beh)*1.3, \
+    axscheme1.text(t[-1], yl+yo, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
     axscheme1.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
 
@@ -245,12 +255,12 @@ cleanAxes(axscheme1)
 
 # output of behavior prediction from elastic net
 flag = 'ElasticNet'
-ybeh = [0, -6]
+
 axscheme2 = plt.subplot(gsPred[0,1], sharex=axscheme1)
 axscheme2.set_title('Sparse linear model', y=1.05)
 
-for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3' ], \
-            [N1, N1], [R1, B1], ybeh, ['Velocity', 'Turn'], ['center', 'center']):
+for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenworm3' ], \
+            [N1, N1], [R1, B1], ybeh,yoff, ['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior]
 
     meanb, maxb = np.nanmean(beh),np.nanstd(beh)
@@ -261,7 +271,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
     
     axscheme2.plot(t, beh+yl, color=color)
     axscheme2.plot(t, behPred+yl, color=cpred)
-    axscheme2.text(t[-1], np.max(yl+behPred), \
+    axscheme2.text(t[-1], yl+yo, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
     axscheme2.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
 
@@ -325,6 +335,11 @@ for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [0, toffset]):
             results=  dset[idn][flag][behavior]
             try:
                 keep.append(np.array([results['scorepredicted'], np.max(results['individualScore'])]))
+                # try with pearson r
+#                xdataL =results['output']
+#                ydataL = data[key]['input'][idn]['Behavior'][behavior]
+#                testL = dset[idn]['Training'][behavior]['Test']
+#                keep.append([pearsonr( ydataL[testL],xdataL[testL])[0]**2, pearsonr(ydataL[testL],xdataL[testL])[0]**2])
             except ValueError:
                 keep.append(np.array([results['scorepredicted'], 0]))
         # do some plotting
@@ -407,15 +422,14 @@ mkStyledBoxplot(axVb, [x0+1.75, x0+1.75+toffset],gcamp[:,:,1],[R1, B1], [1,2], s
 
 locspca = [-1, -1+toffset]
 # now boxplot for pca
-
 mkStyledBoxplot(axV, locspca, pca, [R1, B1], ['Velocity', 'Turn'], scatter=False, rotate=False, dx=1.25)
 mkStyledBoxplot(axVb, locspca, pca, [R1, B1], ['Velocity', 'Turn'], scatter=False, rotate=False, dx=1.25)
 ### print results
 print gcamp.shape
-print 'PCA r2 (velocity, turns)', np.mean(pca, axis=1), np.std(pca, axis=1)/np.sqrt(len(pca[0])), len(pca[0])
-print 'EN r2 (velocity, turns)', np.mean(gcamp[:,:,0], axis=1), np.std(gcamp[:,0], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
-print 'single r2 (velocity, turns)', np.mean(gcamp[:,:,1], axis=1), np.std(gcamp[:,1], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
-print 'GFP r2 (velocity, turns)', np.mean(gfp[:,:,0], axis=1), np.std(gfp[:,0], axis=1)/np.sqrt(len(gfp[0])), len(gfp[0])
+print 'PCA r2 (mean velocity, mean turns), (sem, sem)', np.mean(pca, axis=1), np.std(pca, axis=1)/np.sqrt(len(pca[0])), len(pca[0])
+print 'EN r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,0], axis=1), np.std(gcamp[:,0], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
+print 'single r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,1], axis=1), np.std(gcamp[:,1], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
+print 'GFP r2 (mean velocity, mean turns), (sem, sem)', np.mean(gfp[:,:,0], axis=1), np.std(gfp[:,0], axis=1)/np.sqrt(len(gfp[0])), len(gfp[0])
 
 # now boxplot for gfp
 x0 = 2.25
@@ -431,7 +445,7 @@ axVb.set_ylim([-4,-2])
 axV.spines['bottom'].set_visible(False)
 axV.set_xticks([])
 #axV.set_ylabel(r'$R^2$ (Testset)')
-axV.text(-0.15, 0.75, r'$R^2$ (Testset)', transform = axV.transAxes, rotation = 90, fontsize=14)
+axV.text(-0.18, 0.75, r'$R^2$ (Testset)', transform = axV.transAxes, rotation = 90, fontsize=14)
 axV.text(0.1, 0.95, 'Velocity', transform = axV.transAxes)
 axV.text(0.75,0.95, 'Turn', transform = axV.transAxes)
 # add fancy linebreaks
@@ -449,7 +463,7 @@ axVb.plot((-d,d),(1-d*hr,1+d*2), **kwargs)
 
 x0= -0.25
 axVb.set_xticks([-1, x0, x0+1.75,x0+2.5,-1+toffset ,  x0+toffset, x0+1.75+toffset , x0+2.5+toffset])
-axVb.set_xticklabels(['PCA', 'G', 'S','Ctrl','PCA', 'G', 'S', 'Ctrl'])
+axVb.set_xticklabels(['PCA', 'SLM', 'BN','Ctrl','PCA', 'SLM', 'BN', 'Ctrl'])
 plt.show()
 # get all the weights for the different samples
 

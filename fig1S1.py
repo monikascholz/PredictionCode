@@ -52,12 +52,12 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - S1 : Neural dynamics in immobile transitions', figsize=(9.5, 9*2/4.))
+fig = plt.figure('Fig - S1 : Neural dynamics in immobile transitions', figsize=(9.5, 4.))
 # this gridspec makes one example plot of a heatmap with its PCA
 #gs1 = gridspec.GridSpec(4, 3, width_ratios = [1,1,1], height_ratios=[0.1, 1,1,2])
 #gsHeatmap = gridspec.GridSpecFromSubplotSpec(4,5, subplot_spec=gs1[0:4,:], width_ratios=[1.25, 0.1, 0.5,0.5,0.5], height_ratios = [0.1,10,10,10], wspace=0.3, hspace=0.25)
-gs1 = gridspec.GridSpec(2,4)
-gs1.update(left=0.07, right=0.98,  bottom = 0.15, top=0.98, hspace=0.25, wspace=0.55)
+gs1 = gridspec.GridSpec(1,3, width_ratios=[0.5,1,1])
+gs1.update(left=0.07, right=0.98,  bottom = 0.17, top=0.98, hspace=0.25, wspace=0.55)
 
 ################################################
 #
@@ -66,13 +66,13 @@ gs1.update(left=0.07, right=0.98,  bottom = 0.15, top=0.98, hspace=0.25, wspace=
 ################################################
 
 # add a,b,c letters, 9 pt final size = 18pt in this case
-#letters = ['A', 'B', 'C']
-#y0 = 0.99
-#locations = [(0,y0),  (0.55,y0), (0.76,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
-#            horizontalalignment='left',verticalalignment='top',)
-#
+letters = ['A', 'B', 'C']
+y0 = 0.99
+locations = [(0,y0),  (0.25,y0), (0.62,y0)]
+for letter, loc in zip(letters, locations):
+    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
+            horizontalalignment='left',verticalalignment='top',)
+
 #letters = ['D', 'E', 'F']
 #y0 = 0.6
 #locations = [(0,y0),  (0.40,y0), (0.76,y0)]
@@ -110,10 +110,10 @@ nComp =10
 movExp = ['AML32_moving', 'AML70_chip']
 imExp = ['AML32_immobilized', 'AML70_immobilized']
 movCtrl = ['AML18_moving', 'AML175_moving']
-ax1 = plt.subplot(gs1[1,0])
-ax2 = plt.subplot(gs1[1,1])
-ax3 = plt.subplot(gs1[1,2])
-ax4 = plt.subplot(gs1[1,3])
+ax1 = plt.subplot(gs1[0,0])
+ax2 = plt.subplot(gs1[0,1])
+ax3 = plt.subplot(gs1[0,2])
+#ax4 = plt.subplot(gs1[0,3])
 nneurons = []
 for condition, keys, mark in zip([ 'immobilized','moving'], [ imExp,movExp], ['s', '^']):
     n = []
@@ -128,123 +128,65 @@ for condition, keys, mark in zip([ 'immobilized','moving'], [ imExp,movExp], ['s
             tmpdata.append(np.cumsum(results['expVariance'][:nComp]*100))
             # for later -- no neurons
             n.append(data[key]['input'][idn]['Neurons']['Activity'].shape[0])            
-        ax1.plot(np.arange(1,nComp+1),np.array(tmpdata).T ,'-',color =colorsExp[condition], lw=1, label = '{} {}'.format(typ, condition),alpha=0.3 )
-    ax1.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = colorsExp[condition], marker=mark)
+        #ax1.plot(np.arange(1,nComp+1),np.array(tmpdata).T ,'-',color =colorsExp[condition], lw=1, label = '{} {}'.format(typ, condition),alpha=0.3 )
+    #ax1.errorbar(np.arange(1,nComp+1), np.mean(tmpdata, axis=0), np.std(tmpdata, axis=0), color = colorsExp[condition], marker=mark)
     nneurons.append(n)
-ax1.set_ylabel('Variance exp. (%)')
-ax1.set_yticks([0,25,50,75,100])
+#ax1.set_ylabel('Variance exp. (%)')
+#ax1.set_yticks([0,25,50,75,100])
 #ax12.set_yticks([0,25,50,75,100])
-ax1.set_xlabel('# of components')
+#ax1.set_xlabel('# of components')
 
 # number of neurons found
-
-mkStyledBoxplot(ax2,[0,1],np.array(nneurons), [B1, R1], [ 'immobilized', 'moving'])
-ax2.set_ylabel('# of Neurons')
-ax2.set_xlim([-0.5,1.5])
+nneurons = np.array(nneurons)
+print nneurons
+mkStyledBoxplot(ax1,[0,1],nneurons, [B1, R1], [ 'immobilized', 'moving'])
+print 'Number of neurons (mean, sem) immobilized', np.mean(nneurons[0]), np.std(nneurons[0])
+print 'Number of neurons (mean, sem) moving:', np.mean(nneurons[1]), np.std(nneurons[1])
+ax1.set_ylabel('# of Neurons')
+ax1.set_xlim([-0.5,1.5])
 
 # neurons correlating with velocity -- make histogram and average
 corrV = []
 for condition, keys, c in zip([ 'GFP','GCamp6s'], [ movCtrl,movExp], [N0, R1]):
-    cv = []
+    cv1 = []
+    cv2 = []
     for key in keys:
         dset = data[key]['analysis']
         tmpdata = []
         for idn in dset.keys():
             # correlation with velocity
-            cv.append(data[key]['analysis'][idn]['Correlation']['AngleVelocity'])
-            #print key, np.max(cv[-1])
-            ax3.plot(np.linspace(0,1,len(cv[-1])), np.sort(cv[-1]), color=c, alpha=0.75)
+            cv1.append(data[key]['analysis'][idn]['Correlation']['AngleVelocity'])
+            print key,idn, np.max(cv1[-1])
+            ax2.plot( np.sort(cv1[-1])[::-1],1-np.linspace(0,1,len(cv1[-1])), color=c, alpha=0.75)
             
-            cv.append(data[key]['analysis'][idn]['Correlation']['Eigenworm3'])
-            #print key, np.max(cv[-1])
-            ax4.plot(np.linspace(0,1,len(cv[-1])), np.sort(cv[-1]), color=c, alpha=0.75)
+            cv2.append(data[key]['analysis'][idn]['Correlation']['Eigenworm3'])
+            print key, np.max(cv2[-1])
+            ax3.plot( np.sort(cv2[-1])[::-1], 1-np.linspace(0,1,len(cv2[-1])),color=c, alpha=0.75)
             
-    corrV.append(cv)
+    corrV.append(cv1)
 
-ax3.set_xlabel('Fraction of Neurons')
-ax3.set_ylabel('Correlation \n with velocity')
-ax4.set_xlabel('Fraction of Neurons')
-ax4.set_ylabel('Correlation \n with turns')
-
-
-#################################
-#
-# Activity analysis like PNAS paper
-#
-#################################
-gsAct = gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=gs1[0,:], wspace=0.5)
-ax13 = plt.subplot(gsAct[0,0])
-ax14 = plt.subplot(gsAct[0,1])
-ax15 = plt.subplot(gsAct[0,2])
-# extract neural activity histogram for all datasets
-bins = np.linspace(-3,3,30)
-xticks = [-1,0,1,2,3]
-#xticks = [-0.1,0.1]
-x = bins[:-1] + np.diff(bins)*0.5
-dx = np.diff(bins)[0]
-activities = []
-gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
-gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
-for typ in [gfp, gcamp]:
-    for condition in ['moving', 'immobilized']:
-        keys = typ[condition]
-        tmpdata = []
-        for key in keys:
-            dset = data[key]['input']
-            
-            for idn in dset.keys():
-                X = dset[idn]['Neurons']['Activity']
-               
-                #tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in X], axis=0)*dx)
-                tmpdata.append(np.histogram(X[np.isfinite(X)], bins, density=1)[0]*dx)
-        
-        activities.append(tmpdata)
+ax2.set_xlabel('$R^2$')
+ax2.set_ylabel('Fraction of Neurons \n with correlation < $R^2$')
+ax3.set_xlabel('$R^2$')
+#ax3.set_ylabel('Fraction of Neurons')
 
 
-# plot gfp and gcamp moving in a panel
-histograms = []
-meandata = []
-for hindex, (hist, c) in enumerate(zip([activities[2],  activities[0]], [colorsExp['moving'], colorCtrl['moving']])):
-    m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
-    # normalize now
-#    s/=np.sum(m)
-#    m /= np.sum(m)
-    #[ax13.plot(x, h, color=c) for h in hist]
-    ax13.plot(x, m, color = c, zorder=2)
-    ax13.fill_between(x, m-s,m+s, color = c, alpha=0.5)
-    histograms.append(m)
-    meandata.append([np.sum(h[x>1]) for h in hist])
-    
-# plot gfp and gcamp immobiulized in a panel
-for hindex, (hist, c) in enumerate(zip([activities[3],  activities[1]], [colorsExp['immobilized'], colorCtrl['immobilized']])):
-    m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
-    ax14.plot(x, m, color = c, zorder=2)
-    ax14.fill_between(x, m-s,m+s, color = c, alpha=0.5)
-    histograms.append(m)
-    meandata.append([np.sum(h[x>1]) for h in hist])
-
-ax13.set_xlabel(r'$\Delta R/R_0$')
-ax13.set_xticks(xticks)
-ax14.set_xticks(xticks)
-ax14.set_xlabel(r'$\Delta R/R_0$')
-ax13.set_ylabel('Normalized Counts')
-
-# plot probability of signal
-ax15.plot(x, histograms[0]/(histograms[0]+histograms[1]), color=colorsExp['moving'])
-ax15.plot(x, histograms[2]/(histograms[2]+histograms[3]), color=colorsExp['immobilized'])
-# draw a line where 95 percent level
-ax15.axhline(y = 0.75,color='k', linestyle = '--')
-ax15.set_xlabel(r'$\Delta R/R_0$')
-ax15.set_ylabel('P(Signal)')
-ax15.set_xticks(xticks)
-ax15.set_yticks([0.5,1])
-
-print [np.sum(h[x>1]) for h in histograms]
-print [np.sum(h) for h in histograms]
-# boxplot of signal percentage in each recording
-ax12 = plt.subplot(gsAct[3])
-color, labels, ydata = [],[],[]
-
+##################################
+##
+## Activity analysis like PNAS paper
+##
+##################################
+#gsAct = gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=gs1[0,:], wspace=0.5)
+#ax13 = plt.subplot(gsAct[0,0])
+#ax14 = plt.subplot(gsAct[0,1])
+#ax15 = plt.subplot(gsAct[0,2])
+## extract neural activity histogram for all datasets
+#bins = np.linspace(-3,3,30)
+#xticks = [-1,0,1,2,3]
+##xticks = [-0.1,0.1]
+#x = bins[:-1] + np.diff(bins)*0.5
+#dx = np.diff(bins)[0]
+#activities = []
 #gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
 #gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
 #for typ in [gfp, gcamp]:
@@ -255,20 +197,82 @@ color, labels, ydata = [],[],[]
 #            dset = data[key]['input']
 #            
 #            for idn in dset.keys():
-#                print np.nanstd(dset[idn]['Neurons']['Activity'], axis=1).shape
-#                tmpdata.append(np.nanmean(np.nanmean(dset[idn]['Neurons']['Activity'], axis=1)))
-#        ydata.append(tmpdata)
-
-color = [N0, N1, R1, B1]
-labels = ['M(Ctrl)', 'I(Ctrl)', 'M', 'I']
-color = [R1, N0, B1, N1]
-labels = ['M', 'M(Ctrl)', 'I','I(Ctrl)']
-
-ydata = np.array(meandata).T
-x_data = np.arange(len(ydata))
-mkStyledBoxplot(ax12, x_data, ydata, color, labels)
-ax12.set_xlim([-0.5, 3.25])
-ax12.set_ylabel(r'$P(\Delta R/R_0)>1$')
+#                X = dset[idn]['Neurons']['Activity']
+#               
+#                #tmpdata.append(np.mean([np.histogram(n[np.isfinite(n)], bins, density=True)[0] for n in X], axis=0)*dx)
+#                tmpdata.append(np.histogram(X[np.isfinite(X)], bins, density=1)[0]*dx)
+#        
+#        activities.append(tmpdata)
+#
+#
+## plot gfp and gcamp moving in a panel
+#histograms = []
+#meandata = []
+#for hindex, (hist, c) in enumerate(zip([activities[2],  activities[0]], [colorsExp['moving'], colorCtrl['moving']])):
+#    m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
+#    # normalize now
+##    s/=np.sum(m)
+##    m /= np.sum(m)
+#    #[ax13.plot(x, h, color=c) for h in hist]
+#    ax13.plot(x, m, color = c, zorder=2)
+#    ax13.fill_between(x, m-s,m+s, color = c, alpha=0.5)
+#    histograms.append(m)
+#    meandata.append([np.sum(h[x>1]) for h in hist])
+#    
+## plot gfp and gcamp immobiulized in a panel
+#for hindex, (hist, c) in enumerate(zip([activities[3],  activities[1]], [colorsExp['immobilized'], colorCtrl['immobilized']])):
+#    m, s = np.nanmean(hist, axis=0), np.nanstd(hist, axis=0)/np.sqrt(len(hist))
+#    ax14.plot(x, m, color = c, zorder=2)
+#    ax14.fill_between(x, m-s,m+s, color = c, alpha=0.5)
+#    histograms.append(m)
+#    meandata.append([np.sum(h[x>1]) for h in hist])
+#
+#ax13.set_xlabel(r'$\Delta R/R_0$')
+#ax13.set_xticks(xticks)
+#ax14.set_xticks(xticks)
+#ax14.set_xlabel(r'$\Delta R/R_0$')
+#ax13.set_ylabel('Normalized Counts')
+#
+## plot probability of signal
+#ax15.plot(x, histograms[0]/(histograms[0]+histograms[1]), color=colorsExp['moving'])
+#ax15.plot(x, histograms[2]/(histograms[2]+histograms[3]), color=colorsExp['immobilized'])
+## draw a line where 95 percent level
+#ax15.axhline(y = 0.75,color='k', linestyle = '--')
+#ax15.set_xlabel(r'$\Delta R/R_0$')
+#ax15.set_ylabel('P(Signal)')
+#ax15.set_xticks(xticks)
+#ax15.set_yticks([0.5,1])
+#
+#print [np.sum(h[x>1]) for h in histograms]
+#print [np.sum(h) for h in histograms]
+## boxplot of signal percentage in each recording
+#ax12 = plt.subplot(gsAct[3])
+#color, labels, ydata = [],[],[]
+#
+##gfp = {'moving':['AML18_moving', 'AML175_moving'], 'immobilized':['AML18_immobilized']}
+##gcamp = {'moving':['AML32_moving', 'AML70_chip'], 'immobilized':['AML32_immobilized', 'AML70_immobilized']}
+##for typ in [gfp, gcamp]:
+##    for condition in ['moving', 'immobilized']:
+##        keys = typ[condition]
+##        tmpdata = []
+##        for key in keys:
+##            dset = data[key]['input']
+##            
+##            for idn in dset.keys():
+##                print np.nanstd(dset[idn]['Neurons']['Activity'], axis=1).shape
+##                tmpdata.append(np.nanmean(np.nanmean(dset[idn]['Neurons']['Activity'], axis=1)))
+##        ydata.append(tmpdata)
+#
+#color = [N0, N1, R1, B1]
+#labels = ['M(Ctrl)', 'I(Ctrl)', 'M', 'I']
+#color = [R1, N0, B1, N1]
+#labels = ['M', 'M(Ctrl)', 'I','I(Ctrl)']
+#
+#ydata = np.array(meandata).T
+#x_data = np.arange(len(ydata))
+#mkStyledBoxplot(ax12, x_data, ydata, color, labels)
+#ax12.set_xlim([-0.5, 3.25])
+#ax12.set_ylabel(r'$P(\Delta R/R_0)>1$')
 plt.show()
         #ax.imshow( tmpdata, aspect='auto', interpolation='none', origin='lower',extent=[T[0],T[-1],len(tmpdata),0],vmax=1)
 #ax13.text(-0.25,0,'Autocorrelation', fontsize=14,transform = ax13.transAxes, rotation=90, verticalalignment ='center')
