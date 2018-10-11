@@ -17,6 +17,13 @@ import dataHandler as dh
 # deliberate import all!
 from stylesheet import *
 from scipy.stats import pearsonr
+
+# suddenly this isn't imported from stylesheet anymore...
+mpl.rcParams["axes.labelsize"] = 14
+mpl.rcParams["xtick.labelsize"] = 14
+mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["font.size"] = 14
+fs = mpl.rcParams["font.size"]
 ################################################
 #
 # grab all the data we will need
@@ -58,7 +65,7 @@ print 'Done reading data.'
 fig = plt.figure('Fig - 2 : Predicting behavior from neural dynamics', figsize=(9.5,5))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.2,0.7], height_ratios=[1,0.1,0.75,0.75])
-gs1.update(left=0.085, right=0.97,  bottom = 0.1, top=0.96, hspace=0.25, wspace=0.25)
+gs1.update(left=0.09, right=0.97,  bottom = 0.1, top=0.96, hspace=0.25, wspace=0.25)
 ################################################
 #
 # letters
@@ -83,7 +90,7 @@ for letter, loc in zip(letters, locations):
 ##
 letters = ['E','F']
 y0 = 0.95
-locations = [(0.52,y0), (0.75,y0)]
+locations = [(0.56,y0), (0.77,y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
@@ -133,7 +140,7 @@ cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.04)
 moveAxes(axcb, 'scaley', -0.08)
 moveAxes(axcb, 'scalex', -0.02)
-axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -15)
+axcb.set_ylabel(r'$\Delta I/I_0$', labelpad = -15)
 #ethogram
 
 plotEthogram(axetho, time, moving['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
@@ -203,11 +210,11 @@ ax7.get_yaxis().set_label_coords(-0.12, 0.5)
 ax8.set_xlabel('Time (s)')
 ax8.set_xlim([timeActual[0], timeActual[-1]])
 moveAxes(ax7, 'up', 0.04)
-moveAxes(ax8, 'up', 0.01)
+moveAxes(ax8, 'up', 0.03)
 moveAxes(ax7, 'scaley', 0.03)
 moveAxes(ax8, 'scaley', 0.03)
-ax7.text(-140, 0, 'velocity\n(rad/s)', color = R1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
-ax8.text(-120, 0, 'turn\n(a.u.)', color = B1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
+ax7.text(-140, 0, 'Velocity\n(rad/s)', color = R1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
+ax8.text(-160, 0, 'Body \n curvature \n(a.u.)', color = B1, rotation=0, verticalalignment='center', fontsize=12, multialignment='center')
 
 # move axis to the right
 ax7.yaxis.tick_right()
@@ -228,7 +235,7 @@ flag = 'PCAPred'
 ybeh = [0, -6]
 yoff = [1.5, 2]
 axscheme1 = plt.subplot(gsPred[0,0])
-axscheme1.set_title('PCA model', y=1.05)
+axscheme1.set_title('PCA model', y=1.05, fontsize=fs)
 for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenworm3' ], \
             [N1, N1], [R1, B1], ybeh, yoff,['Velocity', 'Turn'], ['center', 'center']):
     beh = moving['Behavior'][behavior]
@@ -243,11 +250,15 @@ for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenwo
     axscheme1.plot(t, behPred+yl, color=cpred)
     axscheme1.text(t[-1], yl+yo, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
-    axscheme1.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
+
+# ylabels
+axscheme1.text(t[0]*0.8, ybeh[0]+0.5, 'Velocity', rotation=90, color=R1, verticalalignment=align)
+axscheme1.text(t[0]*0.6, ybeh[1], 'Body', rotation=90, color=B1, verticalalignment=align)
+axscheme1.text(t[0]*0.8, ybeh[1], 'curvature', rotation=90, color=B1, verticalalignment=align)
 
 # add scalebar
 l =120
-y = axscheme1.get_ylim()[0]
+y = axscheme1.get_ylim()[0]*1.05
 axscheme1.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
 axscheme1.text(t[0]+l*0.5,y*0.95, '2 min', horizontalalignment='center')
 cleanAxes(axscheme1)
@@ -257,7 +268,7 @@ cleanAxes(axscheme1)
 flag = 'ElasticNet'
 
 axscheme2 = plt.subplot(gsPred[0,1], sharex=axscheme1)
-axscheme2.set_title('Sparse linear model', y=1.05)
+axscheme2.set_title('Sparse linear model', y=1.05, fontsize=fs)
 
 for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenworm3' ], \
             [N1, N1], [R1, B1], ybeh,yoff, ['Velocity', 'Turn'], ['center', 'center']):
@@ -273,16 +284,21 @@ for behavior, color, cpred, yl,yo, label, align in zip(['AngleVelocity','Eigenwo
     axscheme2.plot(t, behPred+yl, color=cpred)
     axscheme2.text(t[-1], yl+yo, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
-    axscheme2.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
+    #axscheme2.text(t[0]*0.8, yl, label, rotation=90, color=cpred, verticalalignment=align)
 
 # add scalebar
-l =120
-y = axscheme2.get_ylim()[0]
-axscheme2.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
-axscheme2.text(t[0]+l*0.5,y*0.93, '2 min', horizontalalignment='center')
+#l =120
+#y = axscheme2.get_ylim()[0]
+#axscheme2.plot([t[0], t[0]+l],[y, y], 'k', lw=2)
+#axscheme2.text(t[0]+l*0.5,y*0.93, '2 min', horizontalalignment='center')
 cleanAxes(axscheme2)
 moveAxes(axscheme1, 'down', 0.04)
 moveAxes(axscheme2, 'down', 0.04)
+moveAxes(axscheme1, 'right', 0.02)
+moveAxes(axscheme1, 'scalex', 0.03)
+moveAxes(axscheme2, 'scalex', 0.03)
+
+
 ###################################
 # scatter of Prediction versus True
 ###################################
@@ -362,7 +378,7 @@ axV.axhline(color='k', linestyle=':')
 gfp = []
 for behavior, xoff in zip(['AngleVelocity', 'Eigenworm3'], [2.5, 2.5+toffset]):
     scores = []
-    for key, marker in zip(['AML18_moving', 'AML175_moving'],['o', "p"]):
+    for key, marker in zip(['AML18_moving', 'AML175_moving'],['o', "^"]):
         dset = data[key]['analysis']
         keep = []
         for idn in dset.keys():
@@ -445,9 +461,11 @@ axVb.set_ylim([-4,-2])
 axV.spines['bottom'].set_visible(False)
 axV.set_xticks([])
 #axV.set_ylabel(r'$R^2$ (Testset)')
-axV.text(-0.18, 0.75, r'$R^2$ (Testset)', transform = axV.transAxes, rotation = 90, fontsize=14)
-axV.text(0.1, 0.95, 'Velocity', transform = axV.transAxes)
-axV.text(0.75,0.95, 'Turn', transform = axV.transAxes)
+yloc = 1
+axV.text(-0.18, 0.75, r'$R^2$ (Testset)', transform = axV.transAxes, rotation = 90, fontsize=fs)
+axV.text(0.25, yloc, 'Velocity', transform = axV.transAxes, horizontalalignment ='center')
+axV.text(0.75,yloc, 'Body', transform = axV.transAxes, horizontalalignment ='center')
+axV.text(0.75,yloc-0.12, 'curvature', transform = axV.transAxes, horizontalalignment ='center')
 # add fancy linebreaks
 d = .015 # how big to make the diagonal lines in axes coordinates
 # arguments to pass plot, just so we don't keep repeating them
@@ -463,7 +481,7 @@ axVb.plot((-d,d),(1-d*hr,1+d*2), **kwargs)
 
 x0= -0.25
 axVb.set_xticks([-1, x0, x0+1.75,x0+2.5,-1+toffset ,  x0+toffset, x0+1.75+toffset , x0+2.5+toffset])
-axVb.set_xticklabels(['PCA', 'SLM', 'BN','Ctrl','PCA', 'SLM', 'BN', 'Ctrl'])
+axVb.set_xticklabels(['PCA', 'SLM', 'SN','Ctrl','PCA', 'SLM', 'SN', 'Ctrl'], fontsize=12, rotation=45)
 plt.show()
 # get all the weights for the different samples
 

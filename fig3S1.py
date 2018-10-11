@@ -93,163 +93,33 @@ movingAML32 ='BrainScanner20180709_100433'
 moving = data['AML32_moving']['input'][movingAML32]
 movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 # negative bends are ventral for this worm
-fig = plt.figure('Fig - 3 : Neuron locations and overlap', figsize=(4.5, 2.5*2.25))
+fig = plt.figure('Fig - S3 : Neuron locations and overlap', figsize=(4.5, 1.5*2.25))
 #fig.patch.set_alpha(0.0)
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(3, 2, width_ratios = [2,1], height_ratios = [0.75,1,1])
+gs1 = gridspec.GridSpec(2, 2, width_ratios = [2,1])
 gs1.update(left=0.08, right=0.99, wspace=0.45, bottom = 0.01, top=0.98, hspace=0.2)
 
 #motionNeurons = ['AVA', 'ASI', 'AIY','AIB','AIA','AIZ','AVD', 'RIM', 'SMB', 'RMD', 'SMD', 'RIV']
 
 # from kato et al suppl. table
-motionNeurons =  ['AIA', 'AIB', 'AIY', 'AIZ', 'AVA', 'AVB', 'AVD', 'DVA', 'RIA', 'RIB', 'RIM', 'RIV', 'RMD', 'RME', 'SIB', 'SMB', 'SMD']
+sensoryNeurons =  ['FLP', 'BAG']
+
+#quiescence = ['ALA', 'RIS']
+interesting = ['RMG', 'ALA', 'RIS', 'RIP']
 # add a,b,c letters, 9 pt final size = 18pt in this case
+
 letters = ['A', 'B']
 y0 = 0.99
-locations = [(0,y0),   (0.58,y0)]
+locations = [(0,y0),  (0,0.5), (0.76,y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='top',)
-letters = ['C', 'D']
-y0 = 0.66
-locations = [(0,0.66),  (0,0.3), (0.76,y0)]
-for letter, loc in zip(letters, locations):
-    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
-            horizontalalignment='left',verticalalignment='top',)
-#letters = ['F', 'G', 'H']
-#y0 = 0.45
-#locations = [(0,y0),  (0.32,y0), (0.73,y0)]
-#for letter, loc in zip(letters, locations):
-#    plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
-#            horizontalalignment='left',verticalalignment='top',)
-################################################
-#
-#first row - number of neurons, overlap and crossprediction
-#
-################################################
-# weights
-flag = 'ElasticNet'
-avWeights = movingAnalysis[flag]['AngleVelocity']['weights']
-avRelevant = np.where(np.abs(avWeights>0))[0]
-tWeights = movingAnalysis[flag]['Eigenworm3']['weights']
-tRelevant = np.where(np.abs(tWeights>0))[0]
-notRelevant = (np.where(np.abs(avWeights==0)*np.abs(tWeights==0)))[0]
-
-# one example
-time = moving['Neurons']['TimeFull']
-label = 'AngleVelocity'
-splits = movingAnalysis['Training']
-train, test = splits[label]['Train'], splits[label]['Test']
 
 
-
-axNN = plt.subplot(gs1[0,0])
-
-# number of neurons
-for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, 0), (B2, 1.5)], [axNN, axNN ]):
-
-    alldata = []
-    # color and offset
-    c = colors[0]
-    xoff = colors[1]
-    for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
-        dset = data[key]['analysis']
-        keep = []
-        for idn in dset.keys():
-            results=  dset[idn][flag][behavior]
-            keep.append(results['noNeurons'])
-            
-        keep = np.array(keep)
-        rnd1 = np.random.rand(len(keep))*0.2
-        axR2.scatter(np.zeros(len(keep))+rnd1+xoff, keep, marker = marker, c = c, edgecolor=c, alpha=0.5)
-        alldata.append(keep)
-    alldata = np.reshape(np.concatenate(alldata), (-1,1))
-    
-    mkStyledBoxplot(axR2, [-0.25+xoff, 0.25+xoff], alldata.T, [c], ['GCamp6s'], scatter=False, dx=1)
-    print 'No neurons (mean, stdev, N, s.e.m)', np.mean(alldata), np.std(alldata), len(alldata), np.std(alldata)/np.sqrt(len(alldata))
-    #print 'No neurons (mean, stdev, N)', np.mean(alldata[1]), np.std(alldata[1]), len(alldata)
-axNN.set_xlim([-1, 2.0])
-axNN.set_xticks([-0.5,-0.5+xoff])
-axNN.set_xticklabels(['Velocity', 'Body \n curvature'], rotation = 0)
-axNN.set_ylabel('# neurons')
-axNN.set_ylim([0,45])
-moveAxes(axNN, 'right', 0.05)
-
-########show overlap
-axOverlap = plt.subplot(gs1[0,1])
-venn= []
-for key, marker in zip(['AML32_moving', 'AML70_chip'], ['o', "^"]):
-        dset = data[key]['analysis']
-        keep = []
-        for idn in dset.keys():
-            
-            results=  dset[idn][flag]
-            avWeights = results['AngleVelocity']['weights']
-            avRelevant = np.where(np.abs(avWeights>0))[0]
-            tWeights = results['Eigenworm3']['weights']
-            tRelevant = np.where(np.abs(tWeights>0))[0]
-            notRelevant = (np.where(np.abs(avWeights==0)*np.abs(tWeights==0)))[0]
-            N = 1.0*len(avRelevant)+1.0*len(tRelevant)
-            unique = len(np.unique(np.concatenate([avRelevant, tRelevant])))
-            overlap = len(np.intersect1d(avRelevant, tRelevant))
-            
-            zero = len(notRelevant)
-            
-            venn.append([unique/N, overlap/N, zero/N])
-            keep.append([unique/N, overlap/N, zero/N])
-        keep = np.array(keep)
-        rnd1 = np.random.rand(len(keep))*0.2
-        axOverlap.scatter(np.zeros(len(keep))+rnd1, keep[:,0], marker = marker, c =L1, edgecolor=None, alpha=0.5)
-        #axOverlap.scatter(np.zeros(len(keep))+rnd1+1, keep[:,1], marker = marker, c = L2, edgecolor=None, alpha=0.5)
-       
-# plot boxplot of overlap
-venn = np.array(venn)
-print venn.shape
-#mkStyledBoxplot(axOverlap, [-0.25,0.75,], venn.T, [L1, L2], ['unique','overlap'], scatter = False)
-mkStyledBoxplot(axOverlap, [-0.1,0.75,], venn.T, [L1], ['unique'], scatter = False,dx=0.5, rotate=False)
-axOverlap.set_xlim([-0.5, 0.25])
-axOverlap.set_ylim([-0.0, 1.1])
-axOverlap.set_ylabel('Fraction', labelpad=0)
-
-
-######## converse prediction
-
-#axNN = plt.subplot(gs1[0,2])
-#flag = 'ConversePredictionEN'
-## prediction with opposing set of neurons
-#for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, 0), (B2, 2.25)], [axNN, axNN ]):
-#
-#    alldata = []
-#    # color and offset
-#    c = colors[0]
-#    xoff = colors[1]
-#    for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
-#        dset = data[key]['analysis']
-#        keep = []
-#        for idn in dset.keys():
-#            results=  dset[idn]['ElasticNet'][behavior]
-#            
-#            results2=  dset[idn][flag][behavior]
-#            keep.append([results['scorepredicted'], results2['scorepredicted']])
-#            
-#        keep = np.array(keep)
-#        
-#        rnd1 = np.random.rand(len(keep))*0.2
-#        axR2.scatter(np.zeros(len(keep[:,0]))+rnd1+xoff+0.05, keep[:,0], marker = marker, c = c, edgecolor=c, alpha=0.5)
-#        axR2.scatter(np.zeros(len(keep[:,1]))+rnd1+xoff+1, keep[:,1], marker = marker, c = c, edgecolor=c, alpha=0.5)
-#        alldata.append(keep)
-#    alldata = np.array(np.concatenate(alldata, axis=0))
-#    mkStyledBoxplot(axR2, [-0.25+xoff, 0.75+xoff], alldata.T, [c, c], ['GCamp6s', 'GCamp6s'], scatter=False, dx=1)
-#axNN.axhline(color='k', linestyle=':')
-#axNN.set_xlim([-0.5, 3.75])
-#axNN.set_xticks([-0.25,0.75, -0.25+xoff,  0.75+xoff])
-#axNN.set_xticklabels(['Velocity (Full set)', 'Turn neurons', 'Turn (Full set)', 'Velocity neurons'])
-#axNN.set_ylabel('R$^2 (Testset)$')
-#axNN.set_ylim([-0.5,0.75])
 
 ################################################
 #
-#second row
+# plot favorite 'Other neurons'
 #
 ################################################
 
@@ -258,7 +128,7 @@ s0,s1,s2 = 25,25,25 # size of gray, red, blue neurons
 dim = False
 flag = 'ElasticNet'
 markers = ['p', '^', '*', 'X', '+', '8', 's', '3', '>']
-weightLocs = gridspec.GridSpecFromSubplotSpec(2,1, subplot_spec=gs1[1:,:], wspace=0.0, hspace=0)
+weightLocs = gridspec.GridSpecFromSubplotSpec(2,1, subplot_spec=gs1[:,:], wspace=0.0, hspace=0)
 #axweight = plt.subplot(weightLocs[0,0], aspect='equal', clip_on=False)
 #axweight.set_title('Velocity neurons')
 #axweight2 = plt.subplot(weightLocs[0,1], aspect='equal', clip_on=False)
@@ -390,33 +260,13 @@ axweight3.scatter(A[AtlasLocs[av],0], A[AtlasLocs[av],1],marker = 'o', s=s2,colo
 alphaScatter = 0.25
 axweight4.scatter(A[AtlasLocs[t],0], A[AtlasLocs[t],1],marker = 'o', s=s2,color=B1, alpha=alphaScatter)
 
-
-# pritn out best ranked neurons
-n = 30
-most_commonAV = dAV.most_common(3)
-most_commonT = dT.most_common(3)
-for k, v in most_commonAV:
-    print 'Rank',i, k, v, labels[k]
-    
-for k, v in most_commonT:
-    print 'Rank',i, k, v, labels[k]
-    
-     
-# name the ones that are already known to be motion asscociated
-dAV = np.unique(AtlasLocs[av])
-dT = np.unique(AtlasLocs[t])
-# hardcode arrow position for motion neurons
-#['AIA', 'AIB', 'AIY', 'AIZ', 'AVA', 'AVB', 'AVD', 'DVA', 'RIA', 'RIB', 'RIM', 'RIV', 'RMD', 'RME', 'SIB', 'SMB', 'SMD']
-x0, y0 = 1, 1
-arrows = {'AIA': (x0, 0), 'AIB':(0, -y0), 'AIY':(x0, y0), 'AIZ':(x0, -y0), 'AVA':(-x0, -y0/2.), 'AVB':(-x0, -y0), 'AVD':(0, -y0), \
-    'DVA':(-x0, 0), 'RIA':(-x0, -y0), 'RIB':(-x0, 0), 'RIM':(x0, -y0), 'RIV':(-x0, 0), 'RMD':(-2*x0, y0), 'RME':(-x0, -y0/2.), 'SIB':(-x0/2., y0), 'SMB':(x0, y0), 'SMD':(0, y0)
-}
-
 l = 28
-# remove all non-motion associated labels
+# put only interesting neurons
+x0, y0 = 1,1
+arrows = {'ALA': (x0,-y0), 'RIS': (-x0,y0), 'RIP': (x0,-y0), 'RMG': (-x0,-y0)}
 stored = []
 for loc in dAV:
-    if labels[loc][:3] in motionNeurons and labels[loc][:3] not in stored:
+    if labels[loc][:3] in interesting and labels[loc][:3] not in stored:
         #axweight3.text(A[loc,0], A[loc,1],labels[loc][:-1], color=R1, fontsize=10,\
         #horizontalalignment ='center', verticalalignment='bottom')
         dx, dy = arrows[labels[loc][:3]]
@@ -426,14 +276,14 @@ for loc in dAV:
         dy *= l/l0
         x, y = A[loc,0], A[loc,1]
         
-        axweight3.annotate(labels[loc][:-1], xy=(x, y), xytext=(x+dx, y+dy),
+        axweight3.annotate(labels[loc][:3], xy=(x, y), xytext=(x+dx, y+dy),
             arrowprops=dict(color=N0, headlength=2,headwidth=2, shrinkA=0, shrinkB=0.01,width=0.1),color=N0, fontsize=12, textcoords='data',\
             horizontalalignment='center', verticalalignment='center')
         stored.append(labels[loc][:3])
 
 stored = []
 for loc in dT:
-    if labels[loc][:3] in motionNeurons and labels[loc][:3] not in stored:
+    if labels[loc][:3] in interesting and labels[loc][:3] not in stored:
         #axweight3.text(A[loc,0], A[loc,1],labels[loc][:-1], color=R1, fontsize=10,\
         #horizontalalignment ='center', verticalalignment='bottom')
         dx, dy = arrows[labels[loc][:3]]
@@ -443,7 +293,7 @@ for loc in dT:
         dy *= l/l0
         x, y = A[loc,0], A[loc,1]
         
-        axweight4.annotate(labels[loc][:-1], xy=(x, y), xytext=(x+dx, y+dy),
+        axweight4.annotate(labels[loc][:3], xy=(x, y), xytext=(x+dx, y+dy),
             arrowprops=dict(color=N0, headlength=2,headwidth=2, shrinkA=0, shrinkB=0.01,width=0.1),color=N0, fontsize=12, textcoords='data',\
             horizontalalignment='center', verticalalignment='center')
         stored.append(labels[loc][:3])
@@ -456,7 +306,7 @@ for ax in [axweight3, axweight4]:
     ax.set_ylim([-45, 35])
     cleanAxes(ax)
     moveAxes(ax, 'left', 0.03)
-    moveAxes(ax, 'down', 0.04)
+    #moveAxes(ax, 'down', 0.04)
 
 # add orientation bars
 length=12
@@ -479,7 +329,7 @@ alphas = [alphaScatter,alphaScatter*2, alphaScatter*3, alphaScatter*4]
 legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
                           markerfacecolor=R1, alpha =alphas[i]) for i in range(4)]
 leg = axweight3.legend(handles=legend_elements,  fontsize=fs, frameon = True,handletextpad =0, markerscale = 1.5,numpoints=1,\
-borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.25, 0.5, 0.5))
+borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.29, 0.5, 0.5))
 legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
                           markerfacecolor=B1, alpha =alphas[i]) for i in range(4)]
 leg = axweight4.legend(handles=legend_elements, loc=4, fontsize=fs, frameon = True, handletextpad =0, markerscale = 1.5,numpoints=1,\

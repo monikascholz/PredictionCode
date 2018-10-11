@@ -130,7 +130,7 @@ for letter, loc in zip(letters, locations):
 #first row -- show example heatmaps for a movng and immobile dataset
 #
 ################################################
-movData = 'BrainScanner20170613_134800'
+movData = 'BrainScanner20170424_105620'
 immData = 'BrainScanner20180510_092218'
 #transientData = 'BrainScanner20180329_152141'
 flag = 'PCA'

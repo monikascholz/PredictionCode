@@ -11,24 +11,37 @@ import numpy as np
 # grab all the data we will need
 #
 ################################################
-strains = {'AML32':'pan-neuronal GCaMP6s and tagRFP',
-              'AML18':'pan-neuronal GFP and tagRFP',
-              'AML175':'pan-neuronal GFP and tagRFP in lite-1 background',
-              'AML70':'pan-neuronal GCaMP6s and tagRFP in lite-1 background',
-              'Special': 'pan-neuronal GCaMP6s and tagRFP'
+strains = {'AML32':'GCaMP6s',
+              'AML18':'GFP',
+              'AML175':'GFP',
+              'AML70':'GCaMP6s',
+              'Special': 'GCaMP6s'
+    }
+bg = {'AML32':'wt',
+              'AML18':'wt',
+              'AML175':'lite-1',
+              'AML70':'lite-1',
+              'Special': 'check'
     }
     
-conditions = {'moving': 'freely moving on imaging plate',
-              'chip': 'freely moving in microfluidic device',
+conditions = {'moving': 'freely moving',
+              'chip': 'freely moving ',
               'transition': 'transiently paralyzed with tetramisole',
-              'immobilized': 'physically constrained with microbeads',
+              'immobilized': 'nanobeads',
+              }
+plate = {'moving': 'imaging plate',
+              'chip': 'microfluidic ',
+              'transition': 'microfluidic',
+              'immobilized': 'agarose pad',
               }
               
 
 
 data = {}
-for typ in ['AML32', 'AML18', 'AML175', 'AML70', 'Special']:
-    for condition in ['moving', 'chip', 'immobilized', 'transition']:
+print "Condition, Strain, Unique Identifier,	Indicator,Background,Arena,Duration (min), Number of Neurons "
+
+for typ in ['Special', 'AML32', 'AML18', 'AML175', 'AML70']:
+    for condition in ['transition','immobilized','moving', 'chip']:
         folder = '{}_{}/'.format(typ, condition)
         dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
         outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
@@ -40,10 +53,11 @@ for typ in ['AML32', 'AML18', 'AML175', 'AML70', 'Special']:
             keyList = np.sort(dataSets.keys())
             results = dh.loadDictFromHDF(outLoc) 
             # store in dictionary by typ and condition
-            key = '{}_{}'.format(typ, condition)
+            idn = '{}_{}'.format(typ, condition)
             
             for key in keyList:
-                print typ, key, conditions[condition], dataSets[key]['Neurons']['Activity'].shape[0], int(dataSets[key]['Neurons']['Activity'].shape[1]/6.), 's'
+                if idn!='AML70_moving':
+                    print "{}, {},{}, {}, {}, {}, {}, {}".format(conditions[condition],typ, key, strains[typ],bg[typ], plate[condition],  int(dataSets[key]['Neurons']['Activity'].shape[1]/6./60.),dataSets[key]['Neurons']['Activity'].shape[0])
             
         except IOError:
             #print typ, condition , 'not found.'

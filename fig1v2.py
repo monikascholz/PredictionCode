@@ -6,23 +6,33 @@ Figure 2 - Behavior is represented in the brain
 @author: monika
 """
 import numpy as np
-import matplotlib as mpl
+#import matplotlib as mpl
 import os
 #
-import matplotlib.animation as animation
-import matplotlib.pyplot as plt
+import matplotlib.style
+import matplotlib as mpl
+
+# deliberate import all!
+
+from stylesheet import *
+#mpl.rcParams["xtick.labelsize"] =18
+#import matplotlib.animation as animation
+#import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
-import matplotlib.ticker as mtick
-
-
+#import matplotlib.ticker as mtick
 
 #import singlePanels as sp
 #import makePlots as mp
 import dataHandler as dh
-# deliberate import all!
-from stylesheet import *
+
+# suddenly this isn't imported from stylesheet anymore...
+mpl.rcParams["axes.labelsize"] = 14
+mpl.rcParams["xtick.labelsize"] = 14
+mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["font.size"] = 14
+fs = mpl.rcParams["font.size"]
 ################################################
 #
 # grab all the data we will need
@@ -61,7 +71,7 @@ print 'Done reading data.'
 
 fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(9.5, 4.5))
 gsHeatmap = gridspec.GridSpec(4,4,  width_ratios=[1.5, 0.1, 0.5, 0.5], height_ratios = [1,0.1,0.75,0.05])
-gsHeatmap.update(left=0.05, right=0.98,  bottom = 0.05, top=0.98, hspace=0.3, wspace=0.75)
+gsHeatmap.update(left=0.06, right=0.98,  bottom = 0.05, top=0.98, hspace=0.3, wspace=0.75)
 #fig.patch.set_alpha(0.0)
 #heatmap axes
 axhm = plt.subplot(gsHeatmap[0,0])
@@ -183,7 +193,7 @@ cbar.set_ticklabels(['<2',0,'>2'])
 cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.06)
 moveAxes(axcb, 'scaley', -0.08)
-axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -0)
+axcb.set_ylabel(r'$\Delta I/I_0$', labelpad = -0)
 #ethogram
 
 plotEthogram(axetho, time, transient['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
@@ -290,15 +300,18 @@ for i in range(np.min([len(results2half['pcaComponents']), 3])):
     ax4.text(-100, np.mean(y)+i*1.05, 'PC{}'.format(i+1), color = 'k')
     ax4.plot(time[transient['Neurons']['valid']], i*1.1+y, label='Component {}'.format(i+1), lw=1, color = 'k')
 
-yloc = ax4.get_ylim()[-1]*1.1
+yloc = ax4.get_ylim()[-1]*1.25
 ## indicate immobilization etc
 for label, segment in zip(['moving', 'immobilized'], [train, test]):
 
-    ax4.text(np.mean(timeActual[segment]), 1.02*yloc, label,horizontalalignment='center', color=colorsExp[label])
+    ax4.text(np.mean(timeActual[segment]), 1.02*yloc, label,horizontalalignment='center', color=colorsExp[label], fontsize=fs)
     ax4.plot([timeActual[segment[0]],timeActual[segment[-1]]], [yloc, yloc], color=colorsExp[label])
 # add tetramisole
-ax4.text(np.mean(timeActual[train[-1]]), 0.98*yloc, "+ tet",horizontalalignment='left', color='k')
-ax4.plot([timeActual[train[-1]],timeActual[test[-1]]], [0.96*yloc, 0.96*yloc], color='k', linestyle='--')
+ax4.text(np.mean(timeActual[train[-1]]), 0.94*yloc, "+ tet",horizontalalignment='left', color='k', fontsize=fs)
+# the most complicated way to get a step drawn
+ax4.step([timeActual[train[-1]],timeActual[test[-1]]], [0.92*yloc, 0.92*yloc], color='k', linestyle='-')
+ax4.plot([timeActual[train[0]],timeActual[train[-1]]], [0.86*yloc, 0.86*yloc], color='k', linestyle='-')
+ax4.plot([timeActual[train[-1]],timeActual[train[-1]]], [0.86*yloc, 0.92*yloc], color='k', linestyle='-')
 # labels and such
 ax4.set_xlabel('Time (s)')
 ax4.set_xlim([np.min(timeActual), np.max(timeActual)])
@@ -341,7 +354,7 @@ for ax, label  in zip([ax5, ax6], ['moving', 'immobilized']):
     ax.axes.xaxis.set_ticklabels([])
     ax.axes.yaxis.set_ticklabels([])
     ax.axes.zaxis.set_ticklabels([])
-    ax.set_title(label)
+    ax.set_title(label, fontsize=mpl.rcParams['font.size'])
 #        #make scalebar
     axesNames = [ax.xaxis, ax.yaxis, ax.zaxis]
     for tmp, loc in zip(axesNames, [(0,0,0),(1,1,1),(2,2,2)]):

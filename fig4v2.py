@@ -30,6 +30,12 @@ from sklearn.metrics import r2_score,mean_squared_error
 from scipy.interpolate import UnivariateSpline
 from scipy import ndimage
 
+# suddenly this isn't imported from stylesheet anymore...
+mpl.rcParams["axes.labelsize"] = 14
+mpl.rcParams["xtick.labelsize"] = 14
+mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["font.size"] = 14
+fs = mpl.rcParams["font.size"]
 
 
 def compareReconstructedWorms(cl, eigenworms, avTrue, thetaTrue,pc3, avP, tP, tPnew):
@@ -115,7 +121,7 @@ movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 fig = plt.figure('Fig - 4 : Recreating postures', figsize=(9.5, 6.5))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(2, 2, width_ratios = [4,1], height_ratios=[1,1])
-gs1.update(left=0.055, right=0.99, wspace=0.25, bottom = 0.07, top=0.97, hspace=0.15)
+gs1.update(left=0.058, right=0.99, wspace=0.25, bottom = 0.075, top=0.97, hspace=0.15)
 # third row
 gsNL = gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=gs1[:,1], wspace=0.4, hspace=0.5)#, width_ratios = [1,1,1,1])
 #ax3= plt.subplot(gsNL[0,0])

@@ -16,6 +16,10 @@ from scipy.ndimage.filters import gaussian_filter1d
 # define colors
 #
 ################################################
+mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
+mpl.rc('text.latex', preamble='\usepackage{sfmath}')
+mpl.rcParams['image.cmap'] = 'viridis'
+
 axescolor = 'k'
 mpl.rcParams["axes.edgecolor"]=axescolor
 mpl.rcParams["axes.spines.right"] = False
@@ -31,14 +35,13 @@ mpl.rcParams["legend.frameon"]=False
 mpl.rcParams["legend.labelspacing"]=0.25
 mpl.rcParams["legend.labelspacing"]=0.25
 #mpl.rcParams['text.usetex'] =True
-mpl.rcParams["axes.labelsize"]=  14
-mpl.rcParams["xtick.labelsize"]=  12
-mpl.rcParams["ytick.labelsize"]=  12
-mpl.rcParams["axes.labelpad"] = 0
 mpl.rcParams["font.size"] = 12
-mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
-mpl.rc('text.latex', preamble='\usepackage{sfmath}')
-mpl.rcParams['image.cmap'] = 'viridis'
+mpl.rcParams["axes.labelsize"]=  18
+mpl.rcParams["xtick.labelsize"]=  18
+mpl.rcParams["ytick.labelsize"]=  18
+mpl.rcParams["axes.labelpad"] = 0
+
+
 ################################################
 #
 # define colors
