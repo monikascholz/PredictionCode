@@ -851,7 +851,7 @@ def runLasso(data, pars, splits, plot = False, behaviors = ['AngleVelocity', 'Ei
         else:
             a = np.logspace(-3,0,100)
             nfold =5#%int(len(X)/500)
-        print nfold
+        
         #if label =='Eigenworm3':
         #    nfold = balancedFolds(Y[trainingsInd], nSets=cv)
 ##        else:
@@ -969,7 +969,7 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
         # fit elasticNet and validate
         
         if label =='Eigenworm3':
-            l1_ratio = [0.95]
+            l1_ratio = [0.99]
             #l1_ratio = [0.95]
             #fold =10
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
@@ -978,17 +978,17 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
             tol = 1e-10
         else:
             #l1_ratio = [0.5, 0.7, 0.8, .9, .95,.99, 1]
-            l1_ratio = [0.95]
+            l1_ratio = [0.99]
             #fold = balancedFolds(Y[trainingsInd], nSets=cv)
-            a = np.logspace(-4,-2,200)
+            a = np.logspace(-4,-1,200)
             nfold = 5
-            tol = 1e-5
+            tol = 1e-10
             
         #cv = 15
         #a = np.logspace(-3,-1,100)
        # fold = 5
         fold = TimeSeriesSplit(n_splits=nfold, max_train_size=None)
-        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=tol)#, alphas=a)
+        reg = linear_model.ElasticNetCV(l1_ratio, cv=fold, verbose=0, selection='random', tol=tol, alphas=a)
         #        
         reg.fit(Xtrain, Ytrain)
 
@@ -1003,14 +1003,15 @@ def runElasticNet(data, pars, splits, plot = False, scramble = False, behaviors 
         linData[label]['l1_ratio'] = reg.l1_ratio_
         linData[label]['score'] = score
         linData[label]['scorepredicted'] = scorepred
-        linData[label]['noNeurons'] = len(reg.coef_[reg.coef_>0])
+        linData[label]['noNeurons'] = len(reg.coef_[np.abs(reg.coef_)>0])
+        print 'R2', scorepred, 'N', len(reg.coef_[np.abs(reg.coef_)>0])
         if scale:
             linData[label]['output'] = scalerY.inverse_transform(reg.predict(X)) # full output training and test
         else:
             linData[label]['output'] = reg.predict(X)
         if plot:
             print 'alpha', reg.alpha_, 'l1_ratio', reg.l1_ratio_, 'r2', scorepred
-            print reg.alphas_.shape, reg.mse_path_.shape
+            
             plt.subplot(221)
             plt.title('Trainingsset')
             plt.plot(Ytrain, 'r')
@@ -1203,7 +1204,7 @@ def scoreModelProgression(data, results, splits, pars, fitmethod = 'LASSO', beha
                 
                 xTmp = np.reshape(X[:,weightsInd[:count+1]], (-1,count+1))
                 reg.fit(xTmp[trainingsInd], Y[trainingsInd])
-                print xTmp.shape
+                
                 sumScore.append(reg.score(xTmp[testInd], Y[testInd]))
                 mse.append(np.sum((reg.predict(xTmp[testInd])-Y[testInd])**2))
                 

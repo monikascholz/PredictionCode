@@ -370,7 +370,7 @@ def loadData(folder, dataPars, ew=1):
     #downsample to 6 volumes/sec
     pc3, pc2, pc1 = pcs[:,clIndices]
 
-    velo = velo[clIndices]*50/6. # to get it in per Volume units. This is radians per sec
+    velo = velo[clIndices]*50. # to get it in per Volume units -> This is radians per sec
     
     theta = theta[clIndices]
     cl = clFull[clIndices]

@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.ticker as mtick
 from  sklearn.metrics.pairwise import pairwise_distances
-from matplotlib_venn import venn2
+#from matplotlib_venn import venn2
  
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster, set_link_color_palette
 # custom pip
@@ -105,7 +105,8 @@ gs1.update(left=0.08, right=0.99, wspace=0.45, bottom = 0.01, top=0.98, hspace=0
 sensoryNeurons =  ['FLP', 'BAG']
 
 #quiescence = ['ALA', 'RIS']
-interesting = ['RMG', 'ALA', 'RIS', 'RIP']
+interesting = ['RMG', 'RIS', 'RIP']
+interestingBC = ['AIM', 'ALA', 'RIP']
 # add a,b,c letters, 9 pt final size = 18pt in this case
 
 letters = ['A', 'B']
@@ -124,7 +125,7 @@ for letter, loc in zip(letters, locations):
 ################################################
 
 # plot projections of neurons
-s0,s1,s2 = 25,25,25 # size of gray, red, blue neurons
+s0,s1,s2 = 25,25,50 # size of gray, red, blue neurons
 dim = False
 flag = 'ElasticNet'
 markers = ['p', '^', '*', 'X', '+', '8', 's', '3', '>']
@@ -263,7 +264,8 @@ axweight4.scatter(A[AtlasLocs[t],0], A[AtlasLocs[t],1],marker = 'o', s=s2,color=
 l = 28
 # put only interesting neurons
 x0, y0 = 1,1
-arrows = {'ALA': (x0,-y0), 'RIS': (-x0,y0), 'RIP': (x0,-y0), 'RMG': (-x0,-y0)}
+arrows = {'ALA': (x0,-y0), 'RIS': (-x0,y0), 'RIP': (x0,-y0), 'RMG': (-x0,-y0), 'AIM':(-x0,y0)}
+
 stored = []
 for loc in dAV:
     if labels[loc][:3] in interesting and labels[loc][:3] not in stored:
@@ -277,13 +279,13 @@ for loc in dAV:
         x, y = A[loc,0], A[loc,1]
         
         axweight3.annotate(labels[loc][:3], xy=(x, y), xytext=(x+dx, y+dy),
-            arrowprops=dict(color=N0, headlength=2,headwidth=2, shrinkA=0, shrinkB=0.01,width=0.1),color=N0, fontsize=12, textcoords='data',\
+            arrowprops=dict(color=N0, headlength=2,headwidth=2, shrinkA=0.0, shrinkB=0.01,width=0.1),color=N0, fontsize=12, textcoords='data',\
             horizontalalignment='center', verticalalignment='center')
         stored.append(labels[loc][:3])
 
 stored = []
 for loc in dT:
-    if labels[loc][:3] in interesting and labels[loc][:3] not in stored:
+    if labels[loc][:3] in interestingBC and labels[loc][:3] not in stored:
         #axweight3.text(A[loc,0], A[loc,1],labels[loc][:-1], color=R1, fontsize=10,\
         #horizontalalignment ='center', verticalalignment='bottom')
         dx, dy = arrows[labels[loc][:3]]
@@ -324,7 +326,7 @@ axweight4.text(xmax, ymid, 'P', horizontalalignment = 'left', verticalalignment 
 
 # make a legend for the scatter plot
 from matplotlib.lines import Line2D
-leglabels = ['N=1', 'N=2', 'N=3', r'N $\geq$ 4']
+leglabels = ['N = 1', 'N = 2', 'N = 3', r'N $\geq$ 4']
 alphas = [alphaScatter,alphaScatter*2, alphaScatter*3, alphaScatter*4]
 legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
                           markerfacecolor=R1, alpha =alphas[i]) for i in range(4)]

@@ -18,6 +18,12 @@ import matplotlib.ticker as mtick
 import dataHandler as dh
 # deliberate import all!
 from stylesheet import *
+# suddenly this isn't imported from stylesheet anymore...
+#mpl.rcParams["axes.labelsize"] = 14
+#mpl.rcParams["xtick.labelsize"] = 14
+#mpl.rcParams["ytick.labelsize"] = 14
+mpl.rcParams["font.size"] = 12
+fs = mpl.rcParams["font.size"]
 ################################################
 #
 # grab all the data we will need
@@ -53,7 +59,7 @@ print 'Done reading data.'
 # create figure 1: This is twice the normal size
 #
 ################################################
-fig = plt.figure('Fig1 - S2 : Neural dynamics in immobile transitions', figsize=(9.5, 9*2/2.))
+fig = plt.figure('S2-multipleExampleDatasets', figsize=(9.5, 9*2/2.), dpi=100)
 gsHeatmap = gridspec.GridSpec(6,3,  width_ratios=[1, 1, 0.1], height_ratios = [1,0.1,0.75,1,0.1,0.75])
 gsHeatmap.update(left=0.055, right=0.99,  bottom = 0.05, top=0.9, hspace=0.25, wspace=0.45)
 #fig.patch.set_alpha(0.0)
@@ -196,7 +202,7 @@ cbar.set_ticklabels(['<-2','>2'])
 cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.06)
 moveAxes(axcb, 'scaley', -0.08)
-axcb.set_ylabel(r'$\Delta R/R_0$', labelpad = -25)
+axcb.set_ylabel(r'$\Delta I/I_0$', labelpad = -5, rotation=-90)
 ################################################
 #
 #second row -- show example heatmaps for a movng and immobile dataset
@@ -208,7 +214,7 @@ immData = 'BrainScanner20180518_094052'
 for key, axhm,axetho, axpc, dset, title  in zip([movData, immData,], \
     [axhm1a, axhm2a], [axetho1a, axetho2a],[axpc1a, axpc2a],\
     [data['AML18_moving'],data['AML18_immobilized'], data['Special_transition']],\
-    ['moving (Ctrl)', 'immobilized (Ctrl)', 'transient']):
+    ['moving (GFP)', 'immobilized (GFP)', 'transient']):
     print key
     # get data
     transient = dset['input'][key]

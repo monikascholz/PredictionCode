@@ -118,12 +118,12 @@ movingAML32 = 'BrainScanner20170613_134800'
 moving = data['AML32_moving']['input'][movingAML32]
 movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 
-fig = plt.figure('Fig - 4 : Recreating postures', figsize=(9.5, 6.5))
+fig = plt.figure('Fig - 4 : Recreating postures', figsize=(9.5, 9.5))
 # this gridspec makes one example plot of a heatmap with its PCA
-gs1 = gridspec.GridSpec(2, 2, width_ratios = [4,1], height_ratios=[1,1])
-gs1.update(left=0.058, right=0.99, wspace=0.25, bottom = 0.075, top=0.97, hspace=0.15)
+gs1 = gridspec.GridSpec(3, 1, height_ratios=[1,1,0.6])
+gs1.update(left=0.058, right=0.99, wspace=0.25, bottom = 0.075, top=0.95, hspace=0.25)
 # third row
-gsNL = gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=gs1[:,1], wspace=0.4, hspace=0.5)#, width_ratios = [1,1,1,1])
+gsNL = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs1[2,:], wspace=0.4, hspace=0.5)#, width_ratios = [1,1,1,1])
 #ax3= plt.subplot(gsNL[0,0])
 #moveAxes(ax3, 'scalex', 0.05)
 #moveAxes(ax3, 'scaley', -0.1)
@@ -132,34 +132,39 @@ ax1 = plt.subplot(gs1[0,0], aspect='equal')
 ax2 = plt.subplot(gs1[1,0], aspect='equal')
 moveAxes(ax1, 'left', 0.01)
 moveAxes(ax2, 'left', 0.01)
+for ax in [ax1, ax2]:
+    moveAxes(ax, 'scale', 0.03)
+    moveAxes(ax, 'right', 0.03)
+moveAxes(ax2, 'up', 0.025)
+moveAxes(ax1, 'up', 0.025)
+    #moveAxes(ax, 'left', 0.03)
 
-ax5 = plt.subplot(gsNL[0,:])
-ax6 = plt.subplot(gsNL[1,:])
+ax5 = plt.subplot(gsNL[0])
+ax6 = plt.subplot(gsNL[1])
 #ax8 = plt.subplot(gsNL[2,0])
-ax9 = plt.subplot(gsNL[2,:])
-for ax in [ax5, ax6]:
-    moveAxes(ax, 'scale', 0.02)
-    moveAxes(ax, 'scalex', 0.05)
-    moveAxes(ax, 'left', 0.03)
-for ax in [ ax9]:
-    moveAxes(ax, 'scale', 0.02)
-    moveAxes(ax, 'left', 0.055)
-    moveAxes(ax, 'down', 0.02)
-
-moveAxes(ax6, 'down', 0.03)    
+ax9 = plt.subplot(gsNL[2])
+for ax in [ax5, ax6, ax9]:
+    moveAxes(ax, 'scale', -0.02)
+    #moveAxes(ax, 'scalex', -0.02)
+    moveAxes(ax, 'left', -0.03)
+#for ax in [ ax9]:
+#    moveAxes(ax, 'scale', 0.02)
+#    moveAxes(ax, 'left', 0.055)
+#    moveAxes(ax, 'down', 0.02)
+#
+#moveAxes(ax6, 'down', 0.05)    
 
 #add a,b,c letters, 9 pt final size = 18pt in this case
 letters = ['A', 'B']
 x0 = 0.0
-locations = [(x0, 0.99),  (x0,0.5)]
+locations = [(x0, 0.99),  (x0,0.65)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
             horizontalalignment='left',verticalalignment='top',)
             
 letters = ['C', 'D', 'E']
-y0 = 0.45
-x0 = 0.66
-locations = [(x0,0.99),  (x0,0.7), (x0,0.33), (0.84,0.31)]
+y0 = 0.28
+locations = [(0,y0),  (0.36,y0), (0.69,y0), (0.84,0.31)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='bold', size=18,\
             horizontalalignment='left',verticalalignment='top',)
@@ -347,9 +352,9 @@ for l in np.where(test%60==0)[0]:
 #ax3.spines['bottom'].set_visible(False)
 #ax3.set_yticks([])
 #ax3.set_xticks([])
-testloc1, testloc2 =test[loc1:loc1+60:6], test[loc2:loc2+60:6]
+testloc1, testloc2 =test[loc1:loc1+66:6], test[loc2:loc2+66:6]
 
-for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N1, N1], [time[test[loc2]], time[test[loc1]]]):
+for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N0, N0], [time[test[loc2]], time[test[loc1]]]):
     #=============================================================================#    
     # calculate mse
     #=============================================================================#
@@ -382,24 +387,24 @@ for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N
     #ax.add_collection(p)
     
     
-    # 3 eigenworm approximate worms
-    patches = []
-    for cindex, cline in enumerate(clApprox[samplePost]):
-        x,y = cline[:,0], cline[:,1]
-        x -=np.mean(x)-offsetx*cindex
-        y -=np.mean(y)+offsety
-        vertices = createWorm(x,y)
-        patches.append(mpl.patches.Polygon(vertices, closed=True))
-        #ax.plot(x, y)
-    p = mpl.collections.PatchCollection(patches, alpha=1, color=N0, edgecolor='none')
-    ax.add_collection(p)
+#    # 3 eigenworm approximate worms
+#    patches = []
+#    for cindex, cline in enumerate(clApprox[samplePost]):
+#        x,y = cline[:,0], cline[:,1]
+#        x -=np.mean(x)-offsetx*cindex
+#        y -=np.mean(y)+offsety
+#        vertices = createWorm(x,y)
+#        patches.append(mpl.patches.Polygon(vertices, closed=True))
+#        #ax.plot(x, y)
+#    p = mpl.collections.PatchCollection(patches, alpha=1, color=N0, edgecolor='none')
+#    ax.add_collection(p)
     
     # predicted worms
     patches = []
     for cindex, cline in enumerate(clPred[samplePost]):
         x,y = cline[:,0], cline[:,1]
         x -=np.mean(x)-offsetx*cindex
-        y -=np.mean(y)+2.5*offsety
+        y -=np.mean(y)+1.5*offsety
         vertices = createWorm(x,y)
         patches.append(mpl.patches.Polygon(vertices, closed=True))
         #ax.plot(x, y)
@@ -423,7 +428,7 @@ for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N
     for cindex, cline in enumerate(cl3[samplePost]):
         x,y = cline[:,0], cline[:,1]
         x -=np.mean(x)-offsetx*cindex
-        y -=np.mean(y)+3.5*offsety
+        y -=np.mean(y)+2.5*offsety
         
         vertices = createWorm(x,y)
         patches.append(mpl.patches.Polygon(vertices, closed=True))
@@ -433,7 +438,7 @@ for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N
     ax.add_collection(p)
     
     # add original to all lines
-    for off in [offsety, 2.5*offsety, 3.5*offsety]:
+    for off in [ 1.5*offsety,2.5*offsety]:
         patches1 = []
         for cindex, cline in enumerate(cl2[samplePost]):
             x,y = cline[:,0], cline[:,1]
@@ -447,29 +452,29 @@ for ax, samplePost, color, timestamp in zip([ax1, ax2], [testloc2, testloc1], [N
     
     # add horizontal line and text
     #ax.axhline(-2*offsetx,color = 'k', linestyle =':')
-    ax.text(0.5, 0.45,'predicted from neural activity', transform = ax.transAxes, horizontalalignment = 'center')
-    ax.text(0.5, 1,'measured postures (t = {} s)'.format(int(timestamp)), transform = ax.transAxes, horizontalalignment = 'center')
+    ax.text(0.5, 0.65,'predicted from neural activity', transform = ax.transAxes, horizontalalignment = 'center')
+    ax.text(0.5, 0.95,'measured postures (t = {} s)'.format(int(timestamp)), transform = ax.transAxes, horizontalalignment = 'center')
     # general plot style
     ax.set_xticks(np.arange(0,len(samplePost+1)*offsetx, 2*offsetx))
     ax.set_xticklabels(['{} s'.format(i) for i in range(0, len(samplePost)+1, 2)])
-    ax.set_xlim([-300, 4300])
-    ax.set_ylim([-3.5*offsety-350, 350])
+    ax.set_xlim([-300, 4600])
+    ax.set_ylim([-2.5*offsety-350, 350])
     ax.set_yticks([])
     ax.spines['left'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
 # just left plot
-ax1.set_yticks(np.linspace(0,-3*offsety, 4))
-ax1.set_yticks([0,- offsety, -2.5*offsety, -3.5*offsety])
-ax1.set_yticklabels(['original', '3 mode \n approx.', 'SLM', 'SLM+NL'])
-ax2.set_yticks(np.linspace(0,-3*offsety, 4))
-ax2.set_yticks([0,- offsety, -2.5*offsety, -3.5*offsety])
-ax2.set_yticklabels(['original', '3 mode \n approx.', 'SLM', 'SLM+NL'])
+
+ax1.set_yticks([0,-1.5*offsety, -2.5*offsety])
+ax1.set_yticklabels(['original',  'SLM', 'SLM+NL'])
+
+ax2.set_yticks([0, -1.5*offsety, -2.5*offsety])
+ax2.set_yticklabels(['original',  'SLM', 'SLM+NL'])
 # move to right
 #moveAxes(ax1, 'right', -0.07)
 #moveAxes(ax2, 'right', -0.07)
 # remove xticks from first axes
 cleanAxes(ax1, 'x')
-
+ax2.spines['bottom'].set_visible(True)
 
 ################################################
 #
@@ -494,16 +499,16 @@ ax6.axvspan(time[test[loc2]], time[test[loc2+60]], color='k', zorder=-10, alpha=
 ax6.plot(time[test], tP[test], color=L1, label='linear',linestyle='--', zorder=20)
 #ax7.plot(time[test], tP[test], color=R1, label='linear', zorder=10)
 # compare to nonlinear
-#ax7.plot(time[test], pc3[test], color=N1, label='true', zorder=-1, linestyle=':')
+ax6.plot(time[test], pc3[test], color=N0, label='true', zorder=-1, linestyle=':')
 ax6.plot(time[test], tPnew[test], color=L3,linestyle='-', label='non-linear')
 
 r2orig = r2_score(pc3[test], tP[test])
 r2nl = r2_score(pc3[test], tPnew[test])
 #r2orig = pearsonr(pc3[test], tP[test])[0]**2
 #r2nl = pearsonr(pc3[test], tPnew[test])[0]**2
-ax6.text(1,0.98,r'$r_L^2 = {:.2f}$'.format(r2orig), horizontalalignment = 'right', transform = ax6.transAxes)
+ax6.text(1,1.1,r'$r_L^2 = {:.2f}$'.format(r2orig), horizontalalignment = 'right', transform = ax6.transAxes)
 #ax6.text(-0.1,0.5,r'Turn', horizontalalignment = 'center', transform = ax6.transAxes, rotation =90)
-ax6.text(1,0.93,r'$r_{{NL}}^2 = {:.2f}$'.format(r2nl), horizontalalignment = 'right',verticalalignment = 'top', transform = ax6.transAxes)
+ax6.text(1,1,r'$r_{{NL}}^2 = {:.2f}$'.format(r2nl), horizontalalignment = 'right',verticalalignment = 'top', transform = ax6.transAxes)
 #ax6.legend(loc=8, bbox_to_anchor=(-0.1, 0.5))
 #ax7.spines['left'].set_visible(False)
 #ax6.spines['left'].set_visible(False)
@@ -536,5 +541,5 @@ ax5.set_ylabel('Actual \n body curvature')
 mkStyledBoxplot(ax9, [0,1], np.array(msePosture).T,[L1, L3], ['SLM', 'SLM+NL'], rotate=False)
 print 'MSE_scores', np.mean(msePosture, axis=0)
 ax9.set_xlim([-0.5,1.5])
-ax9.set_ylabel(r'RMSE (turns)')
+ax9.set_ylabel(r'RMSE (BC > 10)')
 plt.show()

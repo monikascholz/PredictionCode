@@ -30,7 +30,7 @@ outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
 dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':150, # gauss window for angle velocity derivative. Acts on full (50Hz) data
+            'gaussWindow':50, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
             'interpolateNans': 6,#interpolate gaps smaller than this of nan values in calcium data
@@ -41,7 +41,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyList = np.sort(dataSets.keys())
     
 print keyList
-keyList = keyList[2:3]
+keyList = keyList[0:3]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -88,7 +88,7 @@ periodogram = 0
 nestedvalidation = 0
 lasso = 0
 elasticnet = 1#True
-lagregression = 1
+lagregression = 0
 positionweights = 0#True
 resultsPredictionOverview = 0
 transient = 0
@@ -343,9 +343,9 @@ if lasso:
 #            
 #        # do converse calculation -- give it only the neurons non-zero in previous case
 #        subset = {}
-#        subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
-#        subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
-#        resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
+        subset['AngleVelocity'] = np.where(resultDict[key]['LASSO']['Eigenworm3']['weights']>0)[0]
+        subset['Eigenworm3'] = np.where(resultDict[key]['LASSO']['AngleVelocity']['weights']>0)[0]
+        resultDict[key]['LASSO']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'LASSO', subset = subset)
 #        # find non-linearity
         #dr.fitNonlinearity(dataSets[key], resultDict[key], splits, pars, fitmethod = 'LASSO', behaviors = ['AngleVelocity', 'Eigenworm3'])
     
@@ -373,13 +373,13 @@ if elasticnet:
             resultDict[key]['ElasticNet'][tmpKey].update(tmpDict[tmpKey])
             
         # do converse calculation -- give it only the neurons non-zero in previous case
-#        subset = {}
-#        subset['AngleVelocity'] = np.where(resultDict[key]['ElasticNet']['Eigenworm3']['weights']>0)[0]
-#        subset['Eigenworm3'] = np.where(resultDict[key]['ElasticNet']['AngleVelocity']['weights']>0)[0]
-#        resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
+        subset = {}
+        subset['AngleVelocity'] = np.where(np.abs(resultDict[key]['ElasticNet']['Eigenworm3']['weights'])>0)[0]
+        subset['Eigenworm3'] = np.where(np.abs(resultDict[key]['ElasticNet']['AngleVelocity']['weights'])>0)[0]
+        resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
         
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
-    plt.show()
+    plt.show(block=True)
 
  #%%
 ###############################################    

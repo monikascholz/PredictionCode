@@ -62,7 +62,7 @@ print 'Done reading data.'
 # we will select a 'special' dataset here, which will have all the individual plots
 
 
-fig = plt.figure('Fig - 2 : Predicting behavior from neural dynamics', figsize=(9.5,5))
+fig = plt.figure('Fig2_Predicting behavior from neural dynamics', figsize=(9.5,5))
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(4, 4, width_ratios = [1,0.1,0.2,0.7], height_ratios=[1,0.1,0.75,0.75])
 gs1.update(left=0.09, right=0.97,  bottom = 0.1, top=0.96, hspace=0.25, wspace=0.25)
@@ -140,7 +140,7 @@ cbar.outline.set_visible(False)
 moveAxes(axcb, 'left', 0.04)
 moveAxes(axcb, 'scaley', -0.08)
 moveAxes(axcb, 'scalex', -0.02)
-axcb.set_ylabel(r'$\Delta I/I_0$', labelpad = -15)
+axcb.set_ylabel(r'$\Delta I/I_0$', labelpad = 0, rotation=-90)
 #ethogram
 
 plotEthogram(axetho, time, moving['Behavior']['EthogramFull'], alpha = 1, yValMax=1, yValMin=0, legend=0)
@@ -165,7 +165,7 @@ for i in range(np.min([len(results['pcaComponents']), 3])):
     # normalize
     y =y -np.min(y)
     y =y/np.max(y)
-    ax4.text(-100, np.mean(y)-i*1.15, 'PC{}'.format(i+1), color = 'k')
+    ax4.text(-100, np.mean(y)-i*1.15, 'PC$_{}$'.format(i+1), color = 'k')
     ax4.plot(time[moving['Neurons']['valid']], -i*1.1+y, label='Component {}'.format(i+1), lw=1, color = 'k')
 # draw a box for the testset
 ax4.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
@@ -179,7 +179,9 @@ gsEWs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs1[3,0], wspace=0.1
 
 # plot angle velocity and turns
 ax7 = plt.subplot(gsEWs[0,0])
-ax7.plot(timeActual, moving['Behavior']['AngleVelocity'], color = R1)
+# XXXX factor 6 for angle v
+alphaBeh = 0.7
+ax7.plot(timeActual, moving['Behavior']['AngleVelocity']*6, color = R1, alpha=alphaBeh)
 # draw a box for the testset
 ax7.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 ax7.axhline(color='k', linestyle = '--', zorder=-1)
@@ -199,7 +201,7 @@ yscale =  [-0.025, 0.025]
 # remove xlabels
 plt.setp(ax7.get_xticklabels(), visible=False)
 ax8 = plt.subplot(gsEWs[1,0])
-ax8.plot(timeActual,moving['Behavior']['Eigenworm3'], color = B1)
+ax8.plot(timeActual,moving['Behavior']['Eigenworm3'], color = B1, alpha=alphaBeh)
 # draw a box for the testset
 ax8.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 #ax8.text(np.mean(timeActual[test]), ax4.get_ylim()[-1], 'Testset',horizontalalignment='center')
@@ -441,11 +443,16 @@ locspca = [-1, -1+toffset]
 mkStyledBoxplot(axV, locspca, pca, [R1, B1], ['Velocity', 'Turn'], scatter=False, rotate=False, dx=1.25)
 mkStyledBoxplot(axVb, locspca, pca, [R1, B1], ['Velocity', 'Turn'], scatter=False, rotate=False, dx=1.25)
 ### print results
-print gcamp.shape
+print "Results from all linear models"
 print 'PCA r2 (mean velocity, mean turns), (sem, sem)', np.mean(pca, axis=1), np.std(pca, axis=1)/np.sqrt(len(pca[0])), len(pca[0])
 print 'EN r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,0], axis=1), np.std(gcamp[:,0], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
 print 'single r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,1], axis=1), np.std(gcamp[:,1], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
 print 'GFP r2 (mean velocity, mean turns), (sem, sem)', np.mean(gfp[:,:,0], axis=1), np.std(gfp[:,0], axis=1)/np.sqrt(len(gfp[0])), len(gfp[0])
+print "Results from all linear models -- medians"
+print 'PCA r2 (mean velocity, mean turns), (sem, sem)', np.median(pca, axis=1), 
+print 'EN r2 (mean velocity, mean turns), (sem, sem)', np.median(gcamp[:,:,0], axis=1), 
+print 'single r2 (mean velocity, mean turns), (sem, sem)', np.median(gcamp[:,:,1], axis=1)
+print 'GFP r2 (mean velocity, mean turns), (sem, sem)', np.median(gfp[:,:,0], axis=1)
 
 # now boxplot for gfp
 x0 = 2.25

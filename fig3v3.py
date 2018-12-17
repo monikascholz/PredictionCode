@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.ticker as mtick
 from  sklearn.metrics.pairwise import pairwise_distances
-from matplotlib_venn import venn2
+#from matplotlib_venn import venn2
  
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster, set_link_color_palette
 # custom pip
@@ -130,9 +130,9 @@ for letter, loc in zip(letters, locations):
 # weights
 flag = 'ElasticNet'
 avWeights = movingAnalysis[flag]['AngleVelocity']['weights']
-avRelevant = np.where(np.abs(avWeights>0))[0]
+avRelevant = np.where(np.abs(avWeights)>0)[0]
 tWeights = movingAnalysis[flag]['Eigenworm3']['weights']
-tRelevant = np.where(np.abs(tWeights>0))[0]
+tRelevant = np.where(np.abs(tWeights)>0)[0]
 notRelevant = (np.where(np.abs(avWeights==0)*np.abs(tWeights==0)))[0]
 
 # one example
@@ -140,8 +140,6 @@ time = moving['Neurons']['TimeFull']
 label = 'AngleVelocity'
 splits = movingAnalysis['Training']
 train, test = splits[label]['Train'], splits[label]['Test']
-
-
 
 axNN = plt.subplot(gs1[0,0])
 
@@ -157,8 +155,10 @@ for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, 0), (B2
         keep = []
         for idn in dset.keys():
             results=  dset[idn][flag][behavior]
-            keep.append(results['noNeurons'])
-            
+            noNeurons = len(results['weights'][np.abs(results['weights'])>0])
+            Ntotal = len(results['weights'])
+            print noNeurons, noNeurons*1.0/Ntotal*100
+            keep.append(noNeurons*1.0/Ntotal*100)
         keep = np.array(keep)
         rnd1 = np.random.rand(len(keep))*0.2
         axR2.scatter(np.zeros(len(keep))+rnd1+xoff, keep, marker = marker, c = c, edgecolor=c, alpha=0.5)
@@ -166,13 +166,13 @@ for behavior, colors, axR2 in zip(['AngleVelocity', 'Eigenworm3'], [(R2, 0), (B2
     alldata = np.reshape(np.concatenate(alldata), (-1,1))
     
     mkStyledBoxplot(axR2, [-0.25+xoff, 0.25+xoff], alldata.T, [c], ['GCamp6s'], scatter=False, dx=1)
-    print 'No neurons (mean, stdev, N, s.e.m)', np.mean(alldata), np.std(alldata), len(alldata), np.std(alldata)/np.sqrt(len(alldata))
+    #print '% neurons (mean, stdev, N, s.e.m)', np.mean(alldata), np.std(alldata), len(alldata), np.std(alldata)/np.sqrt(len(alldata))
     #print 'No neurons (mean, stdev, N)', np.mean(alldata[1]), np.std(alldata[1]), len(alldata)
 axNN.set_xlim([-1, 2.0])
 axNN.set_xticks([-0.5,-0.5+xoff])
 axNN.set_xticklabels(['Velocity', 'Body \n curvature'], rotation = 0)
 axNN.set_ylabel('# neurons')
-axNN.set_ylim([0,45])
+axNN.set_ylim([0,100])
 moveAxes(axNN, 'right', 0.05)
 
 ########show overlap
@@ -185,12 +185,15 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'], ['o', "^"]):
             
             results=  dset[idn][flag]
             avWeights = results['AngleVelocity']['weights']
-            avRelevant = np.where(np.abs(avWeights>0))[0]
+            avRelevant = np.where(np.abs(avWeights)>0)[0]
             tWeights = results['Eigenworm3']['weights']
-            tRelevant = np.where(np.abs(tWeights>0))[0]
+            tRelevant = np.where(np.abs(tWeights)>0)[0]
             notRelevant = (np.where(np.abs(avWeights==0)*np.abs(tWeights==0)))[0]
+            
             N = 1.0*len(avRelevant)+1.0*len(tRelevant)
+            # this is what appears at least once
             unique = len(np.unique(np.concatenate([avRelevant, tRelevant])))
+            
             overlap = len(np.intersect1d(avRelevant, tRelevant))
             
             zero = len(notRelevant)
@@ -199,14 +202,14 @@ for key, marker in zip(['AML32_moving', 'AML70_chip'], ['o', "^"]):
             keep.append([unique/N, overlap/N, zero/N])
         keep = np.array(keep)
         rnd1 = np.random.rand(len(keep))*0.2
-        axOverlap.scatter(np.zeros(len(keep))+rnd1, keep[:,0], marker = marker, c =L1, edgecolor=None, alpha=0.5)
+        axOverlap.scatter(np.zeros(len(keep))+rnd1, keep[:,1], marker = marker, c =L1, edgecolor=None, alpha=0.5)
         #axOverlap.scatter(np.zeros(len(keep))+rnd1+1, keep[:,1], marker = marker, c = L2, edgecolor=None, alpha=0.5)
        
 # plot boxplot of overlap
 venn = np.array(venn)
 print venn.shape
 #mkStyledBoxplot(axOverlap, [-0.25,0.75,], venn.T, [L1, L2], ['unique','overlap'], scatter = False)
-mkStyledBoxplot(axOverlap, [-0.1,0.75,], venn.T, [L1], ['unique'], scatter = False,dx=0.5, rotate=False)
+mkStyledBoxplot(axOverlap, [-0.1,0.75,], venn.T[1:2], [L1], ['unique'], scatter = False,dx=0.5, rotate=False)
 axOverlap.set_xlim([-0.5, 0.25])
 axOverlap.set_ylim([-0.0, 1.1])
 axOverlap.set_ylabel('Fraction', labelpad=0)
@@ -474,7 +477,7 @@ axweight4.text(xmax, ymid, 'P', horizontalalignment = 'left', verticalalignment 
 
 # make a legend for the scatter plot
 from matplotlib.lines import Line2D
-leglabels = ['N=1', 'N=2', 'N=3', r'N $\geq$ 4']
+leglabels = ['N = 1', 'N = 2', 'N = 3', r'N $\geq$ 4']
 alphas = [alphaScatter,alphaScatter*2, alphaScatter*3, alphaScatter*4]
 legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
                           markerfacecolor=R1, alpha =alphas[i]) for i in range(4)]

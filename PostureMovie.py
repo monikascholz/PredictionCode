@@ -71,7 +71,7 @@ def compareReconstructedWorms(cl, eigenworms, avTrue, thetaTrue,pc3, avP, tP, tP
     predV[:,1]*=np.sin(meanAngle)
     refPoint2 = np.cumsum(predV, axis=0)*25
 
-    velocity = np.stack([refPoint, refPoint2+(500,0)])
+    velocity = np.stack([refPoint, refPoint2+(-250,0)])
 #    plt.plot(refPoint[:,0],refPoint[:,1])
 #    plt.plot(refPoint2[:,0],refPoint2[:,1])
 #    plt.show()
@@ -130,10 +130,10 @@ t = moving['Neurons']['Time'][test]
 noNeurons = moving['Neurons']['Activity'].shape[0]
 results = movingAnalysis['PCA']
 
-fig = plt.figure('Worm crawling', figsize=(9.5, 3.5))
-gs1 = gridspec.GridSpec(1, 2, width_ratios = [1,4])
-gs1.update(left=0.03, right=0.99, wspace=0.15, bottom = 0.1, top=0.99, hspace=0.15)
-
+fig = plt.figure('Worm crawling', figsize=(8, 4.5), dpi=300)
+gs1 = gridspec.GridSpec(1, 2, width_ratios = [1,3])
+gs1.update(left=0.35, right=0.99, wspace=0.0, bottom = 0.1, top=0.99, hspace=0.15)
+gs1.update(left=0.075, right=0.95, wspace=0.1, bottom = 0.15, top=0.9, hspace=0.15)
 
 flag = 'ElasticNet'
 #flag = 'PCAPred'
@@ -194,8 +194,8 @@ ybeh = [0, -6]
 axscheme1 = plt.subplot(gs1[0,0])
 axscheme2 = plt.subplot(gs1[0,1],adjustable='box', aspect=0.66)
 axscheme2.set_ylim(-800, 500)
-axscheme2.set_xlim(-1000, 1500)
-axscheme1.set_title('Sparse linear model', y=1.05)
+axscheme2.set_xlim(-450, 950)
+axscheme1.set_title('Sparse linear model', y=1.0)
 #axscheme1.set_title('PCA model', y=1.05)
 
 
@@ -222,7 +222,7 @@ axscheme1.text(t[0]*0.85, -6, 'curvature', rotation=90, color=B1, verticalalignm
 axscheme1.spines['left'].set_visible(False)
 axscheme1.set_yticks([])
 axscheme1.set_xlabel('Time (s)')
-gs1.tight_layout(fig)
+#gs1.tight_layout(fig)
 
 cleanAxes(axscheme2)
 axscheme2.grid(color='r', linestyle='-', linewidth=2)
@@ -230,6 +230,6 @@ axscheme2.set_facecolor(N2)
 axscheme1.set_xlim([t[0], t[-1]])
 
 print velocity.shape
-mp.make_animation3(fig, axscheme1,timeActual, axscheme2, cl, clPred+(1000,0), frames=test[:], color = N0, save= 1, fname='crawling300dpi.mp4',velocity=velocity)
+mp.make_animation3(fig, axscheme1,timeActual, axscheme2, cl, clPred+(500,0), frames=test, color = N0, save= 1, fname='crawling.mp4',velocity=velocity)
 # animate wor
 plt.show()

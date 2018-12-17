@@ -212,7 +212,7 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
 
         p1.set_xy(Vertices1)
         patch1=ax.add_patch(p1)
-        txt = ax.text(0.9,0.9, 't=0 s', transform=ax.transAxes)
+        txt = ax.text(0.85,0.9, 't=0 s', transform=ax.transAxes)
         if data2 is not None:
             x2,y2 = data2[0].T
             Vertices2 = createWorm(x2, y2)
@@ -258,7 +258,7 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
                 v1 = velocity[0][np.max([i-500, 0]):i].T
                 v2 = velocity[1][np.max([i-500, 0]):i].T
                 v1 = (v1 .T- v1[:,-1].T).T
-                v2 = (v2 .T- v2[:,-1].T+(1000,0)).T 
+                v2 = (v2 .T- v2[:,-1].T+(500,0)).T 
                 # reset to center coordinate of the worm
 #                v1 -= np.tile((v1[:,0]-np.mean(data1[i], axis=0))[:,np.newaxis], (1,v1.shape[1]))
 #                v2 -=  np.tile((v2[:,0]-np.mean(data2[i], axis=0))[:,np.newaxis], (1,v2.shape[1]))
@@ -278,7 +278,9 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
     anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
                                frames=frames, interval=166, blit=True, repeat=False)
     if save:
-        anim.save(fname, writer=writer, dpi=300)
+        anim.save(fname, dpi=300)
+        # if gif        
+       # anim.save(fname, writer='imagemagick', dpi=300)
     plt.show()
     
 
@@ -1287,6 +1289,7 @@ def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True) :
        
         bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
                         notch=False, patch_artist=True)
+        plt.boxplot()
         plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \
              linewidth=1, alpha=0.4)
         plt.setp(bp['whiskers'], color=cl, linestyle='-', linewidth=lw, alpha=1.0)    
