@@ -69,7 +69,7 @@ print 'Done reading data.'
 #
 ################################################
 
-fig = plt.figure('Fig - 1 : Neural dynamics in freely moving animals', figsize=(9.5, 6.5))
+fig = plt.figure('Fig1Neural dynamics in freely moving animals', figsize=(9.5, 6.5))
 gsHeatmap = gridspec.GridSpec(6,4,  width_ratios=[1.5, 0.1, 0.5, 0.5], height_ratios = [0.05,0.95,0.1,0.75,0.05, 0.75])
 gsHeatmap.update(left=0.06, right=0.98,  bottom = 0.06, top=0.98, hspace=0.3, wspace=0.75)
 #fig.patch.set_alpha(0.0)
@@ -138,14 +138,14 @@ for letter, loc in zip(letters, locations):
             horizontalalignment='left',verticalalignment='baseline',)
 
 letters = ['E', 'F']
-y0 = 0.28
+y0 = 0.26
 locations = [(0.4,0.55), (0.0,y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
             horizontalalignment='left',verticalalignment='baseline',)
 
 letters = ['G', 'H']
-y0 = 0.28
+y0 = 0.26
 locations = [(0.58,0.55),  (0.52,y0), (0.77,y0)]
 for letter, loc in zip(letters, locations):
     plt.figtext(loc[0], loc[1], letter, weight='semibold', size=18,\
@@ -373,8 +373,9 @@ heatData = data['AML32_immobilized']['input'][immWorm]['Neurons']['ActivityFull'
 order = data['AML32_immobilized']['analysis'][immWorm]['PCA']['neuronOrderPCA']
 #heatmap
 cax1 = plotHeatmap(time, heatData[order], ax=axhm2, vmin=-2, vmax=2)
-axhm2.xaxis.label.set_visible(False)
-axhm2.set_xticks([])
+
+axhm2.set_xlabel('Time (s)')
+#axhm2.set_xticks([])
 # colorbar
 cbar = fig.colorbar(cax1, cax=axcb2, use_gridspec = True)
 cbar.set_ticks([-2,0,2])
@@ -434,6 +435,6 @@ moveAxes(axexpV, 'right', -0.01)
 
 moveAxes(ax13, 'scaley', -0.03)
 moveAxes(ax14, 'scaley', -0.03)
-
+moveAxes(ax8, 'down', 0.02)
 plt.show()
 

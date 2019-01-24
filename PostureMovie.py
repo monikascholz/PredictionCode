@@ -27,7 +27,7 @@ def compareReconstructedWorms(cl, eigenworms, avTrue, thetaTrue,pc3, avP, tP, tP
     cl = ndimage.gaussian_filter1d(cl, 5, 1)
     # transform eigenworms exactly the same way. Otherwise we get some artefacts from nans
     r =(pcsNew[2]**2+pcsNew[1]**2)
-    r = np.repeat(np.median(r), len(r))
+    #r = np.repeat(np.median(r), len(r))
     #lengths = 5
     #=============================================================================#
     # here we reconstruct from the true angular velocity to check the math. This is smoothed, so we need to compare with this version
@@ -212,7 +212,7 @@ for behavior, color, cpred, yl, label, align in zip(['AngleVelocity','Eigenworm3
     
     axscheme1.plot(t, beh+yl, color=color)
     axscheme1.plot(t, behPred+yl, color=cpred)
-    axscheme1.text(t[-1], np.max(yl+behPred), \
+    axscheme1.text(t[-1], np.max(yl+beh)*1.1, \
     r'$R^2 = {:.2f}$'.format(np.float(movingAnalysis[flag][behavior]['scorepredicted'])), horizontalalignment = 'right')
 
 
@@ -229,7 +229,7 @@ axscheme2.grid(color='r', linestyle='-', linewidth=2)
 axscheme2.set_facecolor(N2)
 axscheme1.set_xlim([t[0], t[-1]])
 
-print velocity.shape
-mp.make_animation3(fig, axscheme1,timeActual, axscheme2, cl, clPred+(500,0), frames=test, color = N0, save= 1, fname='crawling.mp4',velocity=velocity)
-# animate wor
+
+mp.make_animation3(fig, axscheme1,timeActual, axscheme2, cl, clPred+(500,0), frames=test, color = N0, save= 1, fname='crawling.mp4',velocity=velocity, reset=50)
+# animate worm
 plt.show()

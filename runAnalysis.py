@@ -13,8 +13,8 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML175' # possible values AML32, AML18, AML70
-condition = 'moving' # Moving, immobilized, chip
+typ = 'AML70' # possible values AML32, AML18, AML70
+condition = 'immobilized' # Moving, immobilized, chip
 first = True # if 0true, create new HDF5 file
 transient = 0
 ###############################################    
@@ -28,7 +28,7 @@ outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
 outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
-dataPars = {'medianWindow':25, # smooth eigenworms with gauss filter of that size, must be odd
+dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
             'gaussWindow':100, # sgauss window for angle velocity derivative. must be odd
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
@@ -43,6 +43,7 @@ dh.saveDictToHDF(outLocData, dataSets)
 resultDict = {}
 for kindex, key in enumerate(keyList):
     resultDict[key] = {}
+    resultDict[key]['pars'] = dataPars
 # analysis parameters
 
 pars ={'nCompPCA':20, # no of PCA components
@@ -88,7 +89,7 @@ if condition != 'immobilized':
     lasso = 1
     elasticnet = 1#True
     predPCA = 1
-    lagregression =0
+    lagregression = 0
 
 
 ###############################################    

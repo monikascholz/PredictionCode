@@ -30,7 +30,7 @@ outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
 dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
-            'gaussWindow':50, # gauss window for angle velocity derivative. Acts on full (50Hz) data
+            'gaussWindow':100, # gauss window for angle velocity derivative. Acts on full (50Hz) data
             'rotate':False, # rotate Eigenworms using previously calculated rotation matrix
             'windowGCamp': 6,  # gauss window for red and green channel
             'interpolateNans': 6,#interpolate gaps smaller than this of nan values in calcium data
@@ -41,7 +41,7 @@ dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = data
 keyList = np.sort(dataSets.keys())
     
 print keyList
-keyList = keyList[0:3]
+keyList = keyList[-1:]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -51,7 +51,7 @@ for kindex, key in enumerate(keyList):
 pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':False, #timewarp so behaviors are equally represented
         'trainingCut': 0.6, # what fraction of data to use for training 
-        'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
+        'trainingType': 'simple', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
@@ -66,7 +66,7 @@ pars ={'nCompPCA':10, # no of PCA components
      }
 
 behaviors = ['AngleVelocity','Eigenworm3']
-#behaviors = ['Eigenworm3']
+behaviors = ['Eigenworm3']
 
 ###############################################    
 # 
@@ -74,12 +74,12 @@ behaviors = ['AngleVelocity','Eigenworm3']
 #
 ##############################################
 createIndicesTest = 1#True 
-overview = 0#False
+overview = 1#False
 predNeur = 0
 predPCA = 0
 bta = 0
 svm = 0
-pca = 0#False
+pca = 1#False
 kato_pca= 0
 half_pca= 0
 hierclust = False
@@ -132,9 +132,9 @@ if overview:
         # cimple scatter of behavior versus neurons
     #mp.plotBehaviorNeuronCorrs(dataSets, keyList, behaviors)
         # heatmaps of neuronal activity ordered by behavior
-    mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
+    #mp.plotBehaviorOrderedNeurons(dataSets, keyList, behaviors)
         # sanity check - CMS velocity, wave velocity and turn variables with ethogram
-    mp.plotVelocityTurns(dataSets, keyList)
+    #mp.plotVelocityTurns(dataSets, keyList)
         # plot neural data, ethogram, behavior and location for each dataset
     mp.plotDataOverview(dataSets, keyList)
         # neuron locations
@@ -379,7 +379,7 @@ if elasticnet:
         resultDict[key]['ElasticNet']['ConversePrediction'] = dr.runLinearModel(dataSets[key], resultDict[key], pars, splits, plot = True, behaviors = ['AngleVelocity', 'Eigenworm3'], fitmethod = 'ElasticNet', subset = subset)
         
     mp.plotLinearModelResults(dataSets, resultDict, keyList, pars, fitmethod='ElasticNet', behaviors = behaviors,random = pars['trainingType'])
-    plt.show(block=True)
+    plt.show()
 
  #%%
 ###############################################    

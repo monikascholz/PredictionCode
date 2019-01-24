@@ -30,11 +30,24 @@ allCenterlines = np.concatenate(allCenterlines)
 print 'Datasets included: ', allCenterlines.shape
 
 # run PCA on the whole dataset
-nComp = 5
+nComp = 3
 pca = PCA(n_components = nComp)
     
 pcs = pca.fit_transform(allCenterlines)
 newEigenworms = pca.components_
+
+hists = []
+print 'radius', np.mean(pcs[:,1]**2 + pcs[:,2]**2)
+for comp in pcs.T:
+    
+    hist, bins = np.histogram(comp, 50, density = True)
+    hists.append(bins[:-1])
+    hists.append(hist)
+hists = np.array(hists)
+np.savetxt('EigenwormProbs.dat', hists)
+plt.show()
+print 'here'
+print 0/0
 
 print 'Explained variance with 2 components: ', np.cumsum(pca.explained_variance_ratio_)[2]
 print 'Explained variance with 4 components: ', np.cumsum(pca.explained_variance_ratio_)[3]

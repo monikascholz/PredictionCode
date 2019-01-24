@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu May 17 13:15:14 2018
-Figure Fig1-S2 - Heatmap examples for moving, immobilized and transition.
+Figure FigS3 - Compare paralyzed v immobilized.
 @author: monika
 """
 import numpy as np
@@ -61,7 +61,7 @@ print 'Done reading data.'
 # create figure 1: This is twice the normal size
 #
 ################################################
-fig = plt.figure('Fig1S7-ParalyzedImmobilizedComp', figsize=(9.5, 9*2/4.))
+fig = plt.figure('S3-ParalyzedImmobilizedComp', figsize=(9.5, 9*2/4.))
 gsHeatmap = gridspec.GridSpec(4,3,  width_ratios=[1, 1, 0.1], height_ratios = [0.1,1,0.1,0.75])
 gsHeatmap.update(left=0.055, right=0.99,  bottom = 0.15, top=0.95, hspace=0.25, wspace=0.35)
 #fig.patch.set_alpha(0.0)

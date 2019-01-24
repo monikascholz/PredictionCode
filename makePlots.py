@@ -200,7 +200,7 @@ def createWorm(x, y):
     b = np.vstack([x,y])-lwidths*e1
     return np.concatenate([a, b[:,::-1]], axis=1).T
         
-def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', velocity = None, save= False, fname='im4.mp4', rx=1000, ry=750):
+def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', velocity = None, save= False, fname='im4.mp4', rx=1000, ry=750, reset = 50):
     """use pythons built-in animation tools to make a centerline animation."""
     if save:
         writer = animation.FFMpegWriter()
@@ -249,7 +249,7 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
             p2.set_xy(Vertices2)
             patch2=ax.add_patch(p2)
             txt.set_text('{} s'.format(i/6))
-            if i%60==0:
+            if (i-reset)%60==0:
                 txt.set_color('r')
             else:
                 txt.set_color('k')
@@ -278,7 +278,7 @@ def make_animation3(fig, ax0, t, ax, data1, data2, frames, color = 'gray', veloc
     anim = animation.FuncAnimation(fig, animate, fargs=[data1, data2],
                                frames=frames, interval=166, blit=True, repeat=False)
     if save:
-        anim.save(fname, dpi=300)
+        anim.save(fname, dpi=299)
         # if gif        
        # anim.save(fname, writer='imagemagick', dpi=300)
     plt.show()

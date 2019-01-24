@@ -64,10 +64,10 @@ for typ in ['Special', 'AML32', 'AML18', 'AML175', 'AML70']:
             idn = '{}_{}'.format(typ, condition)
             
             for ki, key in enumerate(keyList):
-                #if idn!='AML70_moving':
-                #    print "{}, {},{}, {}, {}, {}, {}, {}".format(conditions[condition],typ, key, strains[typ],bg[typ], plate[condition],  int(dataSets[key]['Neurons']['Activity'].shape[1]/6./60.),dataSets[key]['Neurons']['Activity'].shape[0])
-                if idn == 'AML32_moving' and ki==0:
-                    print dump_keys(results[key])
+                if idn!='AML70_moving':
+                    print "{}, {},{}, {}, {}, {}, {}, {}".format(conditions[condition],typ, key, strains[typ],bg[typ], plate[condition],  int(dataSets[key]['Neurons']['Activity'].shape[1]/6./60.),dataSets[key]['Neurons']['Activity'].shape[0])
+                #if idn == 'AML32_moving' and ki==0:
+                #    print dump_keys(results[key])
                     
                     #pprint.pprint(dataSets[key], depth=1)
         except IOError:

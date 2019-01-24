@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu May 17 13:15:14 2018
-Figure 3 - Sparse linear model predicts behavior
+Figure S... unexpected neuron candidates.
 @author: monika
 """
 import numpy as np
@@ -93,11 +93,11 @@ movingAML32 ='BrainScanner20180709_100433'
 moving = data['AML32_moving']['input'][movingAML32]
 movingAnalysis = data['AML32_moving']['analysis'][movingAML32]
 # negative bends are ventral for this worm
-fig = plt.figure('Fig - S3 : Neuron locations and overlap', figsize=(4.5, 1.5*2.25))
+fig = plt.figure('S10_Neuron locations and overlap', figsize=(4.5, 1.75*2.25))
 #fig.patch.set_alpha(0.0)
 # this gridspec makes one example plot of a heatmap with its PCA
 gs1 = gridspec.GridSpec(2, 2, width_ratios = [2,1])
-gs1.update(left=0.08, right=0.99, wspace=0.45, bottom = 0.01, top=0.98, hspace=0.2)
+gs1.update(left=0.08, right=0.99, wspace=0.45, bottom = 0.03, top=0.95, hspace=0.2)
 
 #motionNeurons = ['AVA', 'ASI', 'AIY','AIB','AIA','AIZ','AVD', 'RIM', 'SMB', 'RMD', 'SMD', 'RIV']
 
@@ -125,7 +125,7 @@ for letter, loc in zip(letters, locations):
 ################################################
 
 # plot projections of neurons
-s0,s1,s2 = 25,25,50 # size of gray, red, blue neurons
+s0,s1,s2 = 25,25,30 # size of gray, red, blue neurons
 dim = False
 flag = 'ElasticNet'
 markers = ['p', '^', '*', 'X', '+', '8', 's', '3', '>']
@@ -168,7 +168,7 @@ keeping_track = []
 special = []
 index = 1
 bestGuess = []
-ventral = [1,1,1,-1,1,-1]
+ventral = [1,1,1,-1,1,1, 1]
 for key, marker in zip(['AML32_moving', 'AML70_chip'],['o', "^"]):
     dset = data[key]['input']
     res = data[key]['analysis']
@@ -230,8 +230,11 @@ av = np.where(np.abs(special[0])>np.percentile(np.abs(special[0]),[0]))[0]
 t = np.where(np.abs(special[1])>np.percentile(np.abs(special[1]), [0]))[0]
 
 # show atlas in lower plots
-axweight4.scatter(A[:,0],A[:,1],color=N0, s = s2, alpha=0.25, zorder=-100)#,clip_on=False)
-axweight3.scatter(A[:,0],A[:,1],color=N0, s = s2, alpha=0.25, zorder=-100)#,clip_on=False)
+# show atlas in lower plots -- only non-weighted points
+nonWav = np.setdiff1d(AtlasLocs, AtlasLocs[av])
+nonWt = np.setdiff1d(AtlasLocs, AtlasLocs[t])
+axweight3.scatter(A[nonWav,0],A[nonWav,1],color=N2, s = s2, zorder=-100)#,clip_on=False)
+axweight4.scatter(A[nonWt,0],A[nonWt,1],color=N2, s = s2, zorder=-100)#,clip_on=False)
 
 
 # name the most common neurons - find most common and set to zero to find next
@@ -243,7 +246,7 @@ tLabels = labels[AtlasLocs[av]]
 dAV = Counter(np.ravel(AtlasLocs[av]))
 dT = Counter(np.ravel(AtlasLocs[t]))
 
-c = 30
+c = 40
 for dic in [dAV, dT]:
     for i in range(c):
         v=list(dic.values())
@@ -255,11 +258,64 @@ for dic in [dAV, dT]:
         print 'Rank',i, maxV, max(v), labels[maxV]
 #        axweight3.scatter(A[AtlasLocs[av],0], A[AtlasLocs[av],1],marker = 'o',s=nMax, color=R1, alpha=alphaScatter)
 
-## show all weighted labels on the atlas plots
-alphaScatter = 0.3
-axweight3.scatter(A[AtlasLocs[av],0], A[AtlasLocs[av],1],marker = 'o', s=s2,color=R1, alpha=alphaScatter)
-alphaScatter = 0.25
-axweight4.scatter(A[AtlasLocs[t],0], A[AtlasLocs[t],1],marker = 'o', s=s2,color=B1, alpha=alphaScatter)
+###############################################################################
+#        
+### plot with weight proportional to occurance
+###############################################################################
+# recalculate these, we modified the entries above
+        # total datasets
+nDatasets = len(np.unique(keeping_track))
+dAV = Counter(np.ravel(AtlasLocs[av]))
+maxRank = 1.0*np.max(dAV.values())
+legValues, legAlphas = [],[]
+for key in dAV.keys():
+    # key is a neural ID
+    # value is the number of occurences
+    alphaScatter = dAV[key]/maxRank
+    # store this to use in legend
+    legValues.append(dAV[key])
+    legAlphas.append(alphaScatter)
+    axweight3.scatter(A[key,0], A[key,1],marker = 'o', s=s2,color=R1cm(alphaScatter))
+    
+# make a legend for the scatter plot
+from matplotlib.lines import Line2D
+leglabels = ['N={}'.format(n) for n in np.unique(legValues)]
+alphas = np.unique(legAlphas)
+# for AV
+legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
+                          markerfacecolor=R1, alpha =alphas[i]) for i in range(len(alphas))]
+# Create empty plot with blank marker containing the extra label for total N
+line= Line2D([0], [0], marker='None', linewidth = 0, label="out of {}".format(int(nDatasets)))
+legend_elements.append(line)
+leg = axweight3.legend(handles=legend_elements,  fontsize=fs, frameon = True,handletextpad =0, markerscale = 1.5,numpoints=1,\
+borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.25, 0.5, 0.5), ncol=1)
+
+###############################################################################
+# 
+### plot with weight proportional to occurance
+###############################################################################
+dT = Counter(np.ravel(AtlasLocs[t]))
+maxRank = 1.0*np.max(dT.values())
+legValues, legAlphas = [],[]
+for key in dT.keys():
+    # key is a neural ID
+    # value is the number of occurences
+    alphaScatter = dT[key]/maxRank
+    # store this to use in legend
+    legValues.append(dT[key])
+    legAlphas.append(alphaScatter)
+    axweight4.scatter(A[key,0], A[key,1],marker = 'o', s=s2,color=B1cm(alphaScatter))
+# make a legend for the scatter plot
+leglabels = ['N={}'.format(n) for n in np.unique(legValues)]
+alphas = np.unique(legAlphas)
+# for AV
+legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
+                          markerfacecolor=B1, alpha =alphas[i]) for i in range(len(alphas))]
+# Create empty plot with blank marker containing the extra label for total N
+line= Line2D([0], [0], marker='None', linewidth = 0, label="out of {}".format(int(nDatasets)))
+legend_elements.append(line)
+leg = axweight4.legend(handles=legend_elements,  fontsize=fs, frameon = True,handletextpad =0, markerscale = 1.5,numpoints=1,\
+borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.25, 0.5, 0.5))
 
 l = 28
 # put only interesting neurons
@@ -304,7 +360,7 @@ for loc in dT:
 for ax in [axweight3, axweight4]:
     moveAxes(ax, 'scale', 0.05)
     #moveAxes(ax, 'down', 0.04)
-    ax.set_xlim([-90, 136])
+    ax.set_xlim([-90, 156])
     ax.set_ylim([-45, 35])
     cleanAxes(ax)
     moveAxes(ax, 'left', 0.03)
@@ -312,7 +368,7 @@ for ax in [axweight3, axweight4]:
 
 # add orientation bars
 length=12
-xmin, ymin = axweight4.get_xlim()[1]-1.5*length, axweight4.get_ylim()[1]#-length
+xmin, ymin = axweight4.get_xlim()[0]+1.5*length, axweight4.get_ylim()[1]#-length
 xmax, ymax = xmin+length, ymin+length
 
 xmid, ymid = np.mean([xmin, xmax]), np.mean([ymin, ymax])
@@ -324,18 +380,18 @@ axweight4.text(xmid, ymax, 'V', horizontalalignment = 'center', verticalalignmen
 axweight4.text(xmin, ymid, 'A', horizontalalignment = 'right', verticalalignment ='center', color=N0, fontsize=fs)
 axweight4.text(xmax, ymid, 'P', horizontalalignment = 'left', verticalalignment ='center', color=N0, fontsize=fs)
 
-# make a legend for the scatter plot
-from matplotlib.lines import Line2D
-leglabels = ['N = 1', 'N = 2', 'N = 3', r'N $\geq$ 4']
-alphas = [alphaScatter,alphaScatter*2, alphaScatter*3, alphaScatter*4]
-legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
-                          markerfacecolor=R1, alpha =alphas[i]) for i in range(4)]
-leg = axweight3.legend(handles=legend_elements,  fontsize=fs, frameon = True,handletextpad =0, markerscale = 1.5,numpoints=1,\
-borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.29, 0.5, 0.5))
-legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
-                          markerfacecolor=B1, alpha =alphas[i]) for i in range(4)]
-leg = axweight4.legend(handles=legend_elements, loc=4, fontsize=fs, frameon = True, handletextpad =0, markerscale = 1.5,numpoints=1,\
-borderaxespad=0, borderpad = 0.2)
+## make a legend for the scatter plot
+#from matplotlib.lines import Line2D
+#leglabels = ['N = 1', 'N = 2', 'N = 3', r'N $\geq$ 4']
+#alphas = [alphaScatter,alphaScatter*2, alphaScatter*3, alphaScatter*4]
+#legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
+#                          markerfacecolor=R1, alpha =alphas[i]) for i in range(4)]
+#leg = axweight3.legend(handles=legend_elements,  fontsize=fs, frameon = True,handletextpad =0, markerscale = 1.5,numpoints=1,\
+#borderaxespad=0, borderpad = 0.2, bbox_to_anchor=(0.5, 0.29, 0.5, 0.5))
+#legend_elements = [Line2D([0], [0], marker='o', color='w', label=leglabels[i],
+#                          markerfacecolor=B1, alpha =alphas[i]) for i in range(4)]
+#leg = axweight4.legend(handles=legend_elements, loc=4, fontsize=fs, frameon = True, handletextpad =0, markerscale = 1.5,numpoints=1,\
+#borderaxespad=0, borderpad = 0.2)
 
 plt.show()
 

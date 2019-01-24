@@ -23,11 +23,12 @@ from sklearn.decomposition import PCA,  FastICA
 
 def recrWorm(av, turns, thetaTrue, r, show = 0):
     """recalculate eigenworm prefactor from angular velocity and turns."""
-    thetaCum = np.cumsum(av)
-    # reset theta every minute to real value   
-    dt = np.arange(0, len(thetaCum), 60)
+    thetaCum = np.cumsum(np.copy(av)/6.) # division due to rate: it's velocity per secod instread of per volume
+    # reset theta every minute to real value
+    dt = np.arange(50, len(thetaCum), 60)
     for tt in dt:    
         thetaCum[tt:] -= -thetaTrue[tt]+thetaCum[tt]
+    
     radius = np.zeros(len(av)) 
     for tt in dt:
         radius[tt:] = r[tt]
@@ -48,10 +49,10 @@ def recrWorm(av, turns, thetaTrue, r, show = 0):
     if show:
         plt.figure('Real and reconstructed phase angle')
         plt.subplot(221)
-        #plt.plot(thetaCum, label = 'reconstructed')
-        #plt.plot(thetaTrue, label = 'real')
+        plt.plot(thetaCum, label = 'reconstructed')
+        plt.plot(thetaTrue, label = 'real')
         
-        plt.scatter(thetaCum,thetaTrue, label = 'reconstructed')
+        #plt.scatter(thetaCum,thetaTrue, label = 'reconstructed')
         #plt.plot(thetaTrue, label = 'real')
         plt.ylabel('Accumulated phase angle')
         plt.legend()
@@ -71,7 +72,7 @@ def recrWorm(av, turns, thetaTrue, r, show = 0):
         plt.ylabel('Phase angle (rad)')
         plt.xlabel('reconstructed Phase angle (rad)')
         plt.tight_layout()
-        plt.show()
+        plt.show(block=True)
     # recalculate eigenworms
     x = -np.sqrt(r)*np.tan(sign*theta)/np.sqrt((np.tan(sign*theta)**2+1))
     y = -sign*np.sqrt(r-x**2)
@@ -261,7 +262,6 @@ def transformEigenworms(pcs, dataPars):
         pcs[pcindex] = pc
         
     theta = np.unwrap(np.arctan2(pcs[2], pcs[1]))
-    
     # convolution with gaussian kernel derivative
     velo = gaussian_filter1d(theta, dataPars['gaussWindow'], order=1)
     # velo is in radians/frame
@@ -372,7 +372,7 @@ def loadData(folder, dataPars, ew=1):
 
     velo = velo[clIndices]*50. # to get it in per Volume units -> This is radians per sec
     
-    theta = theta[clIndices]
+    theta = theta[clIndices] # get it in per seconds
     cl = clFull[clIndices]
     # ethogram redone
     etho = makeEthogram(velo, pc3)

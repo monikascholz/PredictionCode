@@ -16,7 +16,11 @@ from scipy.ndimage.filters import gaussian_filter1d
 # define colors
 #
 ################################################
-mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
+#mpl.rc('font', **{'sans-serif' : 'FiraSans','family' : 'sans-serif'})
+mpl.rcParams['font.family'] = 'sans-serif'
+mpl.rcParams['font.sans-serif'] = 'Deja Vu'#'Fira Sans'
+#mpl.rcParams['font.weight'] = 'regular'
+#mpl.rcParams['figure.titleweight'] = 'medium'
 mpl.rc('text.latex', preamble='\usepackage{sfmath}')
 mpl.rcParams['image.cmap'] = 'viridis'
 
@@ -73,6 +77,9 @@ ethobounds=[-1,0,1,2, 3]
 ethonorm = mpl.colors.BoundaryNorm(ethobounds, ethocmap.N)
 colDict = {-1:R1, 0: N1, 1:L3, 2:B1}
 labelDict = {-1:'Rev',0:'Pause',1:'Fwd',2:'Turn'}
+
+R1cm = mpl.colors.LinearSegmentedColormap.from_list("", ["white", mpl.colors.to_rgb(R1)])
+B1cm = mpl.colors.LinearSegmentedColormap.from_list("", ["white", mpl.colors.to_rgb(B1)])
 #=============================================================================#
 #                           moving axes
 #=============================================================================#
@@ -235,7 +242,6 @@ def mkStyledBoxplot(ax, x_data, y_data, clrs, lbls, scatter = True, rotate=True,
         dx = np.min(np.diff(x_data))
     lw = 1.5
     for xd, yd, cl in zip(x_data, y_data, clrs) :
-       
         bp = ax.boxplot(yd, positions=[xd], widths = 0.2*dx, \
                         notch=False, patch_artist=True)
         plt.setp(bp['boxes'], edgecolor=cl, facecolor=cl, \

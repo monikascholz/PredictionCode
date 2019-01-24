@@ -181,7 +181,7 @@ gsEWs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs1[3,0], wspace=0.1
 ax7 = plt.subplot(gsEWs[0,0])
 # XXXX factor 6 for angle v
 alphaBeh = 0.7
-ax7.plot(timeActual, moving['Behavior']['AngleVelocity']*6, color = R1, alpha=alphaBeh)
+ax7.plot(timeActual, moving['Behavior']['AngleVelocity'], color = R1, alpha=alphaBeh)
 # draw a box for the testset
 ax7.axvspan(timeActual[test[0]], timeActual[test[-1]], color=N2, zorder=-10, alpha=0.75)
 ax7.axhline(color='k', linestyle = '--', zorder=-1)
@@ -333,9 +333,9 @@ flag='ElasticNet'
 #gsLasso = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gsPred[2,:])#, width_ratios=[2,1], height_ratios=[2,1])
 # offset for turn plots
 toffset = 5
-hr = 10
+hr = 20
 # double for broken axis
-gsLasso = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsPred[1,:], height_ratios=[hr,1])#, width_ratios=[2,1], height_ratios=[2,1])
+gsLasso = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gsPred[1,:], height_ratios=[hr/2,1])#, width_ratios=[2,1], height_ratios=[2,1])
 axV = plt.subplot(gsLasso[0])
 axVb = plt.subplot(gsLasso[1],zorder=-10, fc='none')
 #axT = plt.subplot(gsLasso[0])
@@ -449,10 +449,10 @@ print 'EN r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,0], axi
 print 'single r2 (mean velocity, mean turns), (sem, sem)', np.mean(gcamp[:,:,1], axis=1), np.std(gcamp[:,1], axis=1)/np.sqrt(len(gcamp[0])), len(gcamp[0])
 print 'GFP r2 (mean velocity, mean turns), (sem, sem)', np.mean(gfp[:,:,0], axis=1), np.std(gfp[:,0], axis=1)/np.sqrt(len(gfp[0])), len(gfp[0])
 print "Results from all linear models -- medians"
-print 'PCA r2 (mean velocity, mean turns), (sem, sem)', np.median(pca, axis=1), 
-print 'EN r2 (mean velocity, mean turns), (sem, sem)', np.median(gcamp[:,:,0], axis=1), 
-print 'single r2 (mean velocity, mean turns), (sem, sem)', np.median(gcamp[:,:,1], axis=1)
-print 'GFP r2 (mean velocity, mean turns), (sem, sem)', np.median(gfp[:,:,0], axis=1)
+print 'PCA r2 (med velocity, med turns)', np.median(pca, axis=1), 
+print 'EN r2 (med velocity, med turns)', np.median(gcamp[:,:,0], axis=1), 
+print 'single r2 (med velocity, med turns)', np.median(gcamp[:,:,1], axis=1)
+print 'GFP r2 (med velocity, med turns)', np.median(gfp[:,:,0], axis=1)
 
 # now boxplot for gfp
 x0 = 2.25
@@ -463,7 +463,8 @@ axVb.set_xlim([-1.75,8])
 axV.axhline(color='k', linestyle=':')
 # broken axis stuff
 axV.set_ylim([-0.6,axV.get_ylim()[-1]])
-axVb.set_ylim([-4,-2])
+axVb.set_ylim([-5,-3])
+axVb.set_yticks([-5,-3])
 # remove labels and spines
 axV.spines['bottom'].set_visible(False)
 axV.set_xticks([])
