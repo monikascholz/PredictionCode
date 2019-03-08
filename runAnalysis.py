@@ -13,10 +13,11 @@ import dimReduction as dr
 #    run parameters
 #
 ###############################################
-typ = 'AML70' # possible values AML32, AML18, AML70
-condition = 'immobilized' # Moving, immobilized, chip
+typ = 'AML32' # possible values AML32, AML18, AML70
+condition = 'moving' # Moving, immobilized, chip
 first = True # if 0true, create new HDF5 file
 transient = 0
+save = False
 ###############################################    
 # 
 #    load data into dictionary
@@ -37,7 +38,8 @@ dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that siz
 
 dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars)
 keyList = np.sort(dataSets.keys())
-dh.saveDictToHDF(outLocData, dataSets)
+if save:
+    dh.saveDictToHDF(outLocData, dataSets)
 
 ## results dictionary 
 resultDict = {}
@@ -326,4 +328,5 @@ if lagregression:
 # save data as HDF5 file
 #
 ##############################################
-dh.saveDictToHDF(outLoc, resultDict)
+if save:
+    dh.saveDictToHDF(outLoc, resultDict)

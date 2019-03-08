@@ -123,7 +123,8 @@ a = 0.4
 behaviors = ['AngleVelocity', 'Eigenworm3']
 flag = 'ElasticNet'
 colors = [R1, B1]
-alphaFit = [np.logspace(-4,-1,200), np.logspace(-2.5,-0.5,200)]
+alphaFit = [np.logspace(-4,-1,20), np.logspace(-2.5,-0.5,20)]
+
 for i in range(2):
     scores = []
     weights = []
@@ -164,12 +165,14 @@ for i in range(2):
             alph = alphaFit[i]
             alphaStar.append(alpha)
             Ntotal.append(1.0*len(dset[flag][behaviors[i]]['weights']))
+            
 #            fold = TimeSeriesSplit(n_splits=5, max_train_size=None)
 #            reg = ElasticNetCV(l1, cv=fold, verbose=0, selection='random', alphas=alph, tol = 1e-10)      
 #            reg.fit(X[train], y[train])
 #            scorepred = reg.score(X[test], y[test])
 #            score = reg.score(X[train], y[train])
 #            print scorepred, len(reg.coef_[np.abs(reg.coef_)>0])
+            weightDistro = []
             for alpha in alph:
                 reg = ElasticNet(alpha=alpha, l1_ratio = l1)                
                 #reg = ElasticNetCV(l1, cv=fold, verbose=0, selection='random', alphas=[alpha])      
@@ -181,6 +184,11 @@ for i in range(2):
                 s.append(scorepred)
                 w.append(len(reg.coef_[np.abs(reg.coef_)>0]))
                 
+                weightDistro.append(reg.coef_)
+            plt.figure()
+            plt.imshow(np.array(weightDistro))
+            plt.show()
+            weightDistro
             weights.append(w)
             scores.append(s)
             alphas.append(alph)

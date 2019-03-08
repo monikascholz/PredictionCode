@@ -15,7 +15,7 @@ mpl.rcParams['interactive']  = False
 #    run parameters
 #
 ###############################################
-typ = 'AML32' # possible values AML32, AML18, AML70
+typ = 'AML18' # possible values AML32, AML18, AML70
 condition = 'moving'# # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
@@ -37,11 +37,12 @@ dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that siz
             }
 
 
-dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, dataPars = dataPars, nDatasets = None)
+dataSets = dh.loadMultipleDatasets(dataLog, pathTemplate=folder, 
+                                   dataPars = dataPars, nDatasets = 2)
 keyList = np.sort(dataSets.keys())
     
 print keyList
-keyList = keyList[-1:]
+keyList = keyList[:]
 # results dictionary 
 resultDict = {}
 for kindex, key in enumerate(keyList):
@@ -51,7 +52,7 @@ for kindex, key in enumerate(keyList):
 pars ={'nCompPCA':10, # no of PCA components
         'PCAtimewarp':False, #timewarp so behaviors are equally represented
         'trainingCut': 0.6, # what fraction of data to use for training 
-        'trainingType': 'simple', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
+        'trainingType': 'middle', # simple, random or middle.select random or consecutive data for training. Middle is a testset in the middle
         'linReg': 'simple', # ordinary or ransac least squares
         'trainingSample': 1, # take only samples that are at least n apart to have independence. 4sec = gcamp_=->24 apart
         'useRank': 0, # use the rank transformed version of neural data for all analyses
@@ -66,7 +67,7 @@ pars ={'nCompPCA':10, # no of PCA components
      }
 
 behaviors = ['AngleVelocity','Eigenworm3']
-behaviors = ['Eigenworm3']
+#behaviors = ['Eigenworm3']
 
 ###############################################    
 # 
