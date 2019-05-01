@@ -15,12 +15,10 @@ import matplotlib.gridspec as gridspec
 from  sklearn.metrics.pairwise import pairwise_distances
 #from matplotlib_venn import venn2
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster, set_link_color_palette
-import makePlots as mp
-import dataHandler as dh
-import dimReduction as dr
+import prediction.dataHandler as dh
 
-from stylesheet import *
-from pycpd import deformable_registration, rigid_registration
+from prediction.stylesheet import *
+from prediction.pycpd import deformable_registration, rigid_registration
 
 
 # suddenly this isn't imported from stylesheet anymore...
@@ -56,10 +54,10 @@ def registerWorms(R, X, dim=3, nr = True):
 data = {}
 for typ in ['AML32', 'AML18', 'AML70', 'AML175']:
     for condition in ['moving', 'chip']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets
@@ -283,7 +281,7 @@ Xref = np.copy(moving['Neurons']['Positions'].T)
 Xref -= np.mean(Xref,axis=0)
 Xref[:,1] = Xref[:,1]
 # load atlas data
-neuron2D = 'utility/celegans277positionsKaiser.csv'
+neuron2D = '../../utility/celegans277positionsKaiser.csv'
 labels = np.loadtxt(neuron2D, delimiter=',', usecols=(0), dtype=str)
 neuronAtlas2D = np.loadtxt(neuron2D, delimiter=',', usecols=(1,2))
 relevantIds = (neuronAtlas2D[:,0]>-0.1)#*(neuronAtlas2D[:,0]<0.15)

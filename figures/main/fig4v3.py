@@ -21,10 +21,9 @@ from scipy.special import erf
 from scipy.stats import pearsonr
 #
 
-import makePlots as mp
-import dataHandler as dh
+import prediction.dataHandler as dh
 
-from stylesheet import *
+from prediction.stylesheet import *
 # stats
 from sklearn.metrics import r2_score,mean_squared_error
 from scipy.interpolate import UnivariateSpline
@@ -94,10 +93,10 @@ def main():
     data = {}
     for typ in ['AML32', 'AML70']:
         for condition in ['moving', 'chip']:# ['moving', 'immobilized', 'chip']:
-            folder = '{}_{}/'.format(typ, condition)
-            dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-            outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-            outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+            folder = '../../{}_{}/'.format(typ, condition)
+            dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+            outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+            outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
             
             try:
                 # load multiple datasets
@@ -182,9 +181,9 @@ def main():
     #=============================================================================#
     #                           # load eigenworms
     #=============================================================================#
-    eigenwormsFull = dh.loadEigenBasis(filename='utility/Eigenworms.dat', nComp=7, new = True)
+    eigenwormsFull = dh.loadEigenBasis(filename='../../utility/Eigenworms.dat', nComp=7, new = True)
     eigenwormsFull= dh.resize(eigenwormsFull, (7,100))
-    eigenworms = dh.loadEigenBasis(filename='utility/Eigenworms.dat', nComp=3, new = True)    
+    eigenworms = dh.loadEigenBasis(filename='../../utility/Eigenworms.dat', nComp=3, new = True)    
     
     
     pc1, pc2, pc3, avTrue, thetaTrue = moving['Behavior']['Eigenworm1'],moving['Behavior']['Eigenworm2'],\
@@ -343,25 +342,25 @@ def main():
     resets = np.where((test-offsetReset)%60==0)[0]
     #print t[np.where((test-offsetReset)%60==0)[0]]
     print resets
-    plt.figure()
-    offsetx = 450
-    for li, l in enumerate(resets):
-        if np.mean(mse[test][l:l+30]) <50:
-            print l, np.mean(mse[test][l:l+30]), np.mean(mse2[test][l:l+30])
-            samplePost =test[l:l+66:6]
-            
-            for cindex, cline in enumerate(cl2[samplePost]):
-                x,y = cline[:,0], cline[:,1]
-                x -=np.mean(x)-offsetx*cindex
-                y -=np.mean(y)+li*offsetx 
-                plt.plot(x, y, 'r')
-            for cindex, cline in enumerate(clPred[samplePost]):
-                x,y = cline[:,0], cline[:,1]
-                x -=np.mean(x)-offsetx*cindex
-                y -=np.mean(y)+li*offsetx
-                plt.plot(x, y, 'k')
-            plt.text(0, li*offsetx, li)
-    plt.show()
+#    plt.figure()
+#    offsetx = 450
+#    for li, l in enumerate(resets):
+#        if np.mean(mse[test][l:l+30]) <50:
+#            print l, np.mean(mse[test][l:l+30]), np.mean(mse2[test][l:l+30])
+#            samplePost =test[l:l+66:6]
+#            
+#            for cindex, cline in enumerate(cl2[samplePost]):
+#                x,y = cline[:,0], cline[:,1]
+#                x -=np.mean(x)-offsetx*cindex
+#                y -=np.mean(y)+li*offsetx 
+#                plt.plot(x, y, 'r')
+#            for cindex, cline in enumerate(clPred[samplePost]):
+#                x,y = cline[:,0], cline[:,1]
+#                x -=np.mean(x)-offsetx*cindex
+#                y -=np.mean(y)+li*offsetx
+#                plt.plot(x, y, 'k')
+#            plt.text(0, li*offsetx, li)
+#    plt.show()
             #ax.plot(x, y)
     # plot predicted behaviors and location of postures
     #ybeh = [10, 15]

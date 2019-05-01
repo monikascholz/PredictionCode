@@ -7,7 +7,7 @@ test ratiometric versus ICA for some toy data.
 import numpy as np
 import matplotlib.pylab as plt
 from sklearn.decomposition import FastICA
-from stylesheet import *
+from prediction.stylesheet import *
 import matplotlib.gridspec as gridspec
 #####################################
 fig = plt.figure('FigICA', figsize=(9.5, 7.5))

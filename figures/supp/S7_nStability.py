@@ -14,9 +14,9 @@ import matplotlib.gridspec as gridspec
 from scipy.ndimage.filters import gaussian_filter1d
 #
 #import makePlots as mp
-import dataHandler as dh
+import prediction.dataHandler as dh
 # deliberate import all!
-from stylesheet import *
+from prediction.stylesheet import *
 
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 
@@ -76,10 +76,10 @@ fs = mpl.rcParams["font.size"]
 data = {}
 for typ in ['AML32', 'AML70']:
     for condition in ['moving', 'chip']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets
@@ -115,7 +115,7 @@ for letter, loc in zip(letters, locations):
 
 ax2 = plt.subplot(gs1[2,0])
 ax3 = plt.subplot(gs1[2,1])
-plt.show()
+
 ####################
 # get lagged r2s
 #########################
@@ -185,10 +185,11 @@ for i in range(2):
                 w.append(len(reg.coef_[np.abs(reg.coef_)>0]))
                 
                 weightDistro.append(reg.coef_)
-            plt.figure()
-            plt.imshow(np.array(weightDistro))
-            plt.show()
-            weightDistro
+            # show weight dirctibution as a function of alpha
+#            plt.figure()
+#            plt.imshow(np.array(weightDistro))
+#            plt.show()
+#            weightDistro
             weights.append(w)
             scores.append(s)
             alphas.append(alph)
@@ -199,7 +200,7 @@ for i in range(2):
     # scan across alphas
     ax.plot(alphas.T, scores.T, color=colors[i])
     ax1.plot(alphas.T, weights.T, color = colors[i])
-    plt.show()
+    
     
     # calculate confidence boundaries
     for j in range(len(scores)):

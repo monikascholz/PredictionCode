@@ -16,9 +16,9 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.ndimage.filters import gaussian_filter1d
 import matplotlib.ticker as mtick
-import dataHandler as dh
+import prediction.dataHandler as dh
 # deliberate import all!
-from stylesheet import *
+from prediction.stylesheet import *
 
 # suddenly this isn't imported from stylesheet anymore...
 mpl.rcParams["axes.labelsize"] = 14
@@ -35,10 +35,10 @@ fs = mpl.rcParams["font.size"]
 data = {}
 for typ in ['AML32',  'Special']:
     for condition in ['immobilized', 'transition']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets

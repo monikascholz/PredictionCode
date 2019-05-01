@@ -14,7 +14,7 @@ import matplotlib as mpl
 
 # deliberate import all!
 
-from stylesheet import *
+from prediction.stylesheet import *
 #mpl.rcParams["xtick.labelsize"] =18
 #import matplotlib.animation as animation
 #import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 
 #import singlePanels as sp
 #import makePlots as mp
-import dataHandler as dh
+import prediction.dataHandler as dh
 
 # suddenly this isn't imported from stylesheet anymore...
 mpl.rcParams["axes.labelsize"] = 14

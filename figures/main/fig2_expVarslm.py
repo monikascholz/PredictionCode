@@ -13,9 +13,9 @@ import matplotlib.gridspec as gridspec
 from scipy.ndimage.filters import gaussian_filter1d
 #
 #import makePlots as mp
-import dataHandler as dh
+from prediction import dataHandler as dh
 # deliberate import all!
-from stylesheet import *
+from prediction.stylesheet import *
 from scipy.stats import pearsonr
 
 
@@ -34,10 +34,10 @@ fs = mpl.rcParams["font.size"]
 data = {}
 for typ in ['AML32', 'AML18', 'AML175', 'AML70']:
     for condition in ['moving', 'chip']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets
@@ -130,6 +130,7 @@ for key in ['AML32_moving', 'AML70_chip']:
             #w = dset[idn]['PCA']['neuronWeights'][:,0]
             # compare to variance explained pca
             pcaVar = dset[idn]['PCA']['expVariance'][:2]
+            print pcaVar
             # normalize vector
             w = w/np.linalg.norm(w)
             # store variance, total variance
@@ -143,7 +144,7 @@ print gcamp[:,1,0]/gcamp[:,1, 1]
 
 plt.figure(figsize=(3,4))
 ax = plt.subplot(111)
-labels = ['PCA', 'velocity', 'body curvature']
+labels = [r'PC$_1$', 'velocity', 'body curvature']
 mkStyledBoxplot(ax, [0, 1, 2], [gcamp[:,0,2],gcamp[:,0,0]/gcamp[:,0, 1],  gcamp[:,1,0]/gcamp[:,1, 1]], [N0, R1, B1], labels)
 ax.set_ylabel('Variance explained')
 ax.set_xlim([-0.5, 2.25])

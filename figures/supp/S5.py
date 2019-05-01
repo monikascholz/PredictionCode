@@ -11,9 +11,9 @@ from sklearn.feature_selection import mutual_info_classif
 #
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import dataHandler as dh
+import prediction.dataHandler as dh
 # deliberate import all!
-from stylesheet import *
+from prediction.stylesheet import *
 # suddenly this isn't imported from stylesheet anymore...
 mpl.rcParams["axes.labelsize"] = 14
 mpl.rcParams["xtick.labelsize"] = 14
@@ -29,10 +29,10 @@ fs = mpl.rcParams["font.size"]
 data = {}
 for typ in ['AML32', 'AML18', 'AML70', 'AML175']:
     for condition in ['chip', 'moving', 'immobilized']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets

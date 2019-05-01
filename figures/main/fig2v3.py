@@ -13,9 +13,9 @@ import matplotlib.gridspec as gridspec
 from scipy.ndimage.filters import gaussian_filter1d
 #
 #import makePlots as mp
-import dataHandler as dh
+import prediction.dataHandler as dh
 # deliberate import all!
-from stylesheet import *
+from prediction.stylesheet import *
 from scipy.stats import pearsonr
 
 # suddenly this isn't imported from stylesheet anymore...
@@ -33,10 +33,10 @@ fs = mpl.rcParams["font.size"]
 data = {}
 for typ in ['AML32', 'AML18', 'AML175', 'AML70']:
     for condition in ['moving', 'chip']:# ['moving', 'immobilized', 'chip']:
-        folder = '{}_{}/'.format(typ, condition)
-        dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-        outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-        outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+        folder = '../../{}_{}/'.format(typ, condition)
+        dataLog = '../../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+        outLoc = "../../Analysis/{}_{}_results.hdf5".format(typ, condition)
+        outLocData = "../../Analysis/{}_{}.hdf5".format(typ, condition)
         
         try:
             # load multiple datasets
