@@ -16,17 +16,17 @@ mpl.rcParams['interactive']  = False
 #
 ###############################################
 typ = 'AML32' # possible values AML32, AML18, AML70
-condition = 'moving'# # Moving, immobilized, chip
+condition = 'immobilized'# # Moving, immobilized, chip
 first = True # if true, create new HDF5 file
 ###############################################    
 # 
 #    load data into dictionary
 #
 ##############################################
-folder = '{}_{}/'.format(typ, condition)
-dataLog = '{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
-outLoc = "Analysis/{}_{}_results.hdf5".format(typ, condition)
-outLocData = "Analysis/{}_{}.hdf5".format(typ, condition)
+folder = '../{}_{}/'.format(typ, condition)
+dataLog = '../{0}_{1}/{0}_{1}_datasets.txt'.format(typ, condition)
+outLoc = "../Analysis/{}_{}_results.hdf5".format(typ, condition)
+outLocData = "../Analysis/{}_{}.hdf5".format(typ, condition)
 
 # data parameters
 dataPars = {'medianWindow':50, # smooth eigenworms with gauss filter of that size, must be odd
@@ -88,7 +88,7 @@ linreg = False
 periodogram = 0
 nestedvalidation = 0
 lasso = 0
-elasticnet = 1#True
+elasticnet = 0#True
 lagregression = 0
 positionweights = 0#True
 resultsPredictionOverview = 0

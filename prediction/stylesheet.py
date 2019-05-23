@@ -134,7 +134,9 @@ def cleanAxes(ax, where='all'):
     else:
         print 'Command not found. Use "x" or "y" or "all"'
     
-    
+#=============================================================================#
+#                           align subplots to each other
+#=============================================================================#
 def alignAxes(ax1, ax2, where='x'):
     """move axes such that the x or y corners align. Reference is ax1, ax2 gets moved."""
     if where =='xspan':

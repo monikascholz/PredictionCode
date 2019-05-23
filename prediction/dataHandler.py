@@ -362,7 +362,7 @@ def loadData(folder, dataPars, ew=1):
     # get centerlines with full temporal resolution of 50Hz
     clFull, clIndices = loadCenterlines(folder, full=True)
     # load new eigenworms
-    eigenworms = loadEigenBasis(filename = 'utility/Eigenworms.dat', nComp=3, new=True)
+    eigenworms = loadEigenBasis(filename = '../utility/Eigenworms.dat', nComp=3, new=True)
     # get full set of Eigenworms
     pcsFull, meanAngle, lengths, refPoint = calculateEigenwormsFromCL(clFull, eigenworms)
     # do Eigenworm transformations and calculate velocity etc. 
@@ -376,7 +376,7 @@ def loadData(folder, dataPars, ew=1):
     cl = clFull[clIndices]
     # ethogram redone
     etho = makeEthogram(velo, pc3)
-    etho = np.squeeze(ethoOrig)
+    #etho = np.squeeze(ethoOrig)
     # mask nans in ethogram
     ethomask = np.isnan(etho)
     if np.any(ethomask):
